@@ -82,3 +82,12 @@ def test_static_assets_and_vendor_modules_are_served_locally():
     assert "javascript" in orbit_controls.headers["content-type"]
     assert manifest.json()["version"] == "0.180.0"
     assert "https://" not in application_module.text
+
+
+def test_three_entry_relative_dependency_is_served_locally():
+    three_module = client.get("/vendor/three.module.js")
+
+    assert "./three.core.js" in three_module.text
+    three_core = client.get("/vendor/three.core.js")
+    assert three_core.status_code == 200
+    assert "javascript" in three_core.headers["content-type"]

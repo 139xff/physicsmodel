@@ -21,6 +21,16 @@
       }
     },
     {
+      "id": "three-core",
+      "source_url": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.core.js",
+      "local_path": "web/vendor/three.core.js",
+      "sha256": "eb077d2417f61d3e6d9264c317cabc4ea35769ed6b0ab533067292a550784c20",
+      "license": {
+        "spdx": "MIT",
+        "source": "license"
+      }
+    },
+    {
       "id": "orbit-controls",
       "source_url": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js",
       "local_path": "web/vendor/OrbitControls.js",

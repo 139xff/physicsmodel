@@ -9,6 +9,9 @@ PROJECT_ROOT = Path(__file__).parents[1]
 VENDOR_ROOT = PROJECT_ROOT / "web" / "vendor"
 MANIFEST_PATH = VENDOR_ROOT / "manifest.json"
 PINNED_VERSION = "0.180.0"
+RELATIVE_MODULE_SPECIFIER = re.compile(
+    r"""(?:from\s+|import\s*)['"](\./[^'"]+)['"]"""
+)
 
 
 def _sha256(path: Path) -> str:
@@ -34,11 +37,15 @@ def test_manifest_pins_module_sources_hashes_and_mit_license():
     }
 
     modules = {module["id"]: module for module in manifest["modules"]}
-    assert set(modules) == {"three", "orbit-controls"}
+    assert set(modules) == {"three", "three-core", "orbit-controls"}
     assert modules["three"]["source_url"] == (
         f"https://cdn.jsdelivr.net/npm/three@{PINNED_VERSION}/build/three.module.js"
     )
     assert modules["three"]["local_path"] == "web/vendor/three.module.js"
+    assert modules["three-core"]["source_url"] == (
+        f"https://cdn.jsdelivr.net/npm/three@{PINNED_VERSION}/build/three.core.js"
+    )
+    assert modules["three-core"]["local_path"] == "web/vendor/three.core.js"
     assert modules["orbit-controls"]["source_url"] == (
         f"https://cdn.jsdelivr.net/npm/three@{PINNED_VERSION}/examples/jsm/controls/OrbitControls.js"
     )
@@ -63,11 +70,28 @@ def test_browser_module_resolution_remains_local_and_offline_capable():
     assert "cdn.jsdelivr.net" not in application_js
 
 
+def test_manifest_covers_the_relative_es_module_dependency_graph():
+    modules = _manifest()["modules"]
+    module_paths = {module["local_path"] for module in modules}
+
+    for module in modules:
+        local_path = PROJECT_ROOT / module["local_path"]
+        if local_path.suffix != ".js":
+            continue
+        contents = local_path.read_text(encoding="utf-8")
+        for specifier in RELATIVE_MODULE_SPECIFIER.findall(contents):
+            dependency_path = (local_path.parent / specifier).resolve()
+            dependency_manifest_path = dependency_path.relative_to(PROJECT_ROOT).as_posix()
+            assert dependency_manifest_path in module_paths
+            assert dependency_path.is_file()
+
+
 def test_vendor_git_attributes_preserve_the_hashed_upstream_bytes():
     attributes = (VENDOR_ROOT / ".gitattributes").read_text(encoding="ascii")
 
     assert "*.js -text" in attributes
     assert "*.txt -text" in attributes
+    assert "three.core.js whitespace=-space-before-tab" in attributes
 
 
 def test_vendor_script_verifies_the_checked_in_runtime_without_network_downloads():
@@ -80,4 +104,4 @@ def test_vendor_script_verifies_the_checked_in_runtime_without_network_downloads
     )
 
     assert result.returncode == 0, result.stderr
-    assert "Verified Three.js 0.180.0 vendor assets (2 modules and MIT license)." in result.stdout
+    assert "Verified Three.js 0.180.0 vendor assets (3 modules and MIT license)." in result.stdout

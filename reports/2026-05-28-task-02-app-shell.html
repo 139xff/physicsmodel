@@ -29,26 +29,26 @@
     <header>
       <h1>Task 02: FastAPI shell, static workspace, and vendored browser runtime</h1>
       <div class="meta">
-        <span class="status">DONE</span>
-        <span>Completed: <time datetime="2026-05-28T01:10:46+08:00">2026-05-28T01:10:46+08:00</time></span>
+        <span class="status">DONE_AFTER_REVIEW_FIX</span>
+        <span>Completed: <time datetime="2026-05-28T01:25:29+08:00">2026-05-28T01:25:29+08:00</time></span>
       </div>
     </header>
     <section>
       <h2>Scope Delivered</h2>
       <ul>
-        <li>A single FastAPI application serves stable /health and /api/config contracts alongside the static browser workspace.</li>
-        <li>A professional Static Electrostatics shell exposes Source Library, Scene Sources, Viewport, Analysis, status, and visible 2D / 3D switch locations while explicitly marking physical behavior as deferred.</li>
-        <li>Pinned Three.js 0.180.0 and OrbitControls ES modules are served locally with an import map, SHA-256 manifest, checked-in MIT source license, offline --verify path, and vendor-local Git attributes preserving hashed upstream bytes.</li>
-        <li>Minimal src-layout package configuration was added because the RED/GREEN transition showed em_workbench could not otherwise be imported through the uv-managed runtime.</li>
-        <li>The report filename uses the current execution date, 2026-05-28; the implementation plan filename retained its original 2026-05-27 planning date.</li>
+        <li>FastAPI serves stable /health and /api/config contracts together with the static workbench in one process.</li>
+        <li>The Static Electrostatics shell exposes the source, viewport, view-switch and analysis regions while clearly deferring solver and interaction behavior.</li>
+        <li>Three.js 0.180.0 is now a closed local runtime graph: three.module.js, its required ./three.core.js dependency, and OrbitControls.js are all pinned, hash-verified and locally served.</li>
+        <li>The vendor workflow records MIT license provenance and preserves upstream asset bytes, including a scoped Git whitespace exception for the upstream three.core.js mixed indentation.</li>
+        <li>This report uses the execution date 2026-05-28; the plan retains its original 2026-05-27 planning date.</li>
       </ul>
     </section>
     <section>
       <h2>Scope Deferred</h2>
       <ul>
-        <li>Typed scene contracts and source editing APIs remain scheduled for Task 3.</li>
-        <li>Electrostatic solving, potential or field values, and computation quality states remain scheduled for Task 4.</li>
-        <li>Functional shared 2D / 3D interaction, Three.js scene rendering, probes, and Playwright browser workflow evidence remain scheduled for Task 5.</li>
+        <li>Typed scene contracts and electrostatic-source editing APIs remain Task 3 scope.</li>
+        <li>Electrostatic solving and field/potential result states remain Task 4 scope.</li>
+        <li>Interactive 2D / 3D scene rendering, probes and Playwright browser evidence remain Task 5 scope.</li>
       </ul>
     </section>
     <section>
@@ -58,10 +58,10 @@
           <caption>Technology choices</caption>
           <thead><tr><th scope="col">Concern</th><th scope="col">Choice</th></tr></thead>
           <tbody>
-        <tr><td>Application server</td><td>FastAPI serving API routes and static HTML/CSS/ES modules in one process</td></tr>
-        <tr><td>Browser surface</td><td>Semantic static HTML and CSS shell with native ES-module bootstrap</td></tr>
-        <tr><td>3D runtime intake</td><td>Three.js 0.180.0 and OrbitControls from fixed jsDelivr npm URLs, served from web/vendor</td></tr>
-        <tr><td>Package import path</td><td>Hatchling editable src/em_workbench installation through uv lock/sync</td></tr>
+        <tr><td>Application server</td><td>FastAPI serving JSON endpoints and static HTML/CSS/ES modules</td></tr>
+        <tr><td>Browser surface</td><td>Native HTML/CSS/ES module shell with a local import map</td></tr>
+        <tr><td>Browser runtime</td><td>Three.js 0.180.0 module graph and OrbitControls vendored from fixed jsDelivr URLs</td></tr>
+        <tr><td>Integrity</td><td>SHA-256 manifest, MIT source license, offline verify mode and hash-stable Git attributes</td></tr>
           </tbody>
         </table>
       </div>
@@ -73,22 +73,23 @@
           <caption>Files changed in this task</caption>
           <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
           <tbody>
-        <tr><td><code>pyproject.toml</code></td><td>Declare the minimal Hatchling src-layout build target needed for uv-managed package imports.</td></tr>
-        <tr><td><code>uv.lock</code></td><td>Record em-workbench as an editable local package after enabling the src layout.</td></tr>
-        <tr><td><code>src/em_workbench/__init__.py</code></td><td>Create the application package boundary and version.</td></tr>
-        <tr><td><code>src/em_workbench/app.py</code></td><td>Provide typed health/config endpoints and static workspace mounting.</td></tr>
-        <tr><td><code>scripts/vendor_frontend.py</code></td><td>Download or offline-verify pinned browser modules, hashes, license, and manifest.</td></tr>
-        <tr><td><code>web/index.html</code></td><td>Define the explicitly scoped electrostatics workbench shell and local import map.</td></tr>
-        <tr><td><code>web/styles.css</code></td><td>Style the responsive technical workspace shell and disabled planned controls.</td></tr>
-        <tr><td><code>web/app.js</code></td><td>Read stable API configuration and report local runtime staging without simulating physics.</td></tr>
-        <tr><td><code>web/vendor/.gitattributes</code></td><td>Disable text conversion for hashed upstream module and license byte streams.</td></tr>
-        <tr><td><code>web/vendor/three.module.js</code></td><td>Pinned local Three.js 0.180.0 ES module obtained by the vendor script.</td></tr>
-        <tr><td><code>web/vendor/OrbitControls.js</code></td><td>Pinned local OrbitControls ES module obtained by the vendor script.</td></tr>
-        <tr><td><code>web/vendor/LICENSE.three.txt</code></td><td>Upstream MIT license text recorded with the vendored modules.</td></tr>
-        <tr><td><code>web/vendor/manifest.json</code></td><td>Record fixed URLs, version, SHA-256 values, local paths, and license attribution.</td></tr>
-        <tr><td><code>tests/test_app.py</code></td><td>Contract tests for API responses and local static serving.</td></tr>
-        <tr><td><code>tests/test_vendor_manifest.py</code></td><td>Contract, digest, import-map, Git-byte-preservation, and offline verification tests.</td></tr>
-        <tr><td><code>reports/2026-05-28-task-02-app-shell.html</code></td><td>This dated standalone engineering task record.</td></tr>
+        <tr><td><code>pyproject.toml</code></td><td>Declare the minimal Hatchling src-layout build target required by the uv-managed app import.</td></tr>
+        <tr><td><code>uv.lock</code></td><td>Record the application as an editable local package after enabling the src layout.</td></tr>
+        <tr><td><code>src/em_workbench/__init__.py</code></td><td>Create the application package boundary.</td></tr>
+        <tr><td><code>src/em_workbench/app.py</code></td><td>Serve stable health/config endpoints and mount the static workbench.</td></tr>
+        <tr><td><code>scripts/vendor_frontend.py</code></td><td>Fetch or offline-verify all pinned modules and license data in the local runtime graph.</td></tr>
+        <tr><td><code>web/index.html</code></td><td>Provide the scoped workbench shell and import map.</td></tr>
+        <tr><td><code>web/styles.css</code></td><td>Style the responsive technical workbench shell.</td></tr>
+        <tr><td><code>web/app.js</code></td><td>Read local runtime configuration without pretending physics behavior exists.</td></tr>
+        <tr><td><code>web/vendor/.gitattributes</code></td><td>Preserve hashed upstream bytes and accept the upstream three.core.js space-before-tab indentation in Git checks.</td></tr>
+        <tr><td><code>web/vendor/three.module.js</code></td><td>Pinned Three.js public ES-module entry.</td></tr>
+        <tr><td><code>web/vendor/three.core.js</code></td><td>Pinned transitive dependency required by three.module.js, added after specification review.</td></tr>
+        <tr><td><code>web/vendor/OrbitControls.js</code></td><td>Pinned controls module whose bare three import is mapped locally.</td></tr>
+        <tr><td><code>web/vendor/LICENSE.three.txt</code></td><td>Vendored upstream MIT license text.</td></tr>
+        <tr><td><code>web/vendor/manifest.json</code></td><td>Record the three-module graph URLs, paths, digests and license attribution.</td></tr>
+        <tr><td><code>tests/test_app.py</code></td><td>Verify API/static responses and that FastAPI serves the Three.js relative dependency.</td></tr>
+        <tr><td><code>tests/test_vendor_manifest.py</code></td><td>Verify hashes, graph closure, import mapping, Git byte preservation and offline validation.</td></tr>
+        <tr><td><code>reports/2026-05-28-task-02-app-shell.html</code></td><td>Record delivery and the corrected specification-review outcome.</td></tr>
           </tbody>
         </table>
       </div>
@@ -100,23 +101,37 @@
           <caption>Commands executed</caption>
           <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
           <tbody>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_app.py tests\test_vendor_manifest.py</code></td><td>RED (expected failure)</td><td>Collection failed with ModuleNotFoundError: No module named &#x27;em_workbench&#x27;; application routes did not exist.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_vendor_manifest.py</code></td><td>RED (expected failure)</td><td>3 failed before implementation: manifest, web/index.html, and scripts/vendor_frontend.py were absent.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -c &quot;import hashlib, urllib.request; urls=[&#x27;https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js&#x27;,&#x27;https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js&#x27;,&#x27;https://cdn.jsdelivr.net/npm/three@0.180.0/LICENSE&#x27;]; [(lambda data, url: print(hashlib.sha256(data).hexdigest(), len(data), url))(urllib.request.urlopen(url, timeout=30).read(), url) for url in urls]&quot;</code></td><td>PASS</td><td>Established pinned upstream SHA-256 values: c8211c...9cb8a, b97879...6042c, and bfe119...72601.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\vendor_frontend.py</code></td><td>PASS</td><td>Downloaded 3 assets, verified all 3 hashes, and wrote web/vendor/manifest.json for Three.js 0.180.0.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\vendor_frontend.py --verify; .\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_app.py tests\test_vendor_manifest.py</code></td><td>PARTIAL</td><td>Vendor offline verification passed; API test collection still failed, identifying missing src package installation configuration.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe lock</code></td><td>PASS</td><td>Resolved 37 packages after adding the minimal editable src-layout package build configuration.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe export --locked --all-groups --no-emit-project --output-file requirements.txt</code></td><td>PASS</td><td>Regenerated the compatibility export; its tracked contents remained unchanged.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td>PASS</td><td>Built and installed em-workbench==0.1.0 from file:///D:/physicsmodel; uv reported a non-blocking hardlink-to-copy fallback.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_app.py tests\test_vendor_manifest.py</code></td><td>GREEN (intermediate PASS)</td><td>7 tests passed after application, static assets, vendor files, and package installation were present.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src scripts tests</code></td><td>FAIL then corrected</td><td>Reported four import-order violations before the mechanical Ruff correction.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --fix --no-cache src scripts tests</code></td><td>PASS</td><td>Applied four import-order fixes; no remaining Ruff findings in that run.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_vendor_manifest.py</code></td><td>RED then GREEN</td><td>The new byte-preservation check first failed on missing web/vendor/.gitattributes; after adding it, the final focused suite passed.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\vendor_frontend.py --verify</code></td><td>PASS</td><td>Verified Three.js 0.180.0 vendor assets (2 modules and MIT license) using local contents only.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_app.py tests\test_vendor_manifest.py</code></td><td>PASS</td><td>Required final Task 2 test command: 8 passed in 0.54s.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>PASS</td><td>Regression run including Task 1 tests: 11 passed in 1.18s.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src scripts tests</code></td><td>PASS</td><td>Required final lint command: All checks passed.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\render_task_report.py --input - --output reports\2026-05-28-task-02-app-shell.html</code></td><td>PASS</td><td>Generated and refreshed this accessible standalone HTML task report from structured standard input.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_app.py tests\test_vendor_manifest.py</code></td><td>RED (initial cycle)</td><td>Application package was absent; collection failed with ModuleNotFoundError.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_vendor_manifest.py</code></td><td>RED (initial cycle)</td><td>Manifest, web shell and vendor script were absent before implementation.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -c &quot;import hashlib, urllib.request; urls=[&#x27;https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js&#x27;,&#x27;https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js&#x27;,&#x27;https://cdn.jsdelivr.net/npm/three@0.180.0/LICENSE&#x27;]; [(lambda data, url: print(hashlib.sha256(data).hexdigest(), len(data), url))(urllib.request.urlopen(url, timeout=30).read(), url) for url in urls]&quot;</code></td><td>PASS (initial intake)</td><td>Collected fixed digests for the initially selected two modules and license.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\vendor_frontend.py</code></td><td>PASS, incomplete initial intake</td><td>Initially downloaded three.module.js, OrbitControls.js and LICENSE; later review found the omitted core dependency.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe lock</code></td><td>PASS (initial cycle)</td><td>Resolved the lock after minimal src-layout packaging was required for imports.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe export --locked --all-groups --no-emit-project --output-file requirements.txt</code></td><td>PASS (initial cycle)</td><td>Regenerated the compatibility export without tracked content change.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td>PASS (initial cycle)</td><td>Installed the editable application; uv reported only a non-blocking link-mode copy fallback.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --fix --no-cache src scripts tests</code></td><td>PASS (initial correction)</td><td>Corrected four initial import-order lint findings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_app.py tests\test_vendor_manifest.py</code></td><td>PASS, invalidated by review</td><td>The first report claimed success with 8 tests, but none checked transitive module delivery.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -c &quot;from fastapi.testclient import TestClient; from em_workbench.app import app; response=TestClient(app).get(&#x27;/vendor/three.core.js&#x27;); print(response.status_code, response.url.path)&quot;</code></td><td>REPRODUCED REVIEW DEFECT</td><td>The committed shell returned 404 for /vendor/three.core.js.</td></tr>
+        <tr><td><code>@&#x27;
+import hashlib
+import re
+import urllib.request
+url = &#x27;https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.core.js&#x27;
+data = urllib.request.urlopen(url, timeout=30).read()
+text = data.decode(&#x27;utf-8&#x27;)
+pattern = r&#x27;&#x27;&#x27;(?:from\s*|import\s*)[&#x27;\&quot;](\.[^&#x27;\&quot;]+)[&#x27;\&quot;]&#x27;&#x27;&#x27;
+print(&#x27;bytes&#x27;, len(data))
+print(&#x27;sha256&#x27;, hashlib.sha256(data).hexdigest())
+print(&#x27;relative-specifiers&#x27;, re.findall(pattern, text))
+&#x27;@ | .\.tools\uv\uv.exe run --locked --no-sync python -</code></td><td>PASS (review investigation)</td><td>three.core.js is 1403455 bytes, SHA-256 eb077d2417f61d3e6d9264c317cabc4ea35769ed6b0ab533067292a550784c20, with no further relative imports.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_app.py tests\test_vendor_manifest.py</code></td><td>RED (review repair)</td><td>The new tests reported 2 failures: missing served /vendor/three.core.js and an unclosed manifest graph.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\vendor_frontend.py</code></td><td>PASS (review repair)</td><td>Downloaded the missing three.core.js file, verified 4 assets and rewrote the manifest.</td></tr>
+        <tr><td><code>git diff --cached --check</code></td><td>FAIL then PASS (review repair)</td><td>Initially exposed upstream space-before-tab indentation in three.core.js; passed after adding a scoped whitespace attribute without changing hashed bytes.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_vendor_manifest.py -k git_attributes</code></td><td>RED then GREEN (review repair)</td><td>The policy test failed before and passed after recording the scoped upstream whitespace attribute.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\vendor_frontend.py --verify</code></td><td>PASS (final)</td><td>Verified Three.js 0.180.0 vendor assets (3 modules and MIT license).</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_app.py tests\test_vendor_manifest.py</code></td><td>GREEN (final)</td><td>Required focused verification: 10 passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>PASS (final)</td><td>Required regression verification: 13 passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src scripts tests</code></td><td>PASS (final)</td><td>Required lint verification: All checks passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\render_task_report.py --input - --output reports\2026-05-28-task-02-app-shell.html</code></td><td>PASS</td><td>Generated and corrected this accessible standalone engineering report.</td></tr>
           </tbody>
         </table>
       </div>
@@ -128,12 +143,12 @@
           <caption>Verification evidence</caption>
           <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
           <tbody>
-        <tr><td>TDD RED evidence</td><td>PASS</td><td>Before implementation, application import and vendor artifacts failed; a later focused RED protected Git-stable SHA-256 bytes.</td></tr>
-        <tr><td>API and static service contract</td><td>PASS</td><td>8 focused tests cover /health, /api/config, /, CSS/JS/modules, manifest, import-map resolution, and byte preservation.</td></tr>
-        <tr><td>Vendor integrity and offline path</td><td>PASS</td><td>Manifest SHA-256 checks match local assets; --verify passed; Git reports text: unset for both modules and the MIT license.</td></tr>
-        <tr><td>Regression tests</td><td>PASS</td><td>11 project tests passed, including existing Task 1 tests.</td></tr>
-        <tr><td>Lint</td><td>PASS</td><td>Ruff checked src, scripts and tests with --no-cache and reported all checks passed.</td></tr>
-        <tr><td>Browser interaction evidence</td><td>DEFERRED</td><td>Task 2 requires static/API verification only; Playwright interaction and rendered Three.js workflow belong to Task 5.</td></tr>
+        <tr><td>Specification review repair</td><td>PASS</td><td>The report records that three.module.js imported an omitted ./three.core.js resource which previously returned 404.</td></tr>
+        <tr><td>TDD graph closure</td><td>PASS</td><td>New tests failed on the missing edge, then pass with the manifest and FastAPI-serving closure in place.</td></tr>
+        <tr><td>Offline runtime integrity</td><td>PASS</td><td>The local verify path validates three, three-core, OrbitControls and the MIT license using fixed SHA-256 values.</td></tr>
+        <tr><td>Hash-stable Git treatment</td><td>PASS</td><td>Vendor attributes preserve bytes and handle the upstream core indentation without modifying its verified digest.</td></tr>
+        <tr><td>Tests and lint</td><td>PASS</td><td>Focused verification passed with 10 tests, complete regression passed with 13 tests, and Ruff passed.</td></tr>
+        <tr><td>Browser interaction evidence</td><td>DEFERRED</td><td>Task 2 closes static runtime delivery; rendered interaction remains Task 5 scope.</td></tr>
           </tbody>
         </table>
       </div>
@@ -141,15 +156,15 @@
     <section>
       <h2>Known Risks And Limitations</h2>
       <ul>
-        <li>All source, view, probe, and computation controls in this shell are intentionally disabled or informational; no physical result is presented.</li>
-        <li>The import map establishes local OrbitControls-to-Three.js resolution, but functional 3D rendering is not claimed in this slice.</li>
-        <li>No Playwright browser installation or browser interaction run was performed because it is explicitly outside Task 2 scope.</li>
-        <li>The local uv sync operation emitted a hardlink fallback warning and successfully installed by copying files instead.</li>
+        <li>Source editing, view interaction, probe results and physics computation remain intentionally unavailable in this shell.</li>
+        <li>The module graph is locally deliverable and verified, but an interactive Three.js rendered scene is not claimed before Task 5.</li>
+        <li>The original Task 2 verification and report incorrectly omitted three.core.js; this corrected report supersedes that claim.</li>
+        <li>No Playwright browser interaction run was performed because that evidence is explicitly deferred to Task 5.</li>
       </ul>
     </section>
     <section>
       <h2>Next Scheduled Task</h2>
-      <p class="next">Task 3: define typed scene contracts and electrostatic-source editing API endpoints while keeping the static shell honest about solver availability.</p>
+      <p class="next">Task 3: implement typed scene contracts and source editing endpoints while preserving the now-closed local browser runtime graph.</p>
     </section>
   </main>
 </body>

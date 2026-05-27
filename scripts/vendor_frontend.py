@@ -43,6 +43,12 @@ MODULES = (
         sha256="c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
     ),
     VendorAsset(
+        identifier="three-core",
+        local_name="three.core.js",
+        source_url=f"{CDN_BASE}/build/three.core.js",
+        sha256="eb077d2417f61d3e6d9264c317cabc4ea35769ed6b0ab533067292a550784c20",
+    ),
+    VendorAsset(
         identifier="orbit-controls",
         local_name="OrbitControls.js",
         source_url=f"{CDN_BASE}/examples/jsm/controls/OrbitControls.js",
@@ -137,7 +143,10 @@ def vendor_runtime(*, verify_only: bool) -> None:
     _write_or_verify_manifest(write=not verify_only)
 
     if verify_only:
-        print(f"Verified Three.js {VERSION} vendor assets (2 modules and MIT license).")
+        print(
+            f"Verified Three.js {VERSION} vendor assets "
+            f"({len(MODULES)} modules and MIT license)."
+        )
         return
     downloaded = results.count("downloaded")
     print(

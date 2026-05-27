@@ -1,0 +1,3 @@
+# Preserve upstream bytes used by SHA-256 validation in manifest.json.
+*.js -text
+*.txt -text

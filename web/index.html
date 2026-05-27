@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EM Workbench | Static Electrostatics</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/vendor/three.module.js",
+        "three/addons/": "/vendor/"
+      }
+    }
+  </script>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="workbench">
+    <header class="topbar">
+      <div class="identity">
+        <h1>EM Workbench</h1>
+        <p>Static Electrostatics</p>
+      </div>
+      <div class="view-control" aria-label="Planned scene views">
+        <span class="control-label">View</span>
+        <button class="view-button selected" type="button" aria-pressed="true" disabled>
+          2D
+        </button>
+        <button class="view-button" type="button" aria-pressed="false" disabled>
+          3D
+        </button>
+        <span class="planned-note">Interaction connects in Task 5</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar" aria-label="Scene construction">
+        <section class="panel source-library">
+          <div class="panel-heading">
+            <h2>Source Library</h2>
+            <span>Task 3</span>
+          </div>
+          <p class="panel-copy">Source editing becomes available after typed scene contracts land.</p>
+          <div class="source-grid" aria-label="Planned electrostatic source types">
+            <button type="button" disabled>Point charge</button>
+            <button type="button" disabled>Line segment</button>
+            <button type="button" disabled>Ring</button>
+            <button type="button" disabled>Disk</button>
+            <button type="button" disabled>Infinite plane</button>
+            <button type="button" disabled>Spherical shell</button>
+          </div>
+        </section>
+
+        <section class="panel scene-sources">
+          <div class="panel-heading">
+            <h2>Scene Sources</h2>
+            <span>Empty</span>
+          </div>
+          <div class="empty-state">
+            <p>No editable sources yet.</p>
+            <span>This shell does not construct a physical scene.</span>
+          </div>
+        </section>
+      </aside>
+
+      <section class="viewport panel" aria-label="Viewport">
+        <div class="viewport-heading">
+          <div>
+            <h2>Viewport</h2>
+            <p>Reserved for analytical slices and spatial rendering</p>
+          </div>
+          <span class="mode-label">No active scene</span>
+        </div>
+        <div class="canvas-placeholder">
+          <div class="axis axis-x" aria-hidden="true"></div>
+          <div class="axis axis-y" aria-hidden="true"></div>
+          <div class="canvas-message">
+            <strong>Visualization surface ready</strong>
+            <span>Scene models and validated field output are scheduled for later tasks.</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="analysis panel" aria-label="Status and analysis">
+        <div class="panel-heading">
+          <h2>Analysis</h2>
+          <span>Standby</span>
+        </div>
+        <section class="status-block">
+          <h3>Computation Status</h3>
+          <p class="status-value">Not computing</p>
+          <p>Solver integration arrives in Task 4. No field or potential values are available.</p>
+        </section>
+        <section class="status-block">
+          <h3>Probe</h3>
+          <dl>
+            <div><dt>Position</dt><dd>Unavailable</dd></div>
+            <div><dt>Potential V</dt><dd>Unavailable</dd></div>
+            <div><dt>Field |E|</dt><dd>Unavailable</dd></div>
+          </dl>
+        </section>
+        <section class="runtime-block">
+          <h3>Browser Runtime</h3>
+          <p id="runtime-status">Reading local runtime configuration...</p>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="statusbar">
+      <span>Workbench shell online</span>
+      <span>Scene editing, physics solving, and 3D interaction are intentionally deferred.</span>
+    </footer>
+  </div>
+</body>
+</html>

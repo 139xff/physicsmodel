@@ -1,0 +1,84 @@
+from fastapi.testclient import TestClient
+
+from em_workbench.app import app
+
+client = TestClient(app)
+
+
+def test_health_reports_the_static_electrostatics_service():
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "service": "em-workbench",
+        "module": "static-electrostatics",
+    }
+
+
+def test_config_exposes_supported_views_and_local_browser_runtime():
+    response = client.get("/api/config")
+
+    assert response.status_code == 200
+    config = response.json()
+    assert config["product"] == {
+        "name": "EM Workbench",
+        "module": "Static Electrostatics",
+    }
+    assert config["supported_views"] == ["2D", "3D"]
+    assert config["capabilities"] == {
+        "scene_editing": "planned",
+        "solver": "planned",
+        "interaction": "planned",
+    }
+    assert config["runtime"] == {
+        "delivery": "local-vendor",
+        "manifest_url": "/vendor/manifest.json",
+        "three": {
+            "version": "0.180.0",
+            "module_url": "/vendor/three.module.js",
+            "orbit_controls_url": "/vendor/OrbitControls.js",
+        },
+    }
+
+
+def test_root_serves_the_explicitly_scoped_workbench_shell():
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    html = response.text
+    for expected_copy in (
+        "EM Workbench",
+        "Static Electrostatics",
+        "2D",
+        "3D",
+        "Source Library",
+        "Scene Sources",
+        "Viewport",
+        "Analysis",
+        "Solver integration arrives in Task 4",
+    ):
+        assert expected_copy in html
+    assert '<script type="importmap">' in html
+    assert '"three": "/vendor/three.module.js"' in html
+
+
+def test_static_assets_and_vendor_modules_are_served_locally():
+    stylesheet = client.get("/styles.css")
+    application_module = client.get("/app.js")
+    three_module = client.get("/vendor/three.module.js")
+    orbit_controls = client.get("/vendor/OrbitControls.js")
+    manifest = client.get("/vendor/manifest.json")
+
+    assert stylesheet.status_code == 200
+    assert application_module.status_code == 200
+    assert three_module.status_code == 200
+    assert orbit_controls.status_code == 200
+    assert manifest.status_code == 200
+    assert "text/css" in stylesheet.headers["content-type"]
+    assert "javascript" in application_module.headers["content-type"]
+    assert "javascript" in three_module.headers["content-type"]
+    assert "javascript" in orbit_controls.headers["content-type"]
+    assert manifest.json()["version"] == "0.180.0"
+    assert "https://" not in application_module.text

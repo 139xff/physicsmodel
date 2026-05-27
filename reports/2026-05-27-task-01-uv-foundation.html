@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 01: uv-Only Project Foundation And Governance - Engineering Task Report</title>
+  <style>
+    :root { color-scheme: light; --ink: #19202b; --muted: #566576; --line: #d3dce6; --panel: #f5f7fa; --accent: #0d5e63; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #fff; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { border-bottom: 3px solid var(--accent); margin-bottom: 2rem; padding-bottom: 1.25rem; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0 0 0.75rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; color: var(--muted); }
+    .status { background: #e7f4f1; border-radius: 999px; color: var(--accent); font-weight: 700; padding: 0.15rem 0.65rem; }
+    ul { margin-top: 0.5rem; padding-left: 1.4rem; }
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 36rem; width: 100%; }
+    caption { color: var(--muted); font-size: 0.95rem; text-align: left; padding: 0 0 0.5rem; }
+    th, td { border: 1px solid var(--line); padding: 0.6rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    code { font: 0.92em ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; }
+    .next { border-left: 4px solid var(--accent); background: var(--panel); padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Task 01: uv-Only Project Foundation And Governance</h1>
+      <div class="meta">
+        <span class="status">DONE</span>
+        <span>Completed: <time datetime="2026-05-28T00:50:56+08:00">2026-05-28T00:50:56+08:00</time></span>
+      </div>
+    </header>
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Pinned Python 3.12 and established project-local uv as the dependency and project-command entry point after bootstrap.</li>
+        <li>Locked and synchronized the FastAPI, Pydantic, NumPy, SciPy, Uvicorn and development verification stack through uv.</li>
+        <li>Defined governance for uv.lock authority, uv-exported requirements.txt, versionable Three.js/OrbitControls assets and uv-managed Playwright Chromium workflow.</li>
+        <li>Added a standard-library accessible task-report generator with test-first CLI coverage.</li>
+        <li>Hardened bootstrap integrity using fixed official archive and uv.exe hashes, and added mutation-proven ordering coverage so an existing uv.exe cannot be invoked before its digest check.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>FastAPI endpoints and the static workbench surface are scheduled for Task 2.</li>
+        <li>Three.js and OrbitControls acquisition, manifest hashes/licenses and offline browser smoke belong to Task 2.</li>
+        <li>Playwright Chromium installation and browser interaction evidence are deferred until a browser surface exists.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Technical Stack</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Technology choices</caption>
+          <thead><tr><th scope="col">Concern</th><th scope="col">Choice</th></tr></thead>
+          <tbody>
+        <tr><td>Runtime and resolution</td><td>Python 3.12; project-local uv 0.11.16; uv.lock authoritative</td></tr>
+        <tr><td>Bootstrap integrity</td><td>Official ZIP SHA-256 dd9d6d6554bfab265bfa98aa8e8a406c5c3a7b97582f93de1f4d48d9154a0395; uv.exe SHA-256 c5a583d5f1f6d055fc1c32c87d8eceee90edc69a5b9af5da70811befdfc04880</td></tr>
+        <tr><td>Service/contracts</td><td>FastAPI 0.136.3; Uvicorn 0.48.0; Pydantic 2.13.4</td></tr>
+        <tr><td>Numerics</td><td>NumPy 2.4.6; SciPy 1.17.1</td></tr>
+        <tr><td>Verification</td><td>pytest 8.4.2; pytest-cov 6.3.0; Ruff 0.15.14; httpx 0.28.1; Playwright 1.60.0</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Changed Files</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Files changed in this task</caption>
+          <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
+          <tbody>
+        <tr><td><code>.gitignore</code></td><td>Ignores local tooling/caches while allowing governed web/vendor assets to be committed.</td></tr>
+        <tr><td><code>.python-version</code></td><td>Pins Python 3.12 for uv project discovery.</td></tr>
+        <tr><td><code>pyproject.toml</code></td><td>Declares runtime and development dependencies, including SciPy.</td></tr>
+        <tr><td><code>uv.lock</code></td><td>Authoritative resolved dependency lockfile generated by project-local uv.</td></tr>
+        <tr><td><code>requirements.txt</code></td><td>uv-exported compatibility dependency list.</td></tr>
+        <tr><td><code>AGENTS.md</code></td><td>Governs uv-only commands, lock authority, frontend provenance and browser installation.</td></tr>
+        <tr><td><code>REQUIREMENTS.md</code></td><td>Records approved stack and controlled dependency/browser workflow.</td></tr>
+        <tr><td><code>docs/superpowers/plans/2026-05-27-em-workbench-foundation.md</code></td><td>Aligns Task 1 files and verification with report-script testing.</td></tr>
+        <tr><td><code>docs/superpowers/specs/2026-05-27-em-workbench-electrostatics-design.md</code></td><td>Retains the approved design baseline without cached-diff trailing whitespace.</td></tr>
+        <tr><td><code>scripts/bootstrap_uv.ps1</code></td><td>Acquires pinned uv and validates uv.exe before any invocation.</td></tr>
+        <tr><td><code>scripts/render_task_report.py</code></td><td>Renders accessible standalone task reports from structured JSON.</td></tr>
+        <tr><td><code>tests/test_bootstrap_uv.py</code></td><td>Checks tamper rejection and digest-before-execution ordering, with mutation evidence.</td></tr>
+        <tr><td><code>tests/test_render_task_report.py</code></td><td>Tests report rendering, accessibility landmarks and HTML escaping.</td></tr>
+        <tr><td><code>reports/2026-05-27-task-01-uv-foundation.html</code></td><td>This updated engineering task record.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Commands</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Commands executed</caption>
+          <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe lock; .\.tools\uv\uv.exe sync --locked</code></td><td>PASS</td><td>Foundation setup resolved 37 packages and installed 35 packages into the ignored virtual environment.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe export --locked --all-groups --no-emit-project --output-file requirements.txt</code></td><td>PASS</td><td>Exported the hash-pinned compatibility list from uv.lock.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run pytest tests/test_render_task_report.py (RED then GREEN)</code></td><td>PASS AFTER EXPECTED RED</td><td>The CLI test failed before render_task_report.py existed, then passed after implementation.</td></tr>
+        <tr><td><code>PowerShell official uv 0.11.16 archive extraction and Get-FileHash audit</code></td><td>PASS</td><td>Confirmed official archive and extracted uv.exe hashes and corrected the former archive hash constant.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_bootstrap_uv.py (tamper RED then GREEN)</code></td><td>PASS AFTER EXPECTED RED</td><td>Before integrity enforcement, a tampered executable copy ran successfully; after the fix it was rejected by SHA-256.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_bootstrap_uv.py (unsafe-order mutant, old assertion only)</code></td><td>MUTANT SURVIVED</td><td>With `$targetUv --version` temporarily placed before its digest check, the prior single test still reported 1 passed in 2.01s, demonstrating the observation gap.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_bootstrap_uv.py (same mutant plus order assertion)</code></td><td>RED - expected</td><td>The added ordering test failed under the unsafe reorder: digest position 79 was after invocation position 5; result was 1 failed, 1 passed in 1.96s.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_bootstrap_uv.py (safe order restored)</code></td><td>PASS</td><td>2 passed in 0.60s.</td></tr>
+        <tr><td><code>powershell -NoProfile -ExecutionPolicy Bypass -File &#x27;.\scripts\bootstrap_uv.ps1&#x27;</code></td><td>PASS</td><td>The actual local uv.exe matched its pinned digest before reporting uv 0.11.16.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe lock --check</code></td><td>PASS</td><td>Resolved 37 packages in 1ms without lock changes.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --check</code></td><td>PASS</td><td>Checked 35 packages and reported Would make no changes.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests</code></td><td>PASS</td><td>3 passed in 0.67s.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache scripts tests</code></td><td>PASS</td><td>All checks passed.</td></tr>
+        <tr><td><code>git diff --cached --check</code></td><td>PASS</td><td>Exited 0 with no whitespace diagnostics.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts/render_task_report.py --input - --output reports\2026-05-27-task-01-uv-foundation.html</code></td><td>PASS</td><td>Generated this updated report from structured JSON on standard input.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Verification</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Verification evidence</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+        <tr><td>Mutation adequacy</td><td>PASS</td><td>A temporary unsafe call-order mutant survives the former test and is killed by the new ordering assertion.</td></tr>
+        <tr><td>No real-tool mutation</td><td>PASS</td><td>The runtime tamper case writes only a pytest temporary copy; the real .tools/uv file digest is unchanged.</td></tr>
+        <tr><td>Bootstrap real executable</td><td>PASS</td><td>The project-local uv.exe digest matches the fixed hash and runs only after validation.</td></tr>
+        <tr><td>Locked dependency state</td><td>PASS</td><td>uv lock --check and uv sync --locked --check report a synchronized resolution.</td></tr>
+        <tr><td>Unit tests</td><td>PASS</td><td>All three Task 1 tests pass under locked, no-sync uv execution without pytest cache.</td></tr>
+        <tr><td>Static analysis</td><td>PASS</td><td>Ruff passes over scripts and tests with cache disabled.</td></tr>
+        <tr><td>Cached diff whitespace</td><td>PASS</td><td>git diff --cached --check exits without diagnostics.</td></tr>
+        <tr><td>Browser smoke</td><td>DEFERRED</td><td>No browser UI or vendored runtime exists in Task 1; Chromium verification remains scheduled for subsequent UI work.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Known Risks And Limitations</h2>
+      <ul>
+        <li>The initial uv installation previously landed in a user-scoped location before a local copy was supplied in .tools/uv; project dependency and execution commands in Task 1 invoke only the project-local uv binary.</li>
+        <li>Initial uv sync completed successfully but warned that hardlink installation was unavailable and fell back to copying files, affecting installation performance only.</li>
+        <li>On this host, direct PowerShell script execution is disabled; bootstrap validation uses an explicit one-process -ExecutionPolicy Bypass invocation of the checked-in script.</li>
+        <li>No Three.js/OrbitControls assets, Chromium browser binary, API shell, UI or electrostatic solver is delivered in this scoped foundation task.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p class="next">Task 2: Build the FastAPI shell and static workbench surface, then vendor Three.js and OrbitControls through the governed uv-run Python workflow with offline smoke evidence.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,13 @@
+.venv/
+.uv-cache/
+.tools/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+site/
+test-results/
+playwright-report/

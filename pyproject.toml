@@ -15,6 +15,9 @@ dependencies = [
 desktop = [
     "pyside6>=6.11.1",
 ]
+bundle = [
+    "pyinstaller>=6.20.0",
+]
 
 [project.scripts]
 em-workbench-desktop = "em_workbench.desktop:main"

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 11 - Windows Preview Bundle</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f5f7fb;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(100, 116, 139, 0.18);
+        border-radius: 24px;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.1);
+      }
+      h1, h2 {
+        margin-top: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0 28px;
+      }
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #eef4ff;
+      }
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: #eef2f7;
+      }
+      .ok {
+        color: #047857;
+        font-weight: 700;
+      }
+      .warn {
+        color: #b45309;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 11：Windows 桌面预览版打包</h1>
+      <p><strong>完成时间：</strong>2026-05-29 01:15:36 +08:00</p>
+      <p><strong>状态：</strong><span class="ok">完成</span></p>
+
+      <h2>交付范围</h2>
+      <table>
+        <tr><th>项目</th><th>结果</th></tr>
+        <tr>
+          <td>打包工具链</td>
+          <td>新增 <code>bundle</code> 可选依赖，锁定 <code>pyinstaller</code>。</td>
+        </tr>
+        <tr>
+          <td>PyInstaller 配置</td>
+          <td>新增 <code>packaging/em_workbench_desktop.spec</code>，收集 Python 包、Qt WebEngine 与 <code>web/</code> 静态资源。</td>
+        </tr>
+        <tr>
+          <td>构建脚本</td>
+          <td>新增 <code>scripts/build_desktop.ps1</code>，通过项目本地 uv 执行打包。</td>
+        </tr>
+        <tr>
+          <td>打包兼容</td>
+          <td><code>src/em_workbench/app.py</code> 支持 PyInstaller frozen 环境下从 <code>_MEIPASS</code> 定位 <code>web/</code>。</td>
+        </tr>
+        <tr>
+          <td>预览产物</td>
+          <td>生成 <code>dist/EMWorkbench/EMWorkbench.exe</code> 与 <code>dist/EMWorkbench-preview.zip</code>。</td>
+        </tr>
+      </table>
+
+      <h2>延期范围</h2>
+      <table>
+        <tr><th>项目</th><th>说明</th></tr>
+        <tr><td>安装器</td><td>尚未制作 MSI/NSIS 安装器。</td></tr>
+        <tr><td>图标与签名</td><td>当前 exe 使用默认图标，未做代码签名。</td></tr>
+        <tr><td>体积优化</td><td>Qt WebEngine 预览包较大，后续可裁剪 Qt 模块。</td></tr>
+      </table>
+
+      <h2>修改文件</h2>
+      <table>
+        <tr><th>文件</th><th>变更</th></tr>
+        <tr><td><code>pyproject.toml</code></td><td>新增 <code>bundle</code> extra。</td></tr>
+        <tr><td><code>uv.lock</code></td><td>锁定 PyInstaller 及其依赖。</td></tr>
+        <tr><td><code>src/em_workbench/app.py</code></td><td>增加 frozen 环境资源根目录识别。</td></tr>
+        <tr><td><code>packaging/em_workbench_desktop.spec</code></td><td>新增 PyInstaller spec。</td></tr>
+        <tr><td><code>scripts/build_desktop.ps1</code></td><td>新增 Windows 构建脚本。</td></tr>
+        <tr><td><code>reports/2026-05-29-task-11-windows-preview-bundle.html</code></td><td>新增本任务报告。</td></tr>
+      </table>
+
+      <h2>验证命令</h2>
+      <table>
+        <tr><th>命令</th><th>结果</th></tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe add pyinstaller --optional bundle</code></td>
+          <td class="ok">成功新增 PyInstaller 打包依赖。</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td>
+          <td class="ok">All checks passed!</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td>
+          <td class="ok">66 passed, 2 warnings</td>
+        </tr>
+        <tr>
+          <td><code>powershell -ExecutionPolicy Bypass -File scripts\build_desktop.ps1</code></td>
+          <td class="ok">Build complete，产物位于 <code>D:\physicsmodel_real\dist</code>。</td>
+        </tr>
+        <tr>
+          <td><code>Start-Process .\dist\EMWorkbench\EMWorkbench.exe --check -Wait -PassThru</code></td>
+          <td class="ok">退出码 0。</td>
+        </tr>
+        <tr>
+          <td><code>Compress-Archive -Path dist\EMWorkbench -DestinationPath dist\EMWorkbench-preview.zip</code></td>
+          <td class="ok">生成约 225MB 预览压缩包。</td>
+        </tr>
+      </table>
+
+      <h2>产物</h2>
+      <table>
+        <tr><th>路径</th><th>说明</th></tr>
+        <tr><td><code>D:\physicsmodel_real\dist\EMWorkbench\EMWorkbench.exe</code></td><td>Windows 桌面预览版入口。</td></tr>
+        <tr><td><code>D:\physicsmodel_real\dist\EMWorkbench-preview.zip</code></td><td>可分享的压缩包，约 225MB。</td></tr>
+      </table>
+
+      <h2>已知风险</h2>
+      <table>
+        <tr><th>风险</th><th>处理建议</th></tr>
+        <tr>
+          <td>未签名应用可能被 Windows 提醒</td>
+          <td>对朋友测试时说明这是未签名预览版；正式发布前考虑代码签名。</td>
+        </tr>
+        <tr>
+          <td>压缩包仍较大</td>
+          <td>后续可以裁剪 Qt 组件、尝试 Nuitka 或安装器差分压缩。</td>
+        </tr>
+      </table>
+
+      <h2>下一任务</h2>
+      <p>做一次人工桌面验收：打开预览版窗口，检查 2D/3D、预设、探针和场计算是否在无服务器模式下正常交互。</p>
+    </main>
+  </body>
+</html>

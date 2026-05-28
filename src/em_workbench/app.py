@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -13,7 +14,14 @@ from em_workbench.models import Position, Preset, PresetSummary, Scene, SceneVal
 from em_workbench.physics.solver import FieldEvaluationResponse, SolverQuality, evaluate_scene
 from em_workbench.presets import get_preset, list_presets
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+def _project_root() -> Path:
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parents[2]
+
+
+PROJECT_ROOT = _project_root()
 WEB_ROOT = PROJECT_ROOT / "web"
 VENDOR_MANIFEST_PATH = WEB_ROOT / "vendor" / "manifest.json"
 

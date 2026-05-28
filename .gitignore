@@ -8,6 +8,7 @@ __pycache__/
 .coverage
 htmlcov/
 dist/
+build/
 site/
 test-results/
 playwright-report/

@@ -49,15 +49,15 @@ def test_root_serves_the_explicitly_scoped_workbench_shell():
     assert response.headers["content-type"].startswith("text/html")
     html = response.text
     for expected_copy in (
-        "EM Workbench",
-        "Static Electrostatics",
+        "电磁工作台",
+        "大学电磁学",
         "2D",
         "3D",
-        "Source Library",
-        "Scene Sources",
-        "Viewport",
-        "Analysis",
-        "All solving is delegated to POST /api/field/evaluate",
+        "源库",
+        "场景源",
+        "空间视窗",
+        "测量面板",
+        "所有数值计算都由 Python 求解器统一完成",
     ):
         assert expected_copy in html
     assert '<script type="importmap">' in html

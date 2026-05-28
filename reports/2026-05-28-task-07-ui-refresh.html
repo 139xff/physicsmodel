@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 07: Chinese Apple-Style Visual Refresh - Engineering Task Report</title>
+  <style>
+    :root { color-scheme: light; --ink: #19202b; --muted: #566576; --line: #d3dce6; --panel: #f5f7fa; --accent: #0d5e63; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #fff; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { border-bottom: 3px solid var(--accent); margin-bottom: 2rem; padding-bottom: 1.25rem; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0 0 0.75rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; color: var(--muted); }
+    .status { background: #e7f4f1; border-radius: 999px; color: var(--accent); font-weight: 700; padding: 0.15rem 0.65rem; }
+    ul { margin-top: 0.5rem; padding-left: 1.4rem; }
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 36rem; width: 100%; }
+    caption { color: var(--muted); font-size: 0.95rem; text-align: left; padding: 0 0 0.5rem; }
+    th, td { border: 1px solid var(--line); padding: 0.6rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    code { font: 0.92em ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; }
+    .next { border-left: 4px solid var(--accent); background: var(--panel); padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Task 07: Chinese Apple-Style Visual Refresh</h1>
+      <div class="meta">
+        <span class="status">DONE</span>
+        <span>Completed: <time datetime="2026-05-28T20:20:00+08:00">2026-05-28T20:20:00+08:00</time></span>
+      </div>
+    </header>
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Applied the ui-ux-pro-max design-system workflow for an education/scientific Apple-inspired glassmorphism workbench interface.</li>
+        <li>Localized the visible browser interface to Chinese while preserving stable API contracts, data-testid hooks and physics behavior.</li>
+        <li>Rebuilt the visual system around a light Apple-style palette, frosted panels, layered cards, softer shadows, larger touch targets, visible focus states and reduced-motion support.</li>
+        <li>Improved hierarchy for source library, presets, scene source cards, viewport, probe results, overlays and exploration prompts so future feature panels can be added in the same panel/card pattern.</li>
+        <li>Updated browser and shell tests to verify the Chinese UI remains functional across source editing, probe solving, overlays, presets and 2D/3D switching.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>No new electromagnetism features, solver behavior, deployment configuration or source-management operations were added in this styling task.</li>
+        <li>The API product metadata remains English for backward compatibility; the browser document title and visible interface are Chinese.</li>
+        <li>No screenshot baseline testing was added; Playwright continues to verify behavior through DOM and accessibility assertions.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Technical Stack</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Technology choices</caption>
+          <thead><tr><th scope="col">Concern</th><th scope="col">Choice</th></tr></thead>
+          <tbody>
+        <tr><td>Design guidance</td><td>ui-ux-pro-max design-system search with education scientific workbench Apple/minimal/glassmorphism keywords.</td></tr>
+        <tr><td>Frontend stack</td><td>Existing static HTML/CSS/ES-module client; no npm or new frontend build system introduced.</td></tr>
+        <tr><td>Accessibility</td><td>Larger interactive targets, visible focus rings, contrast-oriented light palette and prefers-reduced-motion handling.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Changed Files</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Files changed in this task</caption>
+          <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
+          <tbody>
+        <tr><td><code>web/index.html</code></td><td>Translate visible shell copy to Chinese and keep the same extensible source/preset/viewport/analysis structure.</td></tr>
+        <tr><td><code>web/styles.css</code></td><td>Replace the dark engineering theme with Apple-inspired light glassmorphism, layered panels, responsive spacing and interaction states.</td></tr>
+        <tr><td><code>web/app.js</code></td><td>Translate runtime-generated labels, source defaults, statuses, overlay summaries, preset messages and empty states to Chinese.</td></tr>
+        <tr><td><code>tests/test_browser_smoke.py</code></td><td>Update Playwright assertions for Chinese buttons and labels while preserving behavioral coverage.</td></tr>
+        <tr><td><code>tests/test_app.py</code></td><td>Update root HTML shell expectations for the Chinese visible interface.</td></tr>
+        <tr><td><code>reports/2026-05-28-task-07-ui-refresh.html</code></td><td>Record the styling/localization task, commands, verification and limitations.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Commands</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Commands executed</caption>
+          <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python D:\claude-skills\ui-ux-pro-max\scripts\search.py &quot;education scientific workbench apple minimal glassmorphism chinese dashboard&quot; --design-system -p &quot;EM Workbench&quot;</code></td><td>PASS</td><td>Generated a design-system recommendation emphasizing glassmorphism, minimal high-contrast palette, technical typography guidance, accessibility and interaction checklist.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py</code></td><td>PASS</td><td>2 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>RED then GREEN</td><td>Initial full run failed only because tests/test_app.py still expected old English shell copy; after updating the expectation, full regression passed with 63 passed and 2 warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>PASS</td><td>All checks passed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Verification</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Verification evidence</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+        <tr><td>Chinese localization</td><td>PASS</td><td>Root HTML and browser-generated controls/statuses now present Chinese visible copy while existing IDs and test hooks remain stable.</td></tr>
+        <tr><td>Browser interaction</td><td>PASS</td><td>Playwright still covers adding sources, probe movement, solver output, overlays, presets and 2D/3D state preservation.</td></tr>
+        <tr><td>Regression</td><td>PASS</td><td>Full test suite passed: 63 passed, 2 known deprecation warnings.</td></tr>
+        <tr><td>Lint</td><td>PASS</td><td>Ruff reported All checks passed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Known Risks And Limitations</h2>
+      <ul>
+        <li>The visual refresh is CSS/HTML focused and does not include professional visual design screenshot review or pixel regression tests.</li>
+        <li>Preset titles from the backend remain English until the preset catalog itself is localized.</li>
+        <li>The single large app.js remains acceptable for this slice but should eventually be split into state, rendering and API modules as more functions are added.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p class="next">Continue with focused scene-management improvements such as delete/duplicate source controls, better validation feedback and optional preset-title localization.</p>
+    </section>
+  </main>
+</body>
+</html>

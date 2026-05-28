@@ -71,16 +71,16 @@ def _assert_inside_viewbox(value: float) -> None:
 
 
 def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -> None:
-    expect(page.get_by_role("heading", name="EM Workbench")).to_be_visible()
+    expect(page.get_by_role("heading", name="电磁工作台")).to_be_visible()
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
 
-    page.get_by_role("button", name="Add point charge").click()
-    page.get_by_role("button", name="Add ring").click()
+    page.get_by_role("button", name="加入点电荷").click()
+    page.get_by_role("button", name="加入带电圆环").click()
 
-    expect(page.get_by_test_id("source-card-point-1")).to_contain_text("Point 1")
-    expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("Ring 1")
-    expect(page.get_by_test_id("view-2d")).to_contain_text("Point 1")
-    expect(page.get_by_test_id("view-2d")).to_contain_text("Ring 1")
+    expect(page.get_by_test_id("source-card-point-1")).to_contain_text("点电荷 1")
+    expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
+    expect(page.get_by_test_id("view-2d")).to_contain_text("点电荷 1")
+    expect(page.get_by_test_id("view-2d")).to_contain_text("带电圆环 1")
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
@@ -105,13 +105,13 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     _assert_inside_viewbox(probe_y - 4)
     _assert_inside_viewbox(probe_y + 4)
 
-    _fill_number(page, "Probe x", "0.22")
-    _fill_number(page, "Probe y", "0.03")
-    _fill_number(page, "Probe z", "0.08")
+    _fill_number(page, "探针 x", "0.22")
+    _fill_number(page, "探针 y", "0.03")
+    _fill_number(page, "探针 z", "0.08")
 
-    expect(page.get_by_test_id("solver-status")).to_contain_text("Ready")
-    expect(page.get_by_test_id("potential-value")).not_to_contain_text("Unavailable")
-    expect(page.get_by_test_id("field-magnitude-value")).not_to_contain_text("Unavailable")
+    expect(page.get_by_test_id("solver-status")).to_contain_text("已完成")
+    expect(page.get_by_test_id("potential-value")).not_to_contain_text("暂无")
+    expect(page.get_by_test_id("field-magnitude-value")).not_to_contain_text("暂无")
     expect(page.get_by_test_id("contribution-list")).to_contain_text("point-1")
     expect(page.get_by_test_id("contribution-list")).to_contain_text("ring-1")
     expect(page.get_by_test_id("quality-value")).to_contain_text("preview")
@@ -121,63 +121,63 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("view-3d")).to_be_visible()
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-ring-normal-three", "0,1,0")
     expect(page.get_by_test_id("mode-label")).to_contain_text("3D")
-    expect(page.get_by_test_id("source-count")).to_contain_text("2 sources")
+    expect(page.get_by_test_id("source-count")).to_contain_text("2 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("0.220")
-    expect(page.get_by_test_id("potential-value")).not_to_contain_text("Unavailable")
+    expect(page.get_by_test_id("potential-value")).not_to_contain_text("暂无")
 
     page.get_by_role("button", name="2D").click()
     expect(page.get_by_test_id("view-2d")).to_be_visible()
-    expect(page.get_by_test_id("source-count")).to_contain_text("2 sources")
+    expect(page.get_by_test_id("source-count")).to_contain_text("2 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("0.220")
-    expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("Ring 1")
+    expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     for button_name, test_id in [
-        ("Add point charge", "source-card-point-1"),
-        ("Add line segment", "source-card-line-segment-1"),
-        ("Add ring", "source-card-ring-1"),
-        ("Add disk", "source-card-disk-1"),
-        ("Add infinite plane", "source-card-infinite-plane-1"),
-        ("Add spherical shell", "source-card-spherical-shell-1"),
+        ("加入点电荷", "source-card-point-1"),
+        ("加入带电线段", "source-card-line-segment-1"),
+        ("加入带电圆环", "source-card-ring-1"),
+        ("加入带电圆盘", "source-card-disk-1"),
+        ("加入无限平面", "source-card-infinite-plane-1"),
+        ("加入球壳", "source-card-spherical-shell-1"),
     ]:
         page.get_by_role("button", name=button_name).click()
         expect(page.get_by_test_id(test_id)).to_be_visible()
 
-    expect(page.get_by_test_id("source-count")).to_contain_text("6 sources")
-    expect(page.get_by_test_id("source-card-line-segment-1")).to_contain_text("Orientation")
-    expect(page.get_by_test_id("source-card-disk-1")).to_contain_text("Normal")
-    expect(page.get_by_test_id("source-card-infinite-plane-1")).to_contain_text("Surface density")
-    expect(page.get_by_test_id("source-card-spherical-shell-1")).to_contain_text("Radius m")
+    expect(page.get_by_test_id("source-count")).to_contain_text("6 个源")
+    expect(page.get_by_test_id("source-card-line-segment-1")).to_contain_text("方向")
+    expect(page.get_by_test_id("source-card-disk-1")).to_contain_text("法向")
+    expect(page.get_by_test_id("source-card-infinite-plane-1")).to_contain_text("面电荷密度")
+    expect(page.get_by_test_id("source-card-spherical-shell-1")).to_contain_text("半径 m")
 
-    _fill_number(page, "line-segment-1 orientation x", "0")
-    _fill_number(page, "line-segment-1 orientation y", "1")
-    _fill_number(page, "line-segment-1 length m", "0.18")
-    _fill_number(page, "disk-1 normal z", "1")
-    _fill_number(page, "infinite-plane-1 surface density C/m^2", "2e-9")
-    _fill_number(page, "spherical-shell-1 radius m", "0.14")
+    _fill_number(page, "line-segment-1 方向 x", "0")
+    _fill_number(page, "line-segment-1 方向 y", "1")
+    _fill_number(page, "line-segment-1 长度 m", "0.18")
+    _fill_number(page, "disk-1 法向 z", "1")
+    _fill_number(page, "infinite-plane-1 面电荷密度 C/m^2", "2e-9")
+    _fill_number(page, "spherical-shell-1 半径 m", "0.14")
 
-    page.get_by_label("Solver quality").select_option("refined")
+    page.get_by_label("计算质量").select_option("refined")
     expect(page.get_by_test_id("quality-value")).to_contain_text("refined")
-    expect(page.get_by_test_id("solver-status")).to_contain_text("Ready")
+    expect(page.get_by_test_id("solver-status")).to_contain_text("已完成")
 
-    expect(page.get_by_test_id("overlay-status")).to_contain_text("Ready")
+    expect(page.get_by_test_id("overlay-status")).to_contain_text("已完成")
     expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "25")
-    expect(page.get_by_test_id("overlay-summary")).to_contain_text("sampled |E|")
+    expect(page.get_by_test_id("overlay-summary")).to_contain_text("采样 |E|")
 
     page.get_by_role("button", name="3D").click()
     expect(page.get_by_test_id("view-3d")).to_be_visible()
-    expect(page.get_by_test_id("source-count")).to_contain_text("6 sources")
+    expect(page.get_by_test_id("source-count")).to_contain_text("6 个源")
     expect(page.get_by_test_id("mode-label")).to_contain_text("3D")
 
     page.get_by_role("button", name="2D").click()
     expect(page.get_by_test_id("view-2d")).to_be_visible()
-    expect(page.get_by_test_id("source-card-disk-1")).to_contain_text("Disk 1")
+    expect(page.get_by_test_id("source-card-disk-1")).to_contain_text("带电圆盘 1")
 
-    page.get_by_label("Preset").select_option("electric-dipole")
-    page.get_by_role("button", name="Load preset").click()
-    expect(page.get_by_test_id("preset-status")).to_contain_text("Loaded Electric dipole")
-    expect(page.get_by_test_id("source-count")).to_contain_text("2 sources")
+    page.get_by_label("场景预设").select_option("electric-dipole")
+    page.get_by_role("button", name="加载预设").click()
+    expect(page.get_by_test_id("preset-status")).to_contain_text("已加载：Electric dipole")
+    expect(page.get_by_test_id("source-count")).to_contain_text("2 个源")
     expect(page.get_by_test_id("source-card-dipole-positive")).to_contain_text("Positive pole")
     expect(page.get_by_test_id("quality-value")).to_contain_text("refined")
     expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "25")

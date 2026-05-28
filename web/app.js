@@ -54,6 +54,15 @@ const state = {
   overlaySamples: [],
 };
 
+const KIND_LABELS = {
+  point: "点电荷",
+  line_segment: "带电线段",
+  ring: "带电圆环",
+  disk: "带电圆盘",
+  infinite_plane: "无限平面",
+  spherical_shell: "球壳",
+};
+
 let latestProbeRequestId = "";
 let latestOverlayRequestId = "";
 let requestSerial = 0;
@@ -82,10 +91,7 @@ function escapeHtml(value) {
 }
 
 function kindLabel(kind) {
-  return kind
-    .split("_")
-    .map((part) => part[0].toUpperCase() + part.slice(1))
-    .join(" ");
+  return KIND_LABELS[kind] ?? kind;
 }
 
 function sourceDefaults(kind) {
@@ -102,7 +108,7 @@ function sourceDefaults(kind) {
   if (kind === "point") {
     return {
       ...base,
-      label: `Point ${index}`,
+      label: `点电荷 ${index}`,
       position: { x: -0.16, y: 0, z: 0, unit: "m" },
       charge_c: 1e-9,
     };
@@ -110,7 +116,7 @@ function sourceDefaults(kind) {
   if (kind === "line_segment") {
     return {
       ...base,
-      label: `Line Segment ${index}`,
+      label: `带电线段 ${index}`,
       position: { x: -0.08, y: 0.08, z: 0, unit: "m" },
       orientation: { x: 1, y: 0, z: 0 },
       length_m: 0.16,
@@ -120,7 +126,7 @@ function sourceDefaults(kind) {
   if (kind === "ring") {
     return {
       ...base,
-      label: `Ring ${index}`,
+      label: `带电圆环 ${index}`,
       position: { x: 0.12, y: 0, z: 0, unit: "m" },
       normal: { x: 0, y: 0, z: 1 },
       radius_m: 0.08,
@@ -130,7 +136,7 @@ function sourceDefaults(kind) {
   if (kind === "disk") {
     return {
       ...base,
-      label: `Disk ${index}`,
+      label: `带电圆盘 ${index}`,
       position: { x: 0, y: -0.11, z: 0, unit: "m" },
       normal: { x: 0, y: 0, z: 1 },
       radius_m: 0.09,
@@ -140,7 +146,7 @@ function sourceDefaults(kind) {
   if (kind === "infinite_plane") {
     return {
       ...base,
-      label: `Infinite Plane ${index}`,
+      label: `无限平面 ${index}`,
       position: { x: 0.14, y: 0.11, z: 0, unit: "m" },
       normal: { x: 0, y: 0, z: 1 },
       display_extent_m: 0.24,
@@ -150,7 +156,7 @@ function sourceDefaults(kind) {
   }
   return {
     ...base,
-    label: `Spherical Shell ${index}`,
+    label: `球壳 ${index}`,
     position: { x: -0.14, y: -0.11, z: 0, unit: "m" },
     radius_m: 0.08,
     charge_c: 3e-9,
@@ -244,9 +250,9 @@ function vectorFields(source, group, heading) {
     <div class="vector-fieldset">
       <span>${heading}</span>
       <div class="mini-grid">
-        ${sourceField(source, `${group}.x`, `${group} x`)}
-        ${sourceField(source, `${group}.y`, `${group} y`)}
-        ${sourceField(source, `${group}.z`, `${group} z`)}
+        ${sourceField(source, `${group}.x`, `${heading} x`)}
+        ${sourceField(source, `${group}.y`, `${heading} y`)}
+        ${sourceField(source, `${group}.z`, `${heading} z`)}
       </div>
     </div>
   `;
@@ -255,35 +261,33 @@ function vectorFields(source, group, heading) {
 function scalarControls(source) {
   const controlsMarkup = [];
   if ("charge_c" in source && source.charge_c !== null) {
-    controlsMarkup.push(sourceField(source, "charge_c", "Charge C", "1e-10"));
+    controlsMarkup.push(sourceField(source, "charge_c", "电荷 C", "1e-10"));
   }
   if ("length_m" in source) {
-    controlsMarkup.push(sourceField(source, "length_m", "length m", "0.01"));
+    controlsMarkup.push(sourceField(source, "length_m", "长度 m", "0.01"));
   }
   if ("radius_m" in source) {
-    controlsMarkup.push(sourceField(source, "radius_m", "Radius m", "0.01"));
+    controlsMarkup.push(sourceField(source, "radius_m", "半径 m", "0.01"));
   }
   if ("display_extent_m" in source) {
-    controlsMarkup.push(sourceField(source, "display_extent_m", "display extent m", "0.01"));
+    controlsMarkup.push(sourceField(source, "display_extent_m", "显示范围 m", "0.01"));
   }
   if ("surface_charge_density_c_per_m2" in source) {
     controlsMarkup.push(
-      sourceField(source, "surface_charge_density_c_per_m2", "Surface density C/m^2", "1e-10"),
+      sourceField(source, "surface_charge_density_c_per_m2", "面电荷密度 C/m^2", "1e-10"),
     );
   }
   return controlsMarkup.join("");
 }
 
 function renderSourceList() {
-  sourceCount.textContent = `${state.scene.sources.length} source${
-    state.scene.sources.length === 1 ? "" : "s"
-  }`;
+  sourceCount.textContent = `${state.scene.sources.length} 个源`;
 
   if (state.scene.sources.length === 0) {
     sourceList.innerHTML = `
       <div class="empty-state">
-        <p>No editable sources yet.</p>
-        <span>Add a static source or load a preset to start computing.</span>
+        <p>还没有可编辑的源。</p>
+        <span>加入一个静电源，或加载一个预设场景开始探索。</span>
       </div>
     `;
     return;
@@ -296,19 +300,19 @@ function renderSourceList() {
         <article class="source-card" data-testid="source-card-${source.id}">
           <div class="source-card-heading">
             <strong>${label}</strong>
-            <span>${source.kind}</span>
+            <span>${KIND_LABELS[source.kind] ?? source.kind}</span>
           </div>
-          <label>Label
+          <label>名称
             <input type="text" value="${label}" data-source-id="${source.id}" data-field="label">
           </label>
           <div class="mini-grid">
-            ${sourceField(source, "position.x", "x m")}
-            ${sourceField(source, "position.y", "y m")}
-            ${sourceField(source, "position.z", "z m")}
+            ${sourceField(source, "position.x", "位置 x m")}
+            ${sourceField(source, "position.y", "位置 y m")}
+            ${sourceField(source, "position.z", "位置 z m")}
             ${scalarControls(source)}
           </div>
-          ${vectorFields(source, "orientation", "Orientation")}
-          ${vectorFields(source, "normal", "Normal")}
+          ${vectorFields(source, "orientation", "方向")}
+          ${vectorFields(source, "normal", "法向")}
         </article>
       `;
     })
@@ -574,7 +578,7 @@ function render3d() {
 
 function renderProbe() {
   probePosition.textContent =
-    `Probe at (${formatFixed(state.probe.x)}, ${formatFixed(state.probe.y)}, ` +
+    `探针位置 (${formatFixed(state.probe.x)}, ${formatFixed(state.probe.y)}, ` +
     `${formatFixed(state.probe.z)}) m`;
 }
 
@@ -585,7 +589,7 @@ function renderResult() {
   }
 
   const sample = state.lastResult.samples[0];
-  solverStatus.textContent = `Ready (${state.lastResult.request_id})`;
+  solverStatus.textContent = `已完成 (${state.lastResult.request_id})`;
   potentialValue.textContent = `${formatNumber(sample.potential_v, 5)} V`;
   fieldVectorValue.textContent =
     `(${formatNumber(sample.field_v_per_m.x, 4)}, ` +
@@ -606,7 +610,7 @@ function renderResult() {
   const warnings = [...state.lastResult.warnings, ...sample.warnings];
   warningList.innerHTML = warnings.length
     ? [...new Set(warnings)].map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")
-    : "<li>No warnings.</li>";
+    : "<li>暂无提示。</li>";
 }
 
 function renderOverlaySummary() {
@@ -616,11 +620,11 @@ function renderOverlaySummary() {
   const magnitudes = state.overlayResult.samples.map((sample) => sample.field_magnitude_v_per_m);
   const minMagnitude = Math.min(...magnitudes);
   const maxMagnitude = Math.max(...magnitudes);
-  overlayStatus.textContent = `Ready (${state.overlayResult.request_id})`;
+  overlayStatus.textContent = `已完成 (${state.overlayResult.request_id})`;
   overlaySummary.textContent =
-    `2D vector grid sampled ${state.overlayResult.sample_count} points; ` +
-    `sampled |E| ${formatNumber(minMagnitude, 3)} to ${formatNumber(maxMagnitude, 3)} V/m. ` +
-    "This is a sampled magnitude summary, not field-line or equipotential extraction.";
+    `二维箭头层采样 ${state.overlayResult.sample_count} 个点；` +
+    `采样 |E| 范围 ${formatNumber(minMagnitude, 3)} 到 ${formatNumber(maxMagnitude, 3)} V/m。` +
+    "这是离散采样摘要，不是场线或等势线提取。";
 }
 
 function renderAll() {
@@ -637,14 +641,14 @@ function renderAll() {
 function setEmptyComputationState() {
   state.lastResult = null;
   state.overlayResult = null;
-  solverStatus.textContent = "Waiting for sources";
-  overlayStatus.textContent = "Waiting for sources";
-  potentialValue.textContent = "Unavailable";
-  fieldVectorValue.textContent = "Unavailable";
-  fieldMagnitudeValue.textContent = "Unavailable";
-  contributionList.innerHTML = "<li>No source contributions yet.</li>";
-  warningList.innerHTML = "<li>No warnings.</li>";
-  overlaySummary.textContent = "Vector sampling appears in the 2D view after sources are evaluated.";
+  solverStatus.textContent = "等待源";
+  overlayStatus.textContent = "等待源";
+  potentialValue.textContent = "暂无";
+  fieldVectorValue.textContent = "暂无";
+  fieldMagnitudeValue.textContent = "暂无";
+  contributionList.innerHTML = "<li>还没有源贡献。</li>";
+  warningList.innerHTML = "<li>暂无提示。</li>";
+  overlaySummary.textContent = "加入源后，二维视图会显示采样电场箭头。";
   render2d();
 }
 
@@ -661,7 +665,7 @@ async function postFieldEvaluation(requestId, samplePoints) {
   });
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Field evaluation failed: ${response.status} ${detail}`);
+    throw new Error(`场计算失败：${response.status} ${detail}`);
   }
   return response.json();
 }
@@ -672,7 +676,7 @@ async function evaluateProbe(requestId) {
     return;
   }
 
-  solverStatus.textContent = `Computing (${requestId})`;
+  solverStatus.textContent = `计算中 (${requestId})`;
   const result = await postFieldEvaluation(requestId, [state.probe]);
   if (result.request_id !== latestProbeRequestId) {
     return;
@@ -697,7 +701,7 @@ async function evaluateOverlay(requestId) {
     return;
   }
 
-  overlayStatus.textContent = `Computing (${requestId})`;
+  overlayStatus.textContent = `采样中 (${requestId})`;
   const samples = overlaySamplePoints();
   const result = await postFieldEvaluation(requestId, samples);
   if (result.request_id !== latestOverlayRequestId) {
@@ -738,13 +742,13 @@ function refreshSourceIndexes() {
 async function loadPresetOptions() {
   const response = await fetch("/api/presets", { headers: { Accept: "application/json" } });
   if (!response.ok) {
-    throw new Error(`Preset index failed: ${response.status}`);
+    throw new Error(`预设列表读取失败：${response.status}`);
   }
   const presets = await response.json();
   presetSelect.innerHTML = presets
     .map((preset) => `<option value="${preset.id}">${escapeHtml(preset.title)}</option>`)
     .join("");
-  presetStatus.textContent = `${presets.length} presets available.`;
+  presetStatus.textContent = `可用预设 ${presets.length} 个。`;
 }
 
 async function loadSelectedPreset() {
@@ -752,19 +756,19 @@ async function loadSelectedPreset() {
   if (!presetId) {
     return;
   }
-  presetStatus.textContent = `Loading ${presetId}...`;
+  presetStatus.textContent = `正在加载 ${presetId}...`;
   const response = await fetch(`/api/presets/${encodeURIComponent(presetId)}`, {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    throw new Error(`Preset load failed: ${response.status}`);
+    throw new Error(`预设加载失败：${response.status}`);
   }
   const preset = await response.json();
   state.scene = preset.scene;
   state.lastResult = null;
   state.overlayResult = null;
   refreshSourceIndexes();
-  presetStatus.textContent = `Loaded ${preset.title}.`;
+  presetStatus.textContent = `已加载：${preset.title}。`;
   renderAll();
   scheduleEvaluation();
 }
@@ -774,14 +778,14 @@ async function initialiseShell() {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    throw new Error(`Configuration request failed: ${response.status}`);
+    throw new Error(`配置读取失败：${response.status}`);
   }
 
   const config = await response.json();
-  document.title = `${config.product.name} | ${config.product.module}`;
+  document.title = "电磁工作台 | 静电场";
   runtimeStatus.textContent =
-    `Local modules staged: Three.js ${config.runtime.three.version}. ` +
-    "2D and 3D interaction active.";
+    `本地 Three.js ${config.runtime.three.version} 已就绪。` +
+    "二维与三维交互已启用。";
 }
 
 document.querySelector("#add-point").addEventListener("click", () => addSource("point"));
@@ -834,9 +838,9 @@ window.addEventListener("resize", () => {
 renderAll();
 initialiseShell().catch(() => {
   runtimeStatus.textContent =
-    "Local runtime configuration unavailable. Simulation can still use cached UI state.";
+    "本地运行配置暂不可用；当前界面状态仍可继续保留。";
 });
 loadPresetOptions().catch((error) => {
-  presetSelect.innerHTML = '<option value="">Preset loading failed</option>';
+  presetSelect.innerHTML = '<option value="">预设读取失败</option>';
   presetStatus.textContent = error.message;
 });

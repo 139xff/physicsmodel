@@ -21,6 +21,7 @@ const probeInputs = {
   y: document.querySelector("#probe-y"),
   z: document.querySelector("#probe-z"),
 };
+const VIEWPORT_METERS_TO_UNITS = 180;
 
 const state = {
   mode: "2D",
@@ -33,7 +34,7 @@ const state = {
     title: "Browser interaction scene",
     sources: [],
   },
-  probe: { x: 0.2, y: 0, z: 0.05 },
+  probe: { x: 0.2, y: 0.03, z: 0.05 },
   lastResult: null,
 };
 
@@ -185,11 +186,30 @@ function renderSourceList() {
 }
 
 function mapToViewport(x, y) {
-  const scale = 820;
   return {
-    x: 50 + x * scale,
-    y: 50 - y * scale,
+    x: 50 + x * VIEWPORT_METERS_TO_UNITS,
+    y: 50 - y * VIEWPORT_METERS_TO_UNITS,
   };
+}
+
+function physicsNormalToThreeComponents(normal) {
+  const vector = { x: normal.x, y: normal.z, z: normal.y };
+  const length = Math.hypot(vector.x, vector.y, vector.z);
+  if (length === 0) {
+    return { x: 0, y: 1, z: 0 };
+  }
+  return { x: vector.x / length, y: vector.y / length, z: vector.z / length };
+}
+
+function threeVectorFromComponents(components) {
+  return new THREE.Vector3(components.x, components.y, components.z);
+}
+
+function formatThreeNormal(components) {
+  return [components.x, components.y, components.z]
+    .map((component) => (Math.abs(component) < 1e-9 ? 0 : component))
+    .map((component) => Number(component.toFixed(6)).toString())
+    .join(",");
 }
 
 function render2d() {
@@ -199,15 +219,27 @@ function render2d() {
       const label = escapeHtml(source.label);
       if (source.kind === "ring") {
         return `
-          <g>
-            <circle class="source-ring" cx="${point.x}" cy="${point.y}" r="${source.radius_m * 820}"></circle>
+          <g data-testid="source-ring-group-2d-${source.id}">
+            <circle
+              class="source-ring"
+              data-testid="source-ring-2d-${source.id}"
+              cx="${point.x}"
+              cy="${point.y}"
+              r="${source.radius_m * VIEWPORT_METERS_TO_UNITS}"
+            ></circle>
             <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
           </g>
         `;
       }
       return `
-        <g>
-          <circle class="source-point" cx="${point.x}" cy="${point.y}" r="7"></circle>
+        <g data-testid="source-point-group-2d-${source.id}">
+          <circle
+            class="source-point"
+            data-testid="source-point-2d-${source.id}"
+            cx="${point.x}"
+            cy="${point.y}"
+            r="7"
+          ></circle>
           <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
         </g>
       `;
@@ -227,7 +259,13 @@ function render2d() {
       <line class="axis-line" x1="50" y1="0" x2="50" y2="100"></line>
       ${sourceMarkup}
       <g>
-        <path class="probe-marker" d="M ${probe.x - 4} ${probe.y} L ${probe.x + 4} ${probe.y} M ${probe.x} ${probe.y - 4} L ${probe.x} ${probe.y + 4}"></path>
+        <path
+          class="probe-marker"
+          data-testid="probe-marker-2d"
+          data-view-x="${probe.x}"
+          data-view-y="${probe.y}"
+          d="M ${probe.x - 4} ${probe.y} L ${probe.x + 4} ${probe.y} M ${probe.x} ${probe.y - 4} L ${probe.x} ${probe.y + 4}"
+        ></path>
         <text x="${probe.x + 6}" y="${probe.y + 6}">Probe</text>
       </g>
     </svg>
@@ -261,6 +299,14 @@ function ensure3d() {
 }
 
 function render3d() {
+  view3d.removeAttribute("data-ring-normal-three");
+  const firstRing = state.scene.sources.find((source) => source.kind === "ring");
+  if (firstRing) {
+    view3d.dataset.ringNormalThree = formatThreeNormal(
+      physicsNormalToThreeComponents(firstRing.normal),
+    );
+  }
+
   ensure3d();
   sceneGroup.clear();
 
@@ -269,6 +315,8 @@ function render3d() {
       const geometry = new THREE.TorusGeometry(source.radius_m, 0.004, 10, 72);
       const material = new THREE.MeshBasicMaterial({ color: 0xf7ca6a });
       const mesh = new THREE.Mesh(geometry, material);
+      const threeNormal = threeVectorFromComponents(physicsNormalToThreeComponents(source.normal));
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), threeNormal);
       mesh.position.set(source.position.x, source.position.z, source.position.y);
       sceneGroup.add(mesh);
     } else {

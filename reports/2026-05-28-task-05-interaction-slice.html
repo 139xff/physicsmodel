@@ -30,7 +30,7 @@
       <h1>Task 05: Shared UI state plus 2D and 3D interaction slice</h1>
       <div class="meta">
         <span class="status">DONE</span>
-        <span>Completed: <time datetime="2026-05-28T14:48:30+08:00">2026-05-28T14:48:30+08:00</time></span>
+        <span>Completed: <time datetime="2026-05-28T14:58:28+08:00">2026-05-28T14:58:28+08:00</time></span>
       </div>
     </header>
 
@@ -45,6 +45,9 @@
         <li>Added request_id deconfliction so stale field-evaluation responses from rapid edits are ignored.</li>
         <li>Updated /api/config to mark scene editing and interaction as available for this vertical slice.</li>
         <li>Added a Playwright smoke test covering page load, source creation, probe movement, solver output, warning display, and 2D/3D state preservation.</li>
+        <li>Review fix: corrected 2D top-down physical scaling so the default point, ring, and probe geometry fit inside the SVG viewBox while preserving physical coordinates.</li>
+        <li>Review fix: aligned Three.js ring torus orientation from physical normals using the project mapping (x, z, y), and exposed the first rendered ring normal as a stable browser-test attribute.</li>
+        <li>Review fix: strengthened Playwright coverage to assert actual SVG point/ring/probe geometry bounds and default 3D ring normal mapping.</li>
       </ul>
     </section>
 
@@ -52,7 +55,7 @@
       <h2>Scope Deferred</h2>
       <ul>
         <li>No polished visual design, drag handles, deletion controls, advanced overlays, presets, or optional assistance were added.</li>
-        <li>3D ring orientation is fixed to the current ring normal default; arbitrary normal editing and mesh rotation remain future work.</li>
+        <li>Normal editing controls remain deferred; mesh rotation now honors the source normal already present in the scene contract.</li>
         <li>The browser renders solver output for a single probe only, matching this task slice.</li>
       </ul>
     </section>
@@ -83,7 +86,7 @@
           <tbody>
             <tr><td><code>web/index.html</code></td><td>Introduce editable source controls, 2D/3D view surfaces, probe inputs, solver output panels, and stable test IDs.</td></tr>
             <tr><td><code>web/styles.css</code></td><td>Style editable source cards, probe controls, 2D SVG scene, 3D surface, and compact solver output lists.</td></tr>
-            <tr><td><code>web/app.js</code></td><td>Implement shared UI state, source/probe editing, 2D SVG rendering, Three.js rendering, solver POST calls, and request_id stale-response suppression.</td></tr>
+            <tr><td><code>web/app.js</code></td><td>Implement shared UI state, source/probe editing, 2D SVG rendering, Three.js rendering, solver POST calls, request_id stale-response suppression, corrected SVG scale, and physical-normal-to-Three ring orientation.</td></tr>
             <tr><td><code>src/em_workbench/app.py</code></td><td>Mark scene editing and interaction capabilities available after Task 5.</td></tr>
             <tr><td><code>tests/test_app.py</code></td><td>Update static app contract expectations for available interaction and new shell copy.</td></tr>
             <tr><td><code>tests/test_browser_smoke.py</code></td><td>Add browser smoke coverage for the interaction slice.</td></tr>
@@ -102,9 +105,12 @@
           <tbody>
             <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py -vv</code></td><td>RED</td><td>Initial browser smoke failed on missing Task 5 UI test IDs and enabled interaction controls in the existing placeholder shell.</td></tr>
             <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py -vv</code></td><td>GREEN</td><td>After implementation, the Playwright smoke passed: 1 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py</code></td><td>RED</td><td>Review-fix browser assertions failed before implementation because the SVG point geometry had no stable data-testid; this guarded the new geometry-level checks before patching.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py</code></td><td>RED</td><td>After adding SVG geometry hooks and corrected 2D scaling, the test still failed because data-ring-normal-three was not observable on the 3D surface.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py</code></td><td>GREEN</td><td>Review-fix focused browser command passed: 1 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
             <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py</code></td><td>GREEN</td><td>Required focused browser command passed: 1 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
-            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>GREEN</td><td>Required full regression command passed: 62 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
-            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>GREEN</td><td>Required lint command reported All checks passed.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>GREEN</td><td>Required full regression command passed after review fix: 62 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>GREEN</td><td>Required lint command after review fix reported All checks passed.</td></tr>
           </tbody>
         </table>
       </div>
@@ -122,6 +128,8 @@
             <tr><td>Source editing</td><td>PASS</td><td>Playwright added point-1 and ring-1 and observed both source cards plus 2D labels.</td></tr>
             <tr><td>Probe and solver</td><td>PASS</td><td>Playwright edited probe x/y/z, observed Ready status, populated V and |E|, point and ring contributions, preview quality, and ring finite-segment warnings.</td></tr>
             <tr><td>2D/3D shared state</td><td>PASS</td><td>Playwright toggled to 3D and back to 2D while preserving 2 sources, ring card, probe position 0.220, and solver result display.</td></tr>
+            <tr><td>2D geometry fidelity</td><td>PASS</td><td>Playwright asserted the actual SVG point circle, ring circle, and probe marker coordinates/radius fit within viewBox 0 0 100 100 for the default point (-0.12, 0), ring (0.12, 0, r=0.08), and probe (0.2, 0.03).</td></tr>
+            <tr><td>3D ring orientation fidelity</td><td>PASS</td><td>Playwright asserted data-ring-normal-three="0,1,0", confirming default physical normal (0, 0, 1) maps to Three normal (0, 1, 0).</td></tr>
             <tr><td>Chromium availability</td><td>PASS</td><td>Chromium was already available to the uv-managed Playwright runtime; no browser installation command was needed.</td></tr>
           </tbody>
         </table>
@@ -133,7 +141,7 @@
       <ul>
         <li>3D rendering is intentionally basic and rerenders on state changes; it is suitable for this slice but not optimized for large source counts.</li>
         <li>Inline source editing has no deletion or validation messaging beyond API failure status.</li>
-        <li>Ring source editing exposes radius and charge but not normal; the mesh assumes the default z-normal ring orientation.</li>
+        <li>Ring source editing exposes radius and charge but not normal; arbitrary normals can be rendered from scene data but are not yet user-editable in the browser.</li>
         <li>The stale-response guard ignores out-of-date successful responses but does not cancel in-flight fetches.</li>
         <li>Playwright emits deprecation warnings from uvicorn/websockets dependencies during the in-process test server.</li>
       </ul>

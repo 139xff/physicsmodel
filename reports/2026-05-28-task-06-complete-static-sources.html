@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 06: Complete Static Sources And Analytical Overlays - Engineering Task Report</title>
+  <style>
+    :root { color-scheme: light; --ink: #19202b; --muted: #566576; --line: #d3dce6; --panel: #f5f7fa; --accent: #0d5e63; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #fff; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { border-bottom: 3px solid var(--accent); margin-bottom: 2rem; padding-bottom: 1.25rem; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0 0 0.75rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; color: var(--muted); }
+    .status { background: #e7f4f1; border-radius: 999px; color: var(--accent); font-weight: 700; padding: 0.15rem 0.65rem; }
+    ul { margin-top: 0.5rem; padding-left: 1.4rem; }
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 36rem; width: 100%; }
+    caption { color: var(--muted); font-size: 0.95rem; text-align: left; padding: 0 0 0.5rem; }
+    th, td { border: 1px solid var(--line); padding: 0.6rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    code { font: 0.92em ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; }
+    .next { border-left: 4px solid var(--accent); background: var(--panel); padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Task 06: Complete Static Sources And Analytical Overlays</h1>
+      <div class="meta">
+        <span class="status">DONE</span>
+        <span>Completed: <time datetime="2026-05-28T19:45:41+08:00">2026-05-28T19:45:41+08:00</time></span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Expanded browser source creation and editing from point/ring to all six Task 3/4 source kinds: point, line_segment, ring, disk, infinite_plane, and spherical_shell.</li>
+        <li>Exposed stable position, charge, length, radius, display extent, normal, orientation, and surface-density inputs where each source contract requires them.</li>
+        <li>Kept solver authority in Python by sending probe and overlay samples to POST /api/field/evaluate with the selected quality.</li>
+        <li>Added preview/refined solver quality selection that refreshes probe output and overlays while preserving scene and view state.</li>
+        <li>Added a 25-point 2D vector sampling overlay with stale-response suppression separate from the probe request_id path.</li>
+        <li>Added a sampled field-magnitude summary for the overlay, explicitly marking that this is not field-line or equipotential extraction.</li>
+        <li>Added preset index loading from /api/presets and explicit scene replacement from /api/presets/{id} via a Load preset button.</li>
+        <li>Added optional, non-blocking theory prompts in a drawer independent of any forced lesson progression.</li>
+        <li>Added Playwright coverage for six-source creation/editing, quality selection, preset load, vector overlay appearance, and 2D/3D state preservation.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>No field-line or equipotential extraction was implemented; the overlay remains a sampled vector grid plus magnitude summary.</li>
+        <li>No continuous potential or field-magnitude color heatmap was added in this slice.</li>
+        <li>No source deletion, drag handles, or polished validation UI were added; validation failures surface as request status text.</li>
+        <li>3D rendering for non-point sources is intentionally simple geometry, sufficient for state preservation and source identity rather than publication-quality visualization.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Files changed in this task</caption>
+          <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>web/index.html</code></td><td>Add all static source buttons, preset controls, quality selector, overlay status/summary, and optional theory drawer.</td></tr>
+            <tr><td><code>web/app.js</code></td><td>Implement all source defaults/editing, 2D/3D rendering for additional source kinds, probe and overlay solver calls, stale-response handling, preset load, and quality updates.</td></tr>
+            <tr><td><code>web/styles.css</code></td><td>Style preset controls, vector fields, additional 2D source glyphs, vector overlay, and theory drawer.</td></tr>
+            <tr><td><code>tests/test_browser_smoke.py</code></td><td>Add Task 6 Playwright test coverage for source editing, overlays, presets, quality, and state preservation.</td></tr>
+            <tr><td><code>reports/2026-05-28-task-06-complete-static-sources.html</code></td><td>Record Task 6 scope, commands, evidence, risks, and next task.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Commands</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Commands executed</caption>
+          <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py</code></td><td>RED</td><td>New Task 6 browser test failed before implementation waiting for the missing Add line segment button: 1 failed, 1 passed.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py</code></td><td>GREEN</td><td>After implementation and small label fixes, focused browser command passed: 2 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>GREEN</td><td>Required full regression command passed: 63 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>GREEN</td><td>Required lint command reported All checks passed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Browser Verification Evidence</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Playwright assertions covered by tests/test_browser_smoke.py</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+            <tr><td>Source editing</td><td>PASS</td><td>Playwright added all six source kinds and observed source cards for point-1, line-segment-1, ring-1, disk-1, infinite-plane-1, and spherical-shell-1.</td></tr>
+            <tr><td>Normal/orientation editing</td><td>PASS</td><td>Playwright edited line-segment orientation and length, disk normal, plane surface density, and shell radius through accessible numeric inputs.</td></tr>
+            <tr><td>Quality selection</td><td>PASS</td><td>Playwright selected refined quality and observed quality-value and solver Ready status.</td></tr>
+            <tr><td>Overlay vectors</td><td>PASS</td><td>Playwright observed overlay-status Ready and overlay-vector-layer data-vector-count="25".</td></tr>
+            <tr><td>Overlay magnitude summary</td><td>PASS</td><td>Playwright observed the overlay summary text containing sampled |E|.</td></tr>
+            <tr><td>2D/3D state preservation</td><td>PASS</td><td>Playwright toggled 3D then 2D while preserving six sources and visible source cards.</td></tr>
+            <tr><td>Preset load</td><td>PASS</td><td>Playwright selected electric-dipole, clicked Load preset, observed the preset status, two-source count, Positive pole card, refined quality preservation, and refreshed overlay vector count.</td></tr>
+            <tr><td>Chromium availability</td><td>PASS</td><td>Chromium was already available to the uv-managed Playwright runtime; no browser installation command was needed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Known Risks And Limitations</h2>
+      <ul>
+        <li>Rapidly editing a direction vector through zero can briefly produce a validation failure status until the next nonzero component update restores a valid solver request.</li>
+        <li>The overlay uses fixed 5x5 samples at the probe z-plane and does not adapt density or domain to the current source extent.</li>
+        <li>Refined quality with many numerical sources may be noticeably slower because both probe and overlay requests go through the authoritative Python solver.</li>
+        <li>The stale-response guard ignores outdated responses but does not cancel in-flight fetches.</li>
+        <li>Playwright emits uvicorn/websockets dependency deprecation warnings during the in-process test server.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p class="next">Next task: improve overlay affordances and validation feedback, or begin a focused slice for deletion/scene-management controls if that becomes the next prioritized Release 1 need.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -40,11 +40,32 @@
             <h2>Source Library</h2>
             <span>Editable</span>
           </div>
-          <p class="panel-copy">Add point charges and charged rings to the shared scene state.</p>
+          <p class="panel-copy">Add static source contracts to the shared scene state.</p>
           <div class="source-grid" aria-label="Electrostatic source types">
             <button id="add-point" type="button">Add point charge</button>
+            <button id="add-line-segment" type="button">Add line segment</button>
             <button id="add-ring" type="button">Add ring</button>
+            <button id="add-disk" type="button">Add disk</button>
+            <button id="add-infinite-plane" type="button">Add infinite plane</button>
+            <button id="add-spherical-shell" type="button">Add spherical shell</button>
           </div>
+        </section>
+
+        <section class="panel preset-library">
+          <div class="panel-heading">
+            <h2>Presets</h2>
+            <span>Optional</span>
+          </div>
+          <p class="panel-copy">Load a scene only when you explicitly choose one.</p>
+          <form id="preset-form" class="preset-form">
+            <label>Preset
+              <select id="preset-select" name="preset">
+                <option value="">Loading presets...</option>
+              </select>
+            </label>
+            <button type="submit">Load preset</button>
+          </form>
+          <p class="preset-status" data-testid="preset-status">No preset loaded.</p>
         </section>
 
         <section class="panel scene-sources">
@@ -85,6 +106,20 @@
         </section>
 
         <section class="status-block">
+          <h3>Analytical Overlays</h3>
+          <label class="quality-control">Solver quality
+            <select id="quality-select" name="quality">
+              <option value="preview" selected>preview</option>
+              <option value="refined">refined</option>
+            </select>
+          </label>
+          <p class="status-value" data-testid="overlay-status">Waiting for sources</p>
+          <p class="overlay-summary" data-testid="overlay-summary">
+            Vector sampling appears in the 2D view after sources are evaluated.
+          </p>
+        </section>
+
+        <section class="status-block">
           <h3>Computation Status</h3>
           <p class="status-value" data-testid="solver-status">Waiting for sources</p>
           <dl>
@@ -106,6 +141,18 @@
           <ul id="warning-list" class="compact-list" data-testid="warning-list">
             <li>No warnings.</li>
           </ul>
+        </section>
+
+        <section class="runtime-block">
+          <h3>Theory Prompts</h3>
+          <details class="theory-drawer">
+            <summary>Open exploration prompts</summary>
+            <ul>
+              <li>Compare field symmetry across the x and y axes.</li>
+              <li>Switch preview/refined and look for numerical warnings.</li>
+              <li>Move the probe inside and outside shells or near planes.</li>
+            </ul>
+          </details>
         </section>
 
         <section class="runtime-block">

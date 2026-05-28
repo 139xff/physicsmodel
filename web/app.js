@@ -10,24 +10,38 @@ const view3d = document.querySelector("#view-3d");
 const button2d = document.querySelector("#view-2d-button");
 const button3d = document.querySelector("#view-3d-button");
 const solverStatus = document.querySelector("[data-testid='solver-status']");
+const overlayStatus = document.querySelector("[data-testid='overlay-status']");
+const overlaySummary = document.querySelector("[data-testid='overlay-summary']");
 const potentialValue = document.querySelector("[data-testid='potential-value']");
 const fieldVectorValue = document.querySelector("#field-vector-value");
 const fieldMagnitudeValue = document.querySelector("[data-testid='field-magnitude-value']");
 const contributionList = document.querySelector("#contribution-list");
 const warningList = document.querySelector("#warning-list");
 const probePosition = document.querySelector("[data-testid='probe-position']");
+const qualityValue = document.querySelector("[data-testid='quality-value']");
+const qualitySelect = document.querySelector("#quality-select");
+const presetSelect = document.querySelector("#preset-select");
+const presetForm = document.querySelector("#preset-form");
+const presetStatus = document.querySelector("[data-testid='preset-status']");
 const probeInputs = {
   x: document.querySelector("#probe-x"),
   y: document.querySelector("#probe-y"),
   z: document.querySelector("#probe-z"),
 };
 const VIEWPORT_METERS_TO_UNITS = 180;
+const OVERLAY_SAMPLE_AXIS = [-0.18, -0.09, 0, 0.09, 0.18];
 
 const state = {
   mode: "2D",
   quality: "preview",
-  pointIndex: 0,
-  ringIndex: 0,
+  sourceIndex: {
+    point: 0,
+    line_segment: 0,
+    ring: 0,
+    disk: 0,
+    infinite_plane: 0,
+    spherical_shell: 0,
+  },
   scene: {
     schema_version: 1,
     id: "browser-interaction-scene",
@@ -36,9 +50,12 @@ const state = {
   },
   probe: { x: 0.2, y: 0.03, z: 0.05 },
   lastResult: null,
+  overlayResult: null,
+  overlaySamples: [],
 };
 
-let latestRequestId = "";
+let latestProbeRequestId = "";
+let latestOverlayRequestId = "";
 let requestSerial = 0;
 let sceneGroup;
 let camera;
@@ -64,27 +81,79 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function kindLabel(kind) {
+  return kind
+    .split("_")
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function sourceDefaults(kind) {
+  state.sourceIndex[kind] += 1;
+  const index = state.sourceIndex[kind];
+  const idPrefix = kind.replaceAll("_", "-");
+  const base = {
+    id: `${idPrefix}-${index}`,
+    kind,
+    label: `${kindLabel(kind)} ${index}`,
+    position: { x: 0, y: 0, z: 0, unit: "m" },
+  };
+
   if (kind === "point") {
-    state.pointIndex += 1;
     return {
-      id: `point-${state.pointIndex}`,
-      kind: "point",
-      label: `Point ${state.pointIndex}`,
-      position: { x: -0.12, y: 0, z: 0, unit: "m" },
+      ...base,
+      label: `Point ${index}`,
+      position: { x: -0.16, y: 0, z: 0, unit: "m" },
       charge_c: 1e-9,
     };
   }
-
-  state.ringIndex += 1;
+  if (kind === "line_segment") {
+    return {
+      ...base,
+      label: `Line Segment ${index}`,
+      position: { x: -0.08, y: 0.08, z: 0, unit: "m" },
+      orientation: { x: 1, y: 0, z: 0 },
+      length_m: 0.16,
+      charge_c: 1.5e-9,
+    };
+  }
+  if (kind === "ring") {
+    return {
+      ...base,
+      label: `Ring ${index}`,
+      position: { x: 0.12, y: 0, z: 0, unit: "m" },
+      normal: { x: 0, y: 0, z: 1 },
+      radius_m: 0.08,
+      charge_c: 2e-9,
+    };
+  }
+  if (kind === "disk") {
+    return {
+      ...base,
+      label: `Disk ${index}`,
+      position: { x: 0, y: -0.11, z: 0, unit: "m" },
+      normal: { x: 0, y: 0, z: 1 },
+      radius_m: 0.09,
+      charge_c: 2e-9,
+    };
+  }
+  if (kind === "infinite_plane") {
+    return {
+      ...base,
+      label: `Infinite Plane ${index}`,
+      position: { x: 0.14, y: 0.11, z: 0, unit: "m" },
+      normal: { x: 0, y: 0, z: 1 },
+      display_extent_m: 0.24,
+      surface_charge_density_c_per_m2: 2e-9,
+      physical_model: "infinite",
+    };
+  }
   return {
-    id: `ring-${state.ringIndex}`,
-    kind: "ring",
-    label: `Ring ${state.ringIndex}`,
-    position: { x: 0.12, y: 0, z: 0, unit: "m" },
-    normal: { x: 0, y: 0, z: 1 },
+    ...base,
+    label: `Spherical Shell ${index}`,
+    position: { x: -0.14, y: -0.11, z: 0, unit: "m" },
     radius_m: 0.08,
-    charge_c: 2e-9,
+    charge_c: 3e-9,
   };
 }
 
@@ -96,15 +165,16 @@ function addSource(kind) {
 
 function updateSource(sourceId, field, value) {
   const source = state.scene.sources.find((candidate) => candidate.id === sourceId);
-  if (!source) {
+  if (!source || !field) {
     return;
   }
 
   if (field === "label") {
     source.label = value || source.id;
-  } else if (field.startsWith("position.")) {
-    source.position[field.split(".")[1]] = Number(value);
-  } else if (field === "charge_c" || field === "radius_m") {
+  } else if (field.includes(".")) {
+    const [group, key] = field.split(".");
+    source[group][key] = Number(value);
+  } else if (field !== "physical_model" && field !== "kind" && field !== "id") {
     source[field] = Number(value);
   }
 
@@ -134,13 +204,74 @@ function setProbeFromInputs() {
   scheduleEvaluation();
 }
 
+function setQuality(value) {
+  state.quality = value;
+  qualityValue.textContent = value;
+  renderResult();
+  scheduleEvaluation();
+}
+
+function nestedValue(source, field) {
+  if (!field.includes(".")) {
+    return source[field];
+  }
+  const [group, key] = field.split(".");
+  return source[group][key];
+}
+
 function sourceField(source, field, label, step = "0.01") {
-  const value = field.startsWith("position.") ? source.position[field.split(".")[1]] : source[field];
+  const value = nestedValue(source, field);
+  const accessibleLabel = `${source.id} ${label}`;
   return `
     <label>${label}
-      <input type="number" step="${step}" value="${value}" data-source-id="${source.id}" data-field="${field}">
+      <input
+        aria-label="${escapeHtml(accessibleLabel)}"
+        type="number"
+        step="${step}"
+        value="${value}"
+        data-source-id="${source.id}"
+        data-field="${field}"
+      >
     </label>
   `;
+}
+
+function vectorFields(source, group, heading) {
+  if (!source[group]) {
+    return "";
+  }
+  return `
+    <div class="vector-fieldset">
+      <span>${heading}</span>
+      <div class="mini-grid">
+        ${sourceField(source, `${group}.x`, `${group} x`)}
+        ${sourceField(source, `${group}.y`, `${group} y`)}
+        ${sourceField(source, `${group}.z`, `${group} z`)}
+      </div>
+    </div>
+  `;
+}
+
+function scalarControls(source) {
+  const controlsMarkup = [];
+  if ("charge_c" in source && source.charge_c !== null) {
+    controlsMarkup.push(sourceField(source, "charge_c", "Charge C", "1e-10"));
+  }
+  if ("length_m" in source) {
+    controlsMarkup.push(sourceField(source, "length_m", "length m", "0.01"));
+  }
+  if ("radius_m" in source) {
+    controlsMarkup.push(sourceField(source, "radius_m", "Radius m", "0.01"));
+  }
+  if ("display_extent_m" in source) {
+    controlsMarkup.push(sourceField(source, "display_extent_m", "display extent m", "0.01"));
+  }
+  if ("surface_charge_density_c_per_m2" in source) {
+    controlsMarkup.push(
+      sourceField(source, "surface_charge_density_c_per_m2", "Surface density C/m^2", "1e-10"),
+    );
+  }
+  return controlsMarkup.join("");
 }
 
 function renderSourceList() {
@@ -152,7 +283,7 @@ function renderSourceList() {
     sourceList.innerHTML = `
       <div class="empty-state">
         <p>No editable sources yet.</p>
-        <span>Add a point charge or ring to start computing.</span>
+        <span>Add a static source or load a preset to start computing.</span>
       </div>
     `;
     return;
@@ -160,8 +291,6 @@ function renderSourceList() {
 
   sourceList.innerHTML = state.scene.sources
     .map((source) => {
-      const radiusControl =
-        source.kind === "ring" ? sourceField(source, "radius_m", "Radius m", "0.01") : "";
       const label = escapeHtml(source.label);
       return `
         <article class="source-card" data-testid="source-card-${source.id}">
@@ -176,9 +305,10 @@ function renderSourceList() {
             ${sourceField(source, "position.x", "x m")}
             ${sourceField(source, "position.y", "y m")}
             ${sourceField(source, "position.z", "z m")}
-            ${sourceField(source, "charge_c", "Charge C", "1e-10")}
-            ${radiusControl}
+            ${scalarControls(source)}
           </div>
+          ${vectorFields(source, "orientation", "Orientation")}
+          ${vectorFields(source, "normal", "Normal")}
         </article>
       `;
     })
@@ -212,39 +342,111 @@ function formatThreeNormal(components) {
     .join(",");
 }
 
-function render2d() {
-  const sourceMarkup = state.scene.sources
-    .map((source) => {
-      const point = mapToViewport(source.position.x, source.position.y);
-      const label = escapeHtml(source.label);
-      if (source.kind === "ring") {
-        return `
-          <g data-testid="source-ring-group-2d-${source.id}">
-            <circle
-              class="source-ring"
-              data-testid="source-ring-2d-${source.id}"
-              cx="${point.x}"
-              cy="${point.y}"
-              r="${source.radius_m * VIEWPORT_METERS_TO_UNITS}"
-            ></circle>
-            <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
-          </g>
-        `;
-      }
+function renderSource2d(source) {
+  const point = mapToViewport(source.position.x, source.position.y);
+  const label = escapeHtml(source.label);
+  if (source.kind === "line_segment") {
+    const halfLength = (source.length_m * VIEWPORT_METERS_TO_UNITS) / 2;
+    const angle = Math.atan2(source.orientation.y, source.orientation.x);
+    const dx = Math.cos(angle) * halfLength;
+    const dy = Math.sin(angle) * halfLength;
+    return `
+      <g data-testid="source-line-segment-group-2d-${source.id}">
+        <line
+          class="source-line-segment"
+          data-testid="source-line-segment-2d-${source.id}"
+          x1="${point.x - dx}"
+          y1="${point.y + dy}"
+          x2="${point.x + dx}"
+          y2="${point.y - dy}"
+        ></line>
+        <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
+      </g>
+    `;
+  }
+  if (source.kind === "ring" || source.kind === "disk" || source.kind === "spherical_shell") {
+    const className = `source-${source.kind.replaceAll("_", "-")}`;
+    return `
+      <g data-testid="source-${source.kind.replaceAll("_", "-")}-group-2d-${source.id}">
+        <circle
+          class="${className}"
+          data-testid="source-${source.kind.replaceAll("_", "-")}-2d-${source.id}"
+          cx="${point.x}"
+          cy="${point.y}"
+          r="${source.radius_m * VIEWPORT_METERS_TO_UNITS}"
+        ></circle>
+        <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
+      </g>
+    `;
+  }
+  if (source.kind === "infinite_plane") {
+    const extent = (source.display_extent_m * VIEWPORT_METERS_TO_UNITS) / 2;
+    return `
+      <g data-testid="source-infinite-plane-group-2d-${source.id}">
+        <rect
+          class="source-infinite-plane"
+          data-testid="source-infinite-plane-2d-${source.id}"
+          x="${point.x - extent}"
+          y="${point.y - extent}"
+          width="${extent * 2}"
+          height="${extent * 2}"
+        ></rect>
+        <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
+      </g>
+    `;
+  }
+  return `
+    <g data-testid="source-point-group-2d-${source.id}">
+      <circle
+        class="source-point"
+        data-testid="source-point-2d-${source.id}"
+        cx="${point.x}"
+        cy="${point.y}"
+        r="7"
+      ></circle>
+      <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
+    </g>
+  `;
+}
+
+function renderOverlay2d() {
+  if (!state.overlayResult || state.overlaySamples.length === 0) {
+    return '<g data-testid="overlay-vector-layer" data-vector-count="0"></g>';
+  }
+  const magnitudes = state.overlayResult.samples.map((sample) => sample.field_magnitude_v_per_m);
+  const maxMagnitude = Math.max(...magnitudes, 1);
+  const vectors = state.overlayResult.samples
+    .map((sample, index) => {
+      const point = mapToViewport(state.overlaySamples[index].x, state.overlaySamples[index].y);
+      const field = sample.field_v_per_m;
+      const xyMagnitude = Math.hypot(field.x, field.y);
+      const scale = xyMagnitude > 0 ? Math.min(5.5, 1.5 + 4 * (xyMagnitude / maxMagnitude)) : 0;
+      const dx = xyMagnitude > 0 ? (field.x / xyMagnitude) * scale : 0;
+      const dy = xyMagnitude > 0 ? -(field.y / xyMagnitude) * scale : 0;
       return `
-        <g data-testid="source-point-group-2d-${source.id}">
-          <circle
-            class="source-point"
-            data-testid="source-point-2d-${source.id}"
-            cx="${point.x}"
-            cy="${point.y}"
-            r="7"
-          ></circle>
-          <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
-        </g>
+        <line
+          class="field-vector"
+          x1="${point.x}"
+          y1="${point.y}"
+          x2="${point.x + dx}"
+          y2="${point.y + dy}"
+        ></line>
       `;
     })
     .join("");
+  return `
+    <g
+      class="overlay-vector-layer"
+      data-testid="overlay-vector-layer"
+      data-vector-count="${state.overlayResult.samples.length}"
+    >
+      ${vectors}
+    </g>
+  `;
+}
+
+function render2d() {
+  const sourceMarkup = state.scene.sources.map(renderSource2d).join("");
   const probe = mapToViewport(state.probe.x, state.probe.y);
 
   view2d.innerHTML = `
@@ -257,6 +459,7 @@ function render2d() {
       <rect width="100" height="100" fill="url(#grid)"></rect>
       <line class="axis-line" x1="0" y1="50" x2="100" y2="50"></line>
       <line class="axis-line" x1="50" y1="0" x2="50" y2="100"></line>
+      ${renderOverlay2d()}
       ${sourceMarkup}
       <g>
         <path
@@ -298,6 +501,49 @@ function ensure3d() {
   renderer.userData.scene = scene;
 }
 
+function meshForSource(source) {
+  if (source.kind === "ring") {
+    const geometry = new THREE.TorusGeometry(source.radius_m, 0.004, 10, 72);
+    const material = new THREE.MeshBasicMaterial({ color: 0xf7ca6a });
+    const mesh = new THREE.Mesh(geometry, material);
+    const threeNormal = threeVectorFromComponents(physicsNormalToThreeComponents(source.normal));
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), threeNormal);
+    return mesh;
+  }
+  if (source.kind === "line_segment") {
+    const geometry = new THREE.CylinderGeometry(0.004, 0.004, source.length_m, 12);
+    const material = new THREE.MeshBasicMaterial({ color: 0x8fd0ff });
+    const mesh = new THREE.Mesh(geometry, material);
+    const direction = threeVectorFromComponents(physicsNormalToThreeComponents(source.orientation));
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+    return mesh;
+  }
+  if (source.kind === "disk" || source.kind === "infinite_plane") {
+    const radius = source.kind === "disk" ? source.radius_m : source.display_extent_m * 0.5;
+    const geometry = new THREE.CircleGeometry(radius, 72);
+    const material = new THREE.MeshBasicMaterial({
+      color: source.kind === "disk" ? 0x9fe870 : 0xa580ff,
+      opacity: 0.45,
+      side: THREE.DoubleSide,
+      transparent: true,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    const threeNormal = threeVectorFromComponents(physicsNormalToThreeComponents(source.normal));
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), threeNormal);
+    return mesh;
+  }
+  const geometry = new THREE.SphereGeometry(
+    source.kind === "spherical_shell" ? source.radius_m : 0.018,
+    24,
+    16,
+  );
+  const material = new THREE.MeshBasicMaterial({
+    color: source.charge_c >= 0 ? 0x48c3c8 : 0xff758f,
+    wireframe: source.kind === "spherical_shell",
+  });
+  return new THREE.Mesh(geometry, material);
+}
+
 function render3d() {
   view3d.removeAttribute("data-ring-normal-three");
   const firstRing = state.scene.sources.find((source) => source.kind === "ring");
@@ -311,21 +557,9 @@ function render3d() {
   sceneGroup.clear();
 
   for (const source of state.scene.sources) {
-    if (source.kind === "ring") {
-      const geometry = new THREE.TorusGeometry(source.radius_m, 0.004, 10, 72);
-      const material = new THREE.MeshBasicMaterial({ color: 0xf7ca6a });
-      const mesh = new THREE.Mesh(geometry, material);
-      const threeNormal = threeVectorFromComponents(physicsNormalToThreeComponents(source.normal));
-      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), threeNormal);
-      mesh.position.set(source.position.x, source.position.z, source.position.y);
-      sceneGroup.add(mesh);
-    } else {
-      const geometry = new THREE.SphereGeometry(0.018, 24, 16);
-      const material = new THREE.MeshBasicMaterial({ color: source.charge_c >= 0 ? 0x48c3c8 : 0xff758f });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(source.position.x, source.position.z, source.position.y);
-      sceneGroup.add(mesh);
-    }
+    const mesh = meshForSource(source);
+    mesh.position.set(source.position.x, source.position.z, source.position.y);
+    sceneGroup.add(mesh);
   }
 
   const probeGeometry = new THREE.SphereGeometry(0.012, 16, 12);
@@ -345,6 +579,7 @@ function renderProbe() {
 }
 
 function renderResult() {
+  qualityValue.textContent = state.quality;
   if (!state.lastResult) {
     return;
   }
@@ -370,8 +605,22 @@ function renderResult() {
 
   const warnings = [...state.lastResult.warnings, ...sample.warnings];
   warningList.innerHTML = warnings.length
-    ? [...new Set(warnings)].map((warning) => `<li>${warning}</li>`).join("")
+    ? [...new Set(warnings)].map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")
     : "<li>No warnings.</li>";
+}
+
+function renderOverlaySummary() {
+  if (!state.overlayResult) {
+    return;
+  }
+  const magnitudes = state.overlayResult.samples.map((sample) => sample.field_magnitude_v_per_m);
+  const minMagnitude = Math.min(...magnitudes);
+  const maxMagnitude = Math.max(...magnitudes);
+  overlayStatus.textContent = `Ready (${state.overlayResult.request_id})`;
+  overlaySummary.textContent =
+    `2D vector grid sampled ${state.overlayResult.sample_count} points; ` +
+    `sampled |E| ${formatNumber(minMagnitude, 3)} to ${formatNumber(maxMagnitude, 3)} V/m. ` +
+    "This is a sampled magnitude summary, not field-line or equipotential extraction.";
 }
 
 function renderAll() {
@@ -382,54 +631,142 @@ function renderAll() {
     render3d();
   }
   renderResult();
+  renderOverlaySummary();
 }
 
-async function evaluateProbe(requestId) {
-  if (state.scene.sources.length === 0) {
-    state.lastResult = null;
-    solverStatus.textContent = "Waiting for sources";
-    potentialValue.textContent = "Unavailable";
-    fieldVectorValue.textContent = "Unavailable";
-    fieldMagnitudeValue.textContent = "Unavailable";
-    contributionList.innerHTML = "<li>No source contributions yet.</li>";
-    warningList.innerHTML = "<li>No warnings.</li>";
-    return;
-  }
+function setEmptyComputationState() {
+  state.lastResult = null;
+  state.overlayResult = null;
+  solverStatus.textContent = "Waiting for sources";
+  overlayStatus.textContent = "Waiting for sources";
+  potentialValue.textContent = "Unavailable";
+  fieldVectorValue.textContent = "Unavailable";
+  fieldMagnitudeValue.textContent = "Unavailable";
+  contributionList.innerHTML = "<li>No source contributions yet.</li>";
+  warningList.innerHTML = "<li>No warnings.</li>";
+  overlaySummary.textContent = "Vector sampling appears in the 2D view after sources are evaluated.";
+  render2d();
+}
 
-  solverStatus.textContent = `Computing (${requestId})`;
+async function postFieldEvaluation(requestId, samplePoints) {
   const response = await fetch("/api/field/evaluate", {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({
       request_id: requestId,
       scene: state.scene,
-      sample_points: [state.probe],
+      sample_points: samplePoints,
       quality: state.quality,
     }),
   });
   if (!response.ok) {
-    throw new Error(`Field evaluation failed: ${response.status}`);
+    const detail = await response.text();
+    throw new Error(`Field evaluation failed: ${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
+async function evaluateProbe(requestId) {
+  if (state.scene.sources.length === 0) {
+    setEmptyComputationState();
+    return;
   }
 
-  const result = await response.json();
-  if (result.request_id !== latestRequestId) {
+  solverStatus.textContent = `Computing (${requestId})`;
+  const result = await postFieldEvaluation(requestId, [state.probe]);
+  if (result.request_id !== latestProbeRequestId) {
     return;
   }
   state.lastResult = result;
   renderResult();
 }
 
+function overlaySamplePoints() {
+  const samples = [];
+  for (const y of OVERLAY_SAMPLE_AXIS) {
+    for (const x of OVERLAY_SAMPLE_AXIS) {
+      samples.push({ x, y, z: state.probe.z, unit: "m" });
+    }
+  }
+  return samples;
+}
+
+async function evaluateOverlay(requestId) {
+  if (state.scene.sources.length === 0) {
+    setEmptyComputationState();
+    return;
+  }
+
+  overlayStatus.textContent = `Computing (${requestId})`;
+  const samples = overlaySamplePoints();
+  const result = await postFieldEvaluation(requestId, samples);
+  if (result.request_id !== latestOverlayRequestId) {
+    return;
+  }
+  state.overlaySamples = samples;
+  state.overlayResult = result;
+  render2d();
+  renderOverlaySummary();
+}
+
 function scheduleEvaluation() {
   requestSerial += 1;
-  latestRequestId = `ui-${requestSerial}`;
-  const requestId = latestRequestId;
+  latestProbeRequestId = `ui-probe-${requestSerial}`;
+  latestOverlayRequestId = `ui-overlay-${requestSerial}`;
+  const probeRequestId = latestProbeRequestId;
+  const overlayRequestId = latestOverlayRequestId;
   window.setTimeout(() => {
-    evaluateProbe(requestId).catch((error) => {
-      if (requestId === latestRequestId) {
+    evaluateProbe(probeRequestId).catch((error) => {
+      if (probeRequestId === latestProbeRequestId) {
         solverStatus.textContent = error.message;
       }
     });
+    evaluateOverlay(overlayRequestId).catch((error) => {
+      if (overlayRequestId === latestOverlayRequestId) {
+        overlayStatus.textContent = error.message;
+      }
+    });
   }, 30);
+}
+
+function refreshSourceIndexes() {
+  for (const kind of Object.keys(state.sourceIndex)) {
+    state.sourceIndex[kind] = state.scene.sources.filter((source) => source.kind === kind).length;
+  }
+}
+
+async function loadPresetOptions() {
+  const response = await fetch("/api/presets", { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    throw new Error(`Preset index failed: ${response.status}`);
+  }
+  const presets = await response.json();
+  presetSelect.innerHTML = presets
+    .map((preset) => `<option value="${preset.id}">${escapeHtml(preset.title)}</option>`)
+    .join("");
+  presetStatus.textContent = `${presets.length} presets available.`;
+}
+
+async function loadSelectedPreset() {
+  const presetId = presetSelect.value;
+  if (!presetId) {
+    return;
+  }
+  presetStatus.textContent = `Loading ${presetId}...`;
+  const response = await fetch(`/api/presets/${encodeURIComponent(presetId)}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    throw new Error(`Preset load failed: ${response.status}`);
+  }
+  const preset = await response.json();
+  state.scene = preset.scene;
+  state.lastResult = null;
+  state.overlayResult = null;
+  refreshSourceIndexes();
+  presetStatus.textContent = `Loaded ${preset.title}.`;
+  renderAll();
+  scheduleEvaluation();
 }
 
 async function initialiseShell() {
@@ -448,11 +785,28 @@ async function initialiseShell() {
 }
 
 document.querySelector("#add-point").addEventListener("click", () => addSource("point"));
+document
+  .querySelector("#add-line-segment")
+  .addEventListener("click", () => addSource("line_segment"));
 document.querySelector("#add-ring").addEventListener("click", () => addSource("ring"));
+document.querySelector("#add-disk").addEventListener("click", () => addSource("disk"));
+document
+  .querySelector("#add-infinite-plane")
+  .addEventListener("click", () => addSource("infinite_plane"));
+document
+  .querySelector("#add-spherical-shell")
+  .addEventListener("click", () => addSource("spherical_shell"));
 button2d.addEventListener("click", () => setMode("2D"));
 button3d.addEventListener("click", () => setMode("3D"));
+qualitySelect.addEventListener("change", () => setQuality(qualitySelect.value));
 document.querySelector("#probe-form").addEventListener("input", setProbeFromInputs);
 document.querySelector("#probe-form").addEventListener("change", setProbeFromInputs);
+presetForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  loadSelectedPreset().catch((error) => {
+    presetStatus.textContent = error.message;
+  });
+});
 sourceList.addEventListener("input", (event) => {
   const input = event.target;
   if (input instanceof HTMLInputElement) {
@@ -481,4 +835,8 @@ renderAll();
 initialiseShell().catch(() => {
   runtimeStatus.textContent =
     "Local runtime configuration unavailable. Simulation can still use cached UI state.";
+});
+loadPresetOptions().catch((error) => {
+  presetSelect.innerHTML = '<option value="">Preset loading failed</option>';
+  presetStatus.textContent = error.message;
 });

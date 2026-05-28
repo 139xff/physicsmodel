@@ -126,7 +126,8 @@ button {
   gap: 14px;
 }
 
-.source-library {
+.source-library,
+.preset-library {
   padding: 18px 16px 16px;
 }
 
@@ -247,7 +248,9 @@ button {
 }
 
 .source-card label,
-.probe-form label {
+.probe-form label,
+.preset-form label,
+.quality-control {
   color: var(--muted);
   display: grid;
   font-size: 0.72rem;
@@ -255,7 +258,9 @@ button {
 }
 
 .source-card input,
-.probe-form input {
+.probe-form input,
+.preset-form select,
+.quality-control select {
   background: #08141b;
   border: 1px solid var(--line-bright);
   border-radius: 8px;
@@ -265,10 +270,48 @@ button {
 }
 
 .mini-grid,
-.probe-form {
+.probe-form,
+.preset-form {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preset-form {
+  grid-template-columns: 1fr;
+}
+
+.preset-form button {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-small);
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 620;
+  padding: 9px 10px;
+}
+
+.preset-status,
+.overlay-summary {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 10px 0 0;
+}
+
+.vector-fieldset {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.vector-fieldset > span {
+  color: var(--highlight);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .viewport {
@@ -341,6 +384,43 @@ button {
   stroke-width: 1.2;
 }
 
+.source-line-segment {
+  stroke: #8fd0ff;
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
+.source-disk {
+  fill: rgba(159, 232, 112, 0.18);
+  stroke: #9fe870;
+  stroke-width: 1;
+}
+
+.source-infinite-plane {
+  fill: rgba(165, 128, 255, 0.12);
+  stroke: #a580ff;
+  stroke-dasharray: 1.5 1.2;
+  stroke-width: 0.9;
+}
+
+.source-spherical-shell {
+  fill: rgba(72, 195, 200, 0.08);
+  stroke: var(--accent);
+  stroke-dasharray: 1 1;
+  stroke-width: 1.1;
+}
+
+.overlay-vector-layer {
+  opacity: 0.86;
+}
+
+.field-vector {
+  marker-end: none;
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-linecap: round;
+  stroke-width: 0.55;
+}
+
 .probe-marker {
   stroke: white;
   stroke-linecap: round;
@@ -411,6 +491,20 @@ button {
 
 .runtime-block {
   margin-top: auto;
+}
+
+.theory-drawer summary {
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.theory-drawer ul {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 10px 0 0;
+  padding-left: 18px;
 }
 
 .probe-position {

@@ -130,3 +130,54 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("source-count")).to_contain_text("2 sources")
     expect(page.get_by_test_id("probe-position")).to_contain_text("0.220")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("Ring 1")
+
+
+def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
+    for button_name, test_id in [
+        ("Add point charge", "source-card-point-1"),
+        ("Add line segment", "source-card-line-segment-1"),
+        ("Add ring", "source-card-ring-1"),
+        ("Add disk", "source-card-disk-1"),
+        ("Add infinite plane", "source-card-infinite-plane-1"),
+        ("Add spherical shell", "source-card-spherical-shell-1"),
+    ]:
+        page.get_by_role("button", name=button_name).click()
+        expect(page.get_by_test_id(test_id)).to_be_visible()
+
+    expect(page.get_by_test_id("source-count")).to_contain_text("6 sources")
+    expect(page.get_by_test_id("source-card-line-segment-1")).to_contain_text("Orientation")
+    expect(page.get_by_test_id("source-card-disk-1")).to_contain_text("Normal")
+    expect(page.get_by_test_id("source-card-infinite-plane-1")).to_contain_text("Surface density")
+    expect(page.get_by_test_id("source-card-spherical-shell-1")).to_contain_text("Radius m")
+
+    _fill_number(page, "line-segment-1 orientation x", "0")
+    _fill_number(page, "line-segment-1 orientation y", "1")
+    _fill_number(page, "line-segment-1 length m", "0.18")
+    _fill_number(page, "disk-1 normal z", "1")
+    _fill_number(page, "infinite-plane-1 surface density C/m^2", "2e-9")
+    _fill_number(page, "spherical-shell-1 radius m", "0.14")
+
+    page.get_by_label("Solver quality").select_option("refined")
+    expect(page.get_by_test_id("quality-value")).to_contain_text("refined")
+    expect(page.get_by_test_id("solver-status")).to_contain_text("Ready")
+
+    expect(page.get_by_test_id("overlay-status")).to_contain_text("Ready")
+    expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "25")
+    expect(page.get_by_test_id("overlay-summary")).to_contain_text("sampled |E|")
+
+    page.get_by_role("button", name="3D").click()
+    expect(page.get_by_test_id("view-3d")).to_be_visible()
+    expect(page.get_by_test_id("source-count")).to_contain_text("6 sources")
+    expect(page.get_by_test_id("mode-label")).to_contain_text("3D")
+
+    page.get_by_role("button", name="2D").click()
+    expect(page.get_by_test_id("view-2d")).to_be_visible()
+    expect(page.get_by_test_id("source-card-disk-1")).to_contain_text("Disk 1")
+
+    page.get_by_label("Preset").select_option("electric-dipole")
+    page.get_by_role("button", name="Load preset").click()
+    expect(page.get_by_test_id("preset-status")).to_contain_text("Loaded Electric dipole")
+    expect(page.get_by_test_id("source-count")).to_contain_text("2 sources")
+    expect(page.get_by_test_id("source-card-dipole-positive")).to_contain_text("Positive pole")
+    expect(page.get_by_test_id("quality-value")).to_contain_text("refined")
+    expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "25")

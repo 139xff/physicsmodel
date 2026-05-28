@@ -33,7 +33,7 @@
     {
       "id": "orbit-controls",
       "source_url": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/OrbitControls.js",
-      "local_path": "web/vendor/OrbitControls.js",
+      "local_path": "web/vendor/controls/OrbitControls.js",
       "sha256": "b97879c748170baadeb3fb84cea1ffdf4674e283dc06042f34e2acb95a76042c",
       "license": {
         "spdx": "MIT",

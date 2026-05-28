@@ -37,7 +37,7 @@ def test_config_exposes_supported_views_and_local_browser_runtime():
         "three": {
             "version": "0.180.0",
             "module_url": "/vendor/three.module.js",
-            "orbit_controls_url": "/vendor/OrbitControls.js",
+            "orbit_controls_url": "/vendor/controls/OrbitControls.js",
         },
     }
 
@@ -68,7 +68,7 @@ def test_static_assets_and_vendor_modules_are_served_locally():
     stylesheet = client.get("/styles.css")
     application_module = client.get("/app.js")
     three_module = client.get("/vendor/three.module.js")
-    orbit_controls = client.get("/vendor/OrbitControls.js")
+    orbit_controls = client.get("/vendor/controls/OrbitControls.js")
     manifest = client.get("/vendor/manifest.json")
 
     assert stylesheet.status_code == 200
@@ -82,6 +82,18 @@ def test_static_assets_and_vendor_modules_are_served_locally():
     assert "javascript" in orbit_controls.headers["content-type"]
     assert manifest.json()["version"] == "0.180.0"
     assert "https://" not in application_module.text
+
+
+def test_import_map_standard_orbit_controls_specifier_resolves_to_served_vendor_path():
+    response = client.get("/")
+
+    assert response.status_code == 200
+    html = response.text
+    assert '"three/addons/": "/vendor/"' in html
+
+    resolved_orbit_controls = client.get("/vendor/controls/OrbitControls.js")
+    assert resolved_orbit_controls.status_code == 200
+    assert "javascript" in resolved_orbit_controls.headers["content-type"]
 
 
 def test_three_entry_relative_dependency_is_served_locally():

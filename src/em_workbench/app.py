@@ -93,7 +93,7 @@ def config() -> AppConfig:
             three=ThreeRuntimeConfig(
                 version=_vendor_version(),
                 module_url="/vendor/three.module.js",
-                orbit_controls_url="/vendor/OrbitControls.js",
+                orbit_controls_url="/vendor/controls/OrbitControls.js",
             ),
         ),
     )

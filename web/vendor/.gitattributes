@@ -1,4 +1,5 @@
 # Preserve upstream bytes used by SHA-256 validation in manifest.json.
 *.js -text
 *.txt -text
+controls/OrbitControls.js -text
 three.core.js whitespace=-space-before-tab

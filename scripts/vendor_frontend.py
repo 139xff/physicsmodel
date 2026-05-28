@@ -50,7 +50,7 @@ MODULES = (
     ),
     VendorAsset(
         identifier="orbit-controls",
-        local_name="OrbitControls.js",
+        local_name="controls/OrbitControls.js",
         source_url=f"{CDN_BASE}/examples/jsm/controls/OrbitControls.js",
         sha256="b97879c748170baadeb3fb84cea1ffdf4674e283dc06042f34e2acb95a76042c",
     ),
@@ -88,6 +88,7 @@ def _obtain_asset(asset: VendorAsset, *, download_missing: bool) -> str:
     with urllib.request.urlopen(asset.source_url, timeout=30) as response:
         contents = response.read()
     _verify_digest(asset, contents, asset.source_url)
+    asset.path.parent.mkdir(parents=True, exist_ok=True)
     asset.path.write_bytes(contents)
     return "downloaded"
 

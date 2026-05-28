@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 03: Typed scene contracts and source editing API - Engineering Task Report</title>
+  <style>
+    :root { color-scheme: light; --ink: #19202b; --muted: #566576; --line: #d3dce6; --panel: #f5f7fa; --accent: #0d5e63; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #fff; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { border-bottom: 3px solid var(--accent); margin-bottom: 2rem; padding-bottom: 1.25rem; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0 0 0.75rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; color: var(--muted); }
+    .status { background: #e7f4f1; border-radius: 999px; color: var(--accent); font-weight: 700; padding: 0.15rem 0.65rem; }
+    ul { margin-top: 0.5rem; padding-left: 1.4rem; }
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 36rem; width: 100%; }
+    caption { color: var(--muted); font-size: 0.95rem; text-align: left; padding: 0 0 0.5rem; }
+    th, td { border: 1px solid var(--line); padding: 0.6rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    code { font: 0.92em ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; }
+    .next { border-left: 4px solid var(--accent); background: var(--panel); padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Task 03: Typed scene contracts and source editing API</h1>
+      <div class="meta">
+        <span class="status">DONE</span>
+        <span>Completed: <time datetime="2026-05-28T09:01:32+08:00">2026-05-28T09:01:32+08:00</time></span>
+      </div>
+    </header>
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Added Pydantic v2 editable scene contracts for point charges, line segments, rings, disks, infinite planes, and spherical shells.</li>
+        <li>Normalized nonzero orientation and normal vectors while keeping position and geometry fields explicit in SI units.</li>
+        <li>Enforced positive dimensions, finite charge values, and an exactly-one total-charge-or-density rule where physically meaningful; infinite planes require surface density and remain physically infinite.</li>
+        <li>Added stable preset summary/detail endpoints and a scene validation endpoint that returns normalized ordinary scene JSON without persistence or solver output.</li>
+        <li>Provided five editable presets: single point, electric dipole, charged ring axis, disk approaching plane, and spherical shell inside/outside.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>Electrostatic potential and field solving remains Task 4 scope.</li>
+        <li>Shared 2D/3D browser interaction, source manipulation widgets, probes, overlays, and Playwright browser evidence remain later tasks.</li>
+        <li>No user accounts, persistence, collaboration, or saved custom scenes were introduced.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Technical Stack</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Technology choices</caption>
+          <thead><tr><th scope="col">Concern</th><th scope="col">Choice</th></tr></thead>
+          <tbody>
+        <tr><td>Contracts</td><td>Pydantic v2 models with discriminated unions on the source kind field</td></tr>
+        <tr><td>API</td><td>FastAPI GET preset endpoints and POST scene validation using typed request/response models</td></tr>
+        <tr><td>Presets</td><td>Checked-in Python preset payloads validated into ordinary editable Scene models</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Changed Files</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Files changed in this task</caption>
+          <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
+          <tbody>
+        <tr><td><code>src/em_workbench/models.py</code></td><td>Define SI scene contracts, source union variants, validation helpers, preset DTOs, and scene validation responses.</td></tr>
+        <tr><td><code>src/em_workbench/presets.py</code></td><td>Add five editable Release 1 electrostatics presets and stable summary/detail lookup helpers.</td></tr>
+        <tr><td><code>src/em_workbench/app.py</code></td><td>Expose /api/presets, /api/presets/{id}, and /api/scene/validate without enabling solver behavior.</td></tr>
+        <tr><td><code>tests/test_models.py</code></td><td>Cover all six source contracts, SI serialization, normalization, charge/density constraints, and editable presets.</td></tr>
+        <tr><td><code>tests/test_scene_api.py</code></td><td>Cover preset listing/detail, editable scene validation, normalized API output, invalid 422 responses, and preset 404s.</td></tr>
+        <tr><td><code>reports/2026-05-28-task-03-scene-contracts.html</code></td><td>Record Task 3 scope, RED/GREEN evidence, verification, risks, and next task.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Commands</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Commands executed</caption>
+          <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_models.py tests\test_scene_api.py</code></td><td>RED</td><td>Initial run failed during collection with ModuleNotFoundError: No module named &#x27;em_workbench.models&#x27;.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_models.py tests\test_scene_api.py</code></td><td>GREEN</td><td>After implementation, 16 passed in 0.35s; final focused verification reported 16 passed in 0.33s.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>PASS</td><td>Full regression verification reported 30 passed in 1.22s.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src scripts tests</code></td><td>FAIL then PASS</td><td>First run found I001 in src/em_workbench/presets.py; after Ruff&#x27;s targeted import fix, final lint reported All checks passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --fix --no-cache src\em_workbench\presets.py</code></td><td>PASS</td><td>Ruff fixed 1 import-format issue in presets.py.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\render_task_report.py --input - --output reports\2026-05-28-task-03-scene-contracts.html</code></td><td>PASS</td><td>Generated this standalone accessible HTML task report.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Verification</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Verification evidence</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+        <tr><td>TDD RED</td><td>PASS</td><td>The new focused tests failed before production code existed, proving the missing models/API were exercised.</td></tr>
+        <tr><td>Focused Task 3 tests</td><td>PASS</td><td>16 passed for tests/test_models.py and tests/test_scene_api.py.</td></tr>
+        <tr><td>Full regression tests</td><td>PASS</td><td>30 passed across the repository.</td></tr>
+        <tr><td>Lint</td><td>PASS</td><td>Ruff reported All checks passed for src, scripts, and tests.</td></tr>
+        <tr><td>Browser evidence</td><td>DEFERRED</td><td>Task 3 adds JSON contracts and API validation only; browser interaction evidence remains Task 5 scope.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Known Risks And Limitations</h2>
+      <ul>
+        <li>The API validates and normalizes scenes but does not persist, solve, or calculate V/E values.</li>
+        <li>The browser shell still honestly marks interactive scene editing and solver work as planned; typed JSON endpoints are available for downstream tasks.</li>
+        <li>Infinite-plane display_extent_m is for visualization only and is not used as a finite physical size.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p class="next">Task 4: implement and validate the electrostatic solver against analytic invariants and symmetry cases.</p>
+    </section>
+  </main>
+</body>
+</html>

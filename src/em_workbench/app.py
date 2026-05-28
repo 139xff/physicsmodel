@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+from em_workbench.models import Preset, PresetSummary, Scene, SceneValidationResponse
+from em_workbench.presets import get_preset, list_presets
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 WEB_ROOT = PROJECT_ROOT / "web"
@@ -96,6 +99,32 @@ def config() -> AppConfig:
                 orbit_controls_url="/vendor/controls/OrbitControls.js",
             ),
         ),
+    )
+
+
+@app.get("/api/presets", response_model=list[PresetSummary])
+def presets() -> list[PresetSummary]:
+    """Return loadable scene presets without solver output."""
+    return list_presets()
+
+
+@app.get("/api/presets/{preset_id}", response_model=Preset)
+def preset_detail(preset_id: str) -> Preset:
+    """Return an editable scene JSON payload for one preset."""
+    try:
+        return get_preset(preset_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Preset not found.") from error
+
+
+@app.post("/api/scene/validate", response_model=SceneValidationResponse)
+def validate_scene(scene: Scene) -> SceneValidationResponse:
+    """Validate and normalize a scene without persisting or solving it."""
+    return SceneValidationResponse(
+        valid=True,
+        scene=scene,
+        source_count=len(scene.sources),
+        source_kinds=[source.kind for source in scene.sources],
     )
 
 

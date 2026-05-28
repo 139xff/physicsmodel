@@ -28,7 +28,7 @@ def test_config_exposes_supported_views_and_local_browser_runtime():
     assert config["supported_views"] == ["2D", "3D"]
     assert config["capabilities"] == {
         "scene_editing": "planned",
-        "solver": "planned",
+        "solver": "available",
         "interaction": "planned",
     }
     assert config["runtime"] == {

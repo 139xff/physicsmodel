@@ -7,9 +7,10 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from em_workbench.models import Preset, PresetSummary, Scene, SceneValidationResponse
+from em_workbench.models import Position, Preset, PresetSummary, Scene, SceneValidationResponse
+from em_workbench.physics.solver import FieldEvaluationResponse, SolverQuality, evaluate_scene
 from em_workbench.presets import get_preset, list_presets
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -57,6 +58,15 @@ class AppConfig(BaseModel):
     runtime: RuntimeConfig
 
 
+class FieldEvaluateRequest(BaseModel):
+    """Batch field-evaluation request from the static client."""
+
+    request_id: str = Field(min_length=1)
+    scene: Scene
+    sample_points: list[Position] = Field(min_length=1)
+    quality: SolverQuality = "preview"
+
+
 def _vendor_version() -> str:
     manifest = json.loads(VENDOR_MANIFEST_PATH.read_text(encoding="utf-8"))
     return str(manifest["version"])
@@ -87,7 +97,7 @@ def config() -> AppConfig:
         supported_views=["2D", "3D"],
         capabilities={
             "scene_editing": "planned",
-            "solver": "planned",
+            "solver": "available",
             "interaction": "planned",
         },
         runtime=RuntimeConfig(
@@ -125,6 +135,17 @@ def validate_scene(scene: Scene) -> SceneValidationResponse:
         scene=scene,
         source_count=len(scene.sources),
         source_kinds=[source.kind for source in scene.sources],
+    )
+
+
+@app.post("/api/field/evaluate", response_model=FieldEvaluationResponse)
+def evaluate_field(request: FieldEvaluateRequest) -> FieldEvaluationResponse:
+    """Evaluate electrostatic potential and field at one or more sample points."""
+    return evaluate_scene(
+        request.scene,
+        request.sample_points,
+        quality=request.quality,
+        request_id=request.request_id,
     )
 
 

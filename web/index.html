@@ -22,15 +22,14 @@
         <h1>EM Workbench</h1>
         <p>Static Electrostatics</p>
       </div>
-      <div class="view-control" aria-label="Planned scene views">
+      <div class="view-control" aria-label="Scene views">
         <span class="control-label">View</span>
-        <button class="view-button selected" type="button" aria-pressed="true" disabled>
+        <button id="view-2d-button" class="view-button selected" type="button" aria-pressed="true">
           2D
         </button>
-        <button class="view-button" type="button" aria-pressed="false" disabled>
+        <button id="view-3d-button" class="view-button" type="button" aria-pressed="false">
           3D
         </button>
-        <span class="planned-note">Interaction connects in Task 5</span>
       </div>
     </header>
 
@@ -39,28 +38,21 @@
         <section class="panel source-library">
           <div class="panel-heading">
             <h2>Source Library</h2>
-            <span>Task 3</span>
+            <span>Editable</span>
           </div>
-          <p class="panel-copy">Source editing becomes available after typed scene contracts land.</p>
-          <div class="source-grid" aria-label="Planned electrostatic source types">
-            <button type="button" disabled>Point charge</button>
-            <button type="button" disabled>Line segment</button>
-            <button type="button" disabled>Ring</button>
-            <button type="button" disabled>Disk</button>
-            <button type="button" disabled>Infinite plane</button>
-            <button type="button" disabled>Spherical shell</button>
+          <p class="panel-copy">Add point charges and charged rings to the shared scene state.</p>
+          <div class="source-grid" aria-label="Electrostatic source types">
+            <button id="add-point" type="button">Add point charge</button>
+            <button id="add-ring" type="button">Add ring</button>
           </div>
         </section>
 
         <section class="panel scene-sources">
           <div class="panel-heading">
             <h2>Scene Sources</h2>
-            <span>Empty</span>
+            <span data-testid="source-count">0 sources</span>
           </div>
-          <div class="empty-state">
-            <p>No editable sources yet.</p>
-            <span>This shell does not construct a physical scene.</span>
-          </div>
+          <div id="source-list" class="source-list" aria-live="polite"></div>
         </section>
       </aside>
 
@@ -68,48 +60,64 @@
         <div class="viewport-heading">
           <div>
             <h2>Viewport</h2>
-            <p>Reserved for analytical slices and spatial rendering</p>
+            <p>Shared scene and probe state rendered in either plane or 3D</p>
           </div>
-          <span class="mode-label">No active scene</span>
+          <span class="mode-label" data-testid="mode-label">2D</span>
         </div>
-        <div class="canvas-placeholder">
-          <div class="axis axis-x" aria-hidden="true"></div>
-          <div class="axis axis-y" aria-hidden="true"></div>
-          <div class="canvas-message">
-            <strong>Visualization surface ready</strong>
-            <span>Scene models and validated field output are scheduled for later tasks.</span>
-          </div>
-        </div>
+        <div id="view-2d" class="view-surface" data-testid="view-2d" aria-label="2D field view"></div>
+        <div id="view-3d" class="view-surface hidden" data-testid="view-3d" aria-label="3D field view"></div>
       </section>
 
       <aside class="analysis panel" aria-label="Status and analysis">
         <div class="panel-heading">
           <h2>Analysis</h2>
-          <span>Standby</span>
+          <span data-testid="quality-value">preview</span>
         </div>
-        <section class="status-block">
-          <h3>Computation Status</h3>
-          <p class="status-value">Not computing</p>
-          <p>Solver integration arrives in Task 4. No field or potential values are available.</p>
-        </section>
+
         <section class="status-block">
           <h3>Probe</h3>
+          <form id="probe-form" class="probe-form">
+            <label>Probe x <input id="probe-x" type="number" step="0.01" value="0.20"></label>
+            <label>Probe y <input id="probe-y" type="number" step="0.01" value="0.00"></label>
+            <label>Probe z <input id="probe-z" type="number" step="0.01" value="0.05"></label>
+          </form>
+          <p class="probe-position" data-testid="probe-position">Probe at (0.200, 0.000, 0.050) m</p>
+        </section>
+
+        <section class="status-block">
+          <h3>Computation Status</h3>
+          <p class="status-value" data-testid="solver-status">Waiting for sources</p>
           <dl>
-            <div><dt>Position</dt><dd>Unavailable</dd></div>
-            <div><dt>Potential V</dt><dd>Unavailable</dd></div>
-            <div><dt>Field |E|</dt><dd>Unavailable</dd></div>
+            <div><dt>Potential V</dt><dd data-testid="potential-value">Unavailable</dd></div>
+            <div><dt>Field E</dt><dd id="field-vector-value">Unavailable</dd></div>
+            <div><dt>Field |E|</dt><dd data-testid="field-magnitude-value">Unavailable</dd></div>
           </dl>
         </section>
+
+        <section class="status-block">
+          <h3>Per-source Contributions</h3>
+          <ul id="contribution-list" class="compact-list" data-testid="contribution-list">
+            <li>No source contributions yet.</li>
+          </ul>
+        </section>
+
+        <section class="status-block">
+          <h3>Warnings</h3>
+          <ul id="warning-list" class="compact-list" data-testid="warning-list">
+            <li>No warnings.</li>
+          </ul>
+        </section>
+
         <section class="runtime-block">
           <h3>Browser Runtime</h3>
-          <p id="runtime-status">Reading local runtime configuration...</p>
+          <p id="runtime-status" data-testid="runtime-status">Reading local runtime configuration...</p>
         </section>
       </aside>
     </main>
 
     <footer class="statusbar">
-      <span>Workbench shell online</span>
-      <span>Scene editing, physics solving, and 3D interaction are intentionally deferred.</span>
+      <span>Workbench interaction slice online</span>
+      <span>All solving is delegated to POST /api/field/evaluate.</span>
     </footer>
   </div>
 </body>

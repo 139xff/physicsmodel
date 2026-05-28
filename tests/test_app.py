@@ -27,9 +27,9 @@ def test_config_exposes_supported_views_and_local_browser_runtime():
     }
     assert config["supported_views"] == ["2D", "3D"]
     assert config["capabilities"] == {
-        "scene_editing": "planned",
+        "scene_editing": "available",
         "solver": "available",
-        "interaction": "planned",
+        "interaction": "available",
     }
     assert config["runtime"] == {
         "delivery": "local-vendor",
@@ -57,7 +57,7 @@ def test_root_serves_the_explicitly_scoped_workbench_shell():
         "Scene Sources",
         "Viewport",
         "Analysis",
-        "Solver integration arrives in Task 4",
+        "All solving is delegated to POST /api/field/evaluate",
     ):
         assert expected_copy in html
     assert '<script type="importmap">' in html

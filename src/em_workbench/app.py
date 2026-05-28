@@ -96,9 +96,9 @@ def config() -> AppConfig:
         product=ProductConfig(name="EM Workbench", module="Static Electrostatics"),
         supported_views=["2D", "3D"],
         capabilities={
-            "scene_editing": "planned",
+            "scene_editing": "available",
             "solver": "available",
-            "interaction": "planned",
+            "interaction": "available",
         },
         runtime=RuntimeConfig(
             delivery="local-vendor",

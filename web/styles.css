@@ -105,12 +105,6 @@ button {
   opacity: 1;
 }
 
-.planned-note {
-  color: var(--muted);
-  font-size: 0.78rem;
-  margin-left: 10px;
-}
-
 .workspace {
   display: grid;
   flex: 1;
@@ -185,15 +179,18 @@ button {
   background: var(--panel-soft);
   border: 1px solid var(--line);
   border-radius: var(--radius-small);
-  color: #bccbd1;
+  color: #dce8ec;
+  cursor: pointer;
   font-size: 0.82rem;
   font-weight: 500;
   padding: 11px 12px;
   text-align: left;
 }
 
-.source-grid button:disabled {
-  cursor: not-allowed;
+.source-grid button:hover,
+.view-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .empty-state {
@@ -217,6 +214,63 @@ button {
   line-height: 1.45;
 }
 
+.source-list {
+  display: grid;
+  gap: 12px;
+}
+
+.source-card {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.source-card-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.source-card-heading strong {
+  font-size: 0.9rem;
+}
+
+.source-card-heading span {
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.source-card label,
+.probe-form label {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.72rem;
+  gap: 5px;
+}
+
+.source-card input,
+.probe-form input {
+  background: #08141b;
+  border: 1px solid var(--line-bright);
+  border-radius: 8px;
+  color: var(--ink);
+  min-width: 0;
+  padding: 8px;
+}
+
+.mini-grid,
+.probe-form {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .viewport {
   display: flex;
   flex-direction: column;
@@ -237,7 +291,7 @@ button {
   margin: 7px 0 0;
 }
 
-.canvas-placeholder {
+.view-surface {
   background-color: #09151c;
   background-image:
     linear-gradient(rgba(46, 76, 90, 0.28) 1px, transparent 1px),
@@ -250,49 +304,47 @@ button {
   position: relative;
 }
 
-.axis {
-  background: rgba(72, 195, 200, 0.25);
-  position: absolute;
+.hidden {
+  display: none;
 }
 
-.axis-x {
-  height: 1px;
-  left: 0;
-  right: 0;
-  top: 52%;
-}
-
-.axis-y {
-  bottom: 0;
-  left: 47%;
-  top: 0;
-  width: 1px;
-}
-
-.canvas-message {
-  background: rgba(9, 21, 28, 0.88);
-  border: 1px solid var(--line-bright);
-  border-radius: 12px;
-  left: 50%;
-  max-width: 320px;
-  padding: 22px 20px;
-  position: absolute;
-  text-align: center;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.canvas-message strong {
+.plane-svg {
   display: block;
-  font-size: 0.96rem;
-  font-weight: 590;
-  margin-bottom: 9px;
+  height: 100%;
+  width: 100%;
 }
 
-.canvas-message span {
-  color: var(--muted);
-  font-size: 0.8rem;
-  line-height: 1.55;
+.plane-svg pattern path {
+  stroke: rgba(48, 84, 102, 0.55);
+  stroke-width: 0.25;
+}
+
+.plane-svg text {
+  fill: #dbe8ec;
+  font-size: 3px;
+}
+
+.axis-line {
+  stroke: rgba(72, 195, 200, 0.42);
+  stroke-width: 0.4;
+}
+
+.source-point {
+  fill: var(--accent);
+  stroke: #e7ffff;
+  stroke-width: 0.7;
+}
+
+.source-ring {
+  fill: rgba(247, 202, 106, 0.1);
+  stroke: var(--highlight);
+  stroke-width: 1.2;
+}
+
+.probe-marker {
+  stroke: white;
+  stroke-linecap: round;
+  stroke-width: 1.1;
 }
 
 .analysis {
@@ -359,6 +411,26 @@ button {
 
 .runtime-block {
   margin-top: auto;
+}
+
+.probe-position {
+  color: #c2d0d5 !important;
+  margin-top: 12px !important;
+}
+
+.compact-list {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.76rem;
+  gap: 8px;
+  line-height: 1.45;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.compact-list strong {
+  color: var(--ink);
 }
 
 .statusbar {

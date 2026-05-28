@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 05: Shared UI state plus 2D and 3D interaction slice - Engineering Task Report</title>
+  <style>
+    :root { color-scheme: light; --ink: #19202b; --muted: #566576; --line: #d3dce6; --panel: #f5f7fa; --accent: #0d5e63; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #fff; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { border-bottom: 3px solid var(--accent); margin-bottom: 2rem; padding-bottom: 1.25rem; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0 0 0.75rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; color: var(--muted); }
+    .status { background: #e7f4f1; border-radius: 999px; color: var(--accent); font-weight: 700; padding: 0.15rem 0.65rem; }
+    ul { margin-top: 0.5rem; padding-left: 1.4rem; }
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 36rem; width: 100%; }
+    caption { color: var(--muted); font-size: 0.95rem; text-align: left; padding: 0 0 0.5rem; }
+    th, td { border: 1px solid var(--line); padding: 0.6rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    code { font: 0.92em ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; }
+    .next { border-left: 4px solid var(--accent); background: var(--panel); padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Task 05: Shared UI state plus 2D and 3D interaction slice</h1>
+      <div class="meta">
+        <span class="status">DONE</span>
+        <span>Completed: <time datetime="2026-05-28T14:48:30+08:00">2026-05-28T14:48:30+08:00</time></span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Replaced the static placeholder shell with a shared browser state object for scene sources, probe position, active view mode, quality, request serial, and latest solver result.</li>
+        <li>Added point charge and ring creation plus inline editing for labels, positions, charges, and ring radius.</li>
+        <li>Added a 2D top-down SVG view that renders real source and probe positions from shared state.</li>
+        <li>Added a 3D view using local vendored Three.js and OrbitControls to render point spheres, ring torus geometry, a probe marker, axes, and a grid.</li>
+        <li>Added editable probe controls that call POST /api/field/evaluate and display potential, vector field, field magnitude, per-source contributions, quality, status, and warnings.</li>
+        <li>Added request_id deconfliction so stale field-evaluation responses from rapid edits are ignored.</li>
+        <li>Updated /api/config to mark scene editing and interaction as available for this vertical slice.</li>
+        <li>Added a Playwright smoke test covering page load, source creation, probe movement, solver output, warning display, and 2D/3D state preservation.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>No polished visual design, drag handles, deletion controls, advanced overlays, presets, or optional assistance were added.</li>
+        <li>3D ring orientation is fixed to the current ring normal default; arbitrary normal editing and mesh rotation remain future work.</li>
+        <li>The browser renders solver output for a single probe only, matching this task slice.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Technical Stack</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Technology choices</caption>
+          <thead><tr><th scope="col">Concern</th><th scope="col">Choice</th></tr></thead>
+          <tbody>
+            <tr><td>Runtime</td><td>Static HTML/CSS/ES modules served by the existing FastAPI app.</td></tr>
+            <tr><td>Rendering</td><td>2D uses inline SVG; 3D uses vendored Three.js and vendored OrbitControls through the existing import map.</td></tr>
+            <tr><td>Physics</td><td>The browser never computes V or E; it posts typed scene and probe JSON to /api/field/evaluate.</td></tr>
+            <tr><td>State</td><td>One browser state object drives source editing, probe controls, 2D rendering, 3D rendering, and solver result display.</td></tr>
+            <tr><td>Browser verification</td><td>pytest launches the FastAPI app in-process with uvicorn, then drives Chromium through Playwright.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Files changed in this task</caption>
+          <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>web/index.html</code></td><td>Introduce editable source controls, 2D/3D view surfaces, probe inputs, solver output panels, and stable test IDs.</td></tr>
+            <tr><td><code>web/styles.css</code></td><td>Style editable source cards, probe controls, 2D SVG scene, 3D surface, and compact solver output lists.</td></tr>
+            <tr><td><code>web/app.js</code></td><td>Implement shared UI state, source/probe editing, 2D SVG rendering, Three.js rendering, solver POST calls, and request_id stale-response suppression.</td></tr>
+            <tr><td><code>src/em_workbench/app.py</code></td><td>Mark scene editing and interaction capabilities available after Task 5.</td></tr>
+            <tr><td><code>tests/test_app.py</code></td><td>Update static app contract expectations for available interaction and new shell copy.</td></tr>
+            <tr><td><code>tests/test_browser_smoke.py</code></td><td>Add browser smoke coverage for the interaction slice.</td></tr>
+            <tr><td><code>reports/2026-05-28-task-05-interaction-slice.html</code></td><td>Record Task 5 scope, commands, evidence, risks, and next task.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Commands</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Commands executed</caption>
+          <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py -vv</code></td><td>RED</td><td>Initial browser smoke failed on missing Task 5 UI test IDs and enabled interaction controls in the existing placeholder shell.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py -vv</code></td><td>GREEN</td><td>After implementation, the Playwright smoke passed: 1 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py</code></td><td>GREEN</td><td>Required focused browser command passed: 1 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>GREEN</td><td>Required full regression command passed: 62 passed, 2 uvicorn/websockets deprecation warnings.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>GREEN</td><td>Required lint command reported All checks passed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Verification</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Verification evidence</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+            <tr><td>TDD RED</td><td>PASS</td><td>Browser test failed before implementation against the placeholder Task 2/3 shell.</td></tr>
+            <tr><td>Browser page load</td><td>PASS</td><td>Playwright found the EM Workbench heading and local Three.js runtime status.</td></tr>
+            <tr><td>Source editing</td><td>PASS</td><td>Playwright added point-1 and ring-1 and observed both source cards plus 2D labels.</td></tr>
+            <tr><td>Probe and solver</td><td>PASS</td><td>Playwright edited probe x/y/z, observed Ready status, populated V and |E|, point and ring contributions, preview quality, and ring finite-segment warnings.</td></tr>
+            <tr><td>2D/3D shared state</td><td>PASS</td><td>Playwright toggled to 3D and back to 2D while preserving 2 sources, ring card, probe position 0.220, and solver result display.</td></tr>
+            <tr><td>Chromium availability</td><td>PASS</td><td>Chromium was already available to the uv-managed Playwright runtime; no browser installation command was needed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Known Risks And Limitations</h2>
+      <ul>
+        <li>3D rendering is intentionally basic and rerenders on state changes; it is suitable for this slice but not optimized for large source counts.</li>
+        <li>Inline source editing has no deletion or validation messaging beyond API failure status.</li>
+        <li>Ring source editing exposes radius and charge but not normal; the mesh assumes the default z-normal ring orientation.</li>
+        <li>The stale-response guard ignores out-of-date successful responses but does not cancel in-flight fetches.</li>
+        <li>Playwright emits deprecation warnings from uvicorn/websockets dependencies during the in-process test server.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p class="next">Task 6: add probes, computation-quality controls, overlays, presets, and optional assistance.</p>
+    </section>
+  </main>
+</body>
+</html>

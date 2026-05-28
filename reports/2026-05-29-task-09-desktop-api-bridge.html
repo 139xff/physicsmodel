@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 09 - Desktop API Bridge</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f5f7fb;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px;
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(100, 116, 139, 0.18);
+        border-radius: 24px;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.1);
+      }
+      h1, h2 {
+        margin-top: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0 28px;
+        overflow: hidden;
+        border-radius: 16px;
+      }
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #eef4ff;
+      }
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: #eef2f7;
+      }
+      .ok {
+        color: #047857;
+        font-weight: 700;
+      }
+      .warn {
+        color: #b45309;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 09：桌面应用 API Bridge 准备</h1>
+      <p><strong>完成时间：</strong>2026-05-29 00:52:05 +08:00</p>
+      <p><strong>状态：</strong><span class="ok">完成</span></p>
+
+      <h2>交付范围</h2>
+      <table>
+        <tr><th>项目</th><th>结果</th></tr>
+        <tr>
+          <td>前端 API 抽象</td>
+          <td>新增 <code>web/api-client.js</code>，优先尝试 <code>window.emWorkbenchBridge</code>，否则回退到现有 HTTP API。</td>
+        </tr>
+        <tr>
+          <td>交互边界修复</td>
+          <td>方向向量或法向向量处于零向量中间态时，前端暂停求解请求，避免 422 控制台错误。</td>
+        </tr>
+        <tr>
+          <td>输入同步</td>
+          <td>对象参数编辑同时监听 <code>input</code> 与 <code>change</code>，连续填值时状态能即时更新。</td>
+        </tr>
+        <tr>
+          <td>桌面化计划</td>
+          <td>新增 <code>docs/superpowers/plans/2026-05-29-em-workbench-desktop-app.md</code>。</td>
+        </tr>
+      </table>
+
+      <h2>延期范围</h2>
+      <table>
+        <tr><th>项目</th><th>说明</th></tr>
+        <tr><td>真正桌面壳</td><td>本轮只完成桥接准备，尚未加入 PySide6 / Qt WebEngine。</td></tr>
+        <tr><td>Windows exe 打包</td><td>将在桌面壳可运行后再做 PyInstaller 或 Nuitka 打包。</td></tr>
+        <tr><td>安装器与签名</td><td>属于后续发布工程，不在本轮范围内。</td></tr>
+      </table>
+
+      <h2>修改文件</h2>
+      <table>
+        <tr><th>文件</th><th>变更</th></tr>
+        <tr><td><code>web/api-client.js</code></td><td>新增 bridge-first API 客户端。</td></tr>
+        <tr><td><code>web/app.js</code></td><td>切换到 API 客户端；增加零向量前端保护；改进输入事件同步。</td></tr>
+        <tr><td><code>docs/superpowers/plans/2026-05-29-em-workbench-desktop-app.md</code></td><td>新增桌面应用迁移计划。</td></tr>
+        <tr><td><code>reports/2026-05-29-task-09-desktop-api-bridge.html</code></td><td>新增本任务报告。</td></tr>
+      </table>
+
+      <h2>验证命令</h2>
+      <table>
+        <tr><th>命令</th><th>结果</th></tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td>
+          <td class="ok">All checks passed!</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td>
+          <td class="ok">63 passed, 2 warnings</td>
+        </tr>
+      </table>
+
+      <h2>已知风险</h2>
+      <table>
+        <tr><th>风险</th><th>处理建议</th></tr>
+        <tr>
+          <td>桌面 bridge 尚未真实注入</td>
+          <td>下一轮实现 PySide6 bridge 后，需要补充桌面模式启动测试。</td>
+        </tr>
+        <tr>
+          <td>PySide6 体积较大</td>
+          <td>打包前评估 PySide6 与 pywebview 两条路线，优先保证 WebGL 与本地 bridge 稳定性。</td>
+        </tr>
+      </table>
+
+      <h2>下一任务</h2>
+      <p>实现真正的桌面运行入口：增加 uv 管理的桌面依赖、Python bridge、无服务器启动方式，并保留 FastAPI 开发模式。</p>
+    </main>
+  </body>
+</html>

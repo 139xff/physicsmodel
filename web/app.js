@@ -1,3 +1,4 @@
+import { evaluateField, getConfig, getPreset, listPresets } from "./api-client.js";
 import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js";
 
 const runtimeStatus = document.querySelector("#runtime-status");
@@ -270,6 +271,25 @@ function nestedValue(source, field) {
   }
   const [group, key] = field.split(".");
   return source[group][key];
+}
+
+function vectorMagnitude(vector) {
+  if (!vector) {
+    return 0;
+  }
+  return Math.hypot(Number(vector.x), Number(vector.y), Number(vector.z));
+}
+
+function sceneValidationMessage() {
+  for (const source of state.scene.sources) {
+    if (source.orientation && vectorMagnitude(source.orientation) <= 1e-12) {
+      return "Direction vector cannot be zero; continue editing before solving.";
+    }
+    if (source.normal && vectorMagnitude(source.normal) <= 1e-12) {
+      return "Normal vector cannot be zero; continue editing before solving.";
+    }
+  }
+  return "";
 }
 
 function sourceField(source, field, label, step = "0.01") {
@@ -585,21 +605,12 @@ function setEmptyComputationState() {
 }
 
 async function postFieldEvaluation(requestId, samplePoints) {
-  const response = await fetch("/api/field/evaluate", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({
-      request_id: requestId,
-      scene: state.scene,
-      sample_points: samplePoints,
-      quality: state.quality,
-    }),
+  return evaluateField({
+    request_id: requestId,
+    scene: state.scene,
+    sample_points: samplePoints,
+    quality: state.quality,
   });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`场计算失败：${response.status} ${detail}`);
-  }
-  return response.json();
 }
 
 async function evaluateProbe(requestId) {
@@ -656,6 +667,12 @@ function scheduleEvaluation() {
   if (evaluationTimer) {
     window.clearTimeout(evaluationTimer);
   }
+  const validationMessage = sceneValidationMessage();
+  if (validationMessage) {
+    solverStatus.textContent = validationMessage;
+    overlayStatus.textContent = validationMessage;
+    return;
+  }
   evaluationTimer = window.setTimeout(() => {
     evaluateProbe(probeRequestId).catch((error) => {
       if (probeRequestId === latestProbeRequestId) {
@@ -677,11 +694,7 @@ function refreshSourceIndexes() {
 }
 
 async function loadPresetOptions() {
-  const response = await fetch("/api/presets", { headers: { Accept: "application/json" } });
-  if (!response.ok) {
-    throw new Error(`预设列表读取失败：${response.status}`);
-  }
-  const presets = await response.json();
+  const presets = await listPresets();
   presetSelect.innerHTML = presets
     .map((preset) => `<option value="${preset.id}">${escapeHtml(preset.title)}</option>`)
     .join("");
@@ -695,13 +708,7 @@ async function loadSelectedPreset() {
     return;
   }
   presetStatus.textContent = `正在加载 ${presetId}...`;
-  const response = await fetch(`/api/presets/${encodeURIComponent(presetId)}`, {
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) {
-    throw new Error(`预设加载失败：${response.status}`);
-  }
-  const preset = await response.json();
+  const preset = await getPreset(presetId);
   state.scene = preset.scene;
   state.lastResult = null;
   state.overlayResult = null;
@@ -712,14 +719,7 @@ async function loadSelectedPreset() {
 }
 
 async function initialiseShell() {
-  const response = await fetch("/api/config", {
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) {
-    throw new Error(`配置读取失败：${response.status}`);
-  }
-
-  const config = await response.json();
+  const config = await getConfig();
   document.title = "电磁工作台 | 静电场";
   runtimeStatus.textContent =
     `本地 Three.js ${config.runtime.three.version} 已就绪。` +
@@ -760,12 +760,16 @@ sourceList.addEventListener("click", (event) => {
     removeSource(button.dataset.sourceId);
   }
 });
-sourceList.addEventListener("change", (event) => {
+
+function handleSourceInput(event) {
   const input = event.target;
   if (input instanceof HTMLInputElement) {
     updateSource(input.dataset.sourceId, input.dataset.field, input.value);
   }
-});
+}
+
+sourceList.addEventListener("input", handleSourceInput);
+sourceList.addEventListener("change", handleSourceInput);
 window.addEventListener("resize", () => {
   if (state.mode !== "3D") {
     return;

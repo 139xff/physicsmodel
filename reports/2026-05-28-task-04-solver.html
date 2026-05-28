@@ -31,6 +31,7 @@
       <div class="meta">
         <span class="status">DONE</span>
         <span>Completed: <time datetime="2026-05-28T09:35:06+08:00">2026-05-28T09:35:06+08:00</time></span>
+        <span>Review fix updated: <time datetime="2026-05-28T14:38:00+08:00">2026-05-28T14:38:00+08:00</time></span>
       </div>
     </header>
     <section>
@@ -43,6 +44,8 @@
         <li>Bounded singular or near-source point-charge samples to finite zero contribution with per-source and per-sample warnings.</li>
         <li>Added POST /api/field/evaluate for batch sample evaluation with request_id echo, result_version, quality metadata, per-source contributions, warnings, and solver metadata.</li>
         <li>Updated /api/config so solver capability is available while scene editing and interaction remain planned.</li>
+        <li>Review fix: ring contributions now warn that they use a finite-segment approximation while preserving discrete-ring metadata.</li>
+        <li>Review fix: ring samples on or extremely near the ring wire and line-segment samples on or extremely near the finite segment interior now emit near-source limitation warnings in both contribution and sample summaries.</li>
       </ul>
     </section>
     <section>
@@ -80,7 +83,7 @@
         <tr><td><code>src/em_workbench/physics/solver.py</code></td><td>Implement electrostatic evaluators, quality settings, singularity handling, warnings, metadata, and strict response DTOs.</td></tr>
         <tr><td><code>src/em_workbench/app.py</code></td><td>Add FieldEvaluateRequest, POST /api/field/evaluate, and mark solver capability available.</td></tr>
         <tr><td><code>tests/test_solver.py</code></td><td>Cover point-charge analytic V/E, superposition, dipole symmetry, ring axis benchmark, tilted-ring rotation equivalence, singularity behavior, quality metadata, and all source-kind contribution reporting.</td></tr>
-        <tr><td><code>tests/test_solver_api.py</code></td><td>Cover config capability, batch request/version echo, refined ring metadata, and invalid quality 422 behavior.</td></tr>
+        <tr><td><code>tests/test_solver_api.py</code></td><td>Cover config capability, batch request/version echo, refined ring metadata, warning propagation, and invalid quality 422 behavior.</td></tr>
         <tr><td><code>tests/test_app.py</code></td><td>Update existing app config expectation from solver planned to solver available for Task 4.</td></tr>
         <tr><td><code>reports/2026-05-28-task-04-solver.html</code></td><td>Record Task 4 scope, RED/GREEN evidence, verification commands, limitations, and next scheduled task.</td></tr>
           </tbody>
@@ -99,6 +102,10 @@
         <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>RED then GREEN</td><td>The first full run failed only because tests/test_app.py still expected solver planned; after updating that Task 4 contract, full verification reported 57 passed.</td></tr>
         <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>RED then GREEN</td><td>Ruff first reported line-length issues in new solver/tests; after formatting-only fixes, ruff reported All checks passed.</td></tr>
         <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\render_task_report.py --input - --output reports\2026-05-28-task-04-solver.html</code></td><td>PASS</td><td>Generated this standalone accessible HTML engineering report.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_solver.py tests\test_solver_api.py</code></td><td>RED</td><td>Review-fix tests failed as expected: ring finite-segment warnings, ring near-source warnings, line-segment near-source warnings, and API warning propagation were absent; 4 failed, 12 passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_solver.py tests\test_solver_api.py</code></td><td>GREEN</td><td>After adding explicit ring approximation warnings and geometric near-source checks, focused Task 4 verification reported 16 passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>GREEN</td><td>Full regression verification reported 61 passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>GREEN</td><td>Ruff reported All checks passed.</td></tr>
           </tbody>
         </table>
       </div>
@@ -112,7 +119,8 @@
           <tbody>
         <tr><td>TDD RED</td><td>PASS</td><td>Focused Task 4 tests failed before production implementation because em_workbench.physics was absent.</td></tr>
         <tr><td>Focused solver/API tests</td><td>PASS</td><td>12 passed for tests/test_solver.py and tests/test_solver_api.py after implementation and formatting.</td></tr>
-        <tr><td>Full regression tests</td><td>PASS</td><td>57 passed across the repository after synchronizing the existing config capability test.</td></tr>
+        <tr><td>Focused solver/API review-fix tests</td><td>PASS</td><td>16 passed for tests/test_solver.py and tests/test_solver_api.py after hardening continuous-source warnings.</td></tr>
+        <tr><td>Full regression tests</td><td>PASS</td><td>61 passed across the repository after the review fix.</td></tr>
         <tr><td>Lint</td><td>PASS</td><td>ruff check --no-cache src tests scripts reported All checks passed.</td></tr>
         <tr><td>Browser evidence</td><td>DEFERRED</td><td>Task 4 adds a JSON solver API only; browser interaction and Playwright evidence remain Task 5+ scope.</td></tr>
           </tbody>
@@ -123,8 +131,9 @@
       <h2>Known Risks And Limitations</h2>
       <ul>
         <li>Point-charge singularities are bounded to zero contribution at or within 1e-9 m and produce explicit warnings, avoiding infinities and NaNs in totals.</li>
-        <li>Ring fields use finite midpoint charge segments; refined mode increases segments but is still a numerical approximation off axis.</li>
+        <li>Ring fields use finite midpoint charge segments; refined mode increases segments but is still a numerical approximation off axis and now reports that limitation in contribution and sample warnings.</li>
         <li>Line-segment and disk fields use midpoint numerical approximations and return limitations in warnings; they are available for baseline exploration, not final precision claims.</li>
+        <li>Ring and finite-line geometric near-source checks warn at or within 1e-9 m of the ideal continuous geometry, but they do not replace the current finite-segment numerical result with an analytic singular treatment.</li>
         <li>Infinite-plane potential is reported relative to V=0 at the plane, while the field is analytic away from the discontinuity.</li>
       </ul>
     </section>

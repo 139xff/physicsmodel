@@ -96,6 +96,40 @@ def test_field_evaluate_refined_ring_response_includes_per_source_metadata():
     assert contribution["metadata"]["segments"] == body["metadata"]["ring_segments"]
 
 
+def test_field_evaluate_surfaces_ring_approximation_and_near_source_warnings():
+    request = {
+        "request_id": "ring-warning-api-request",
+        "quality": "preview",
+        "scene": {
+            "id": "api-ring-warning-scene",
+            "title": "API ring warning scene",
+            "sources": [
+                {
+                    "id": "api-warning-ring",
+                    "kind": "ring",
+                    "label": "API warning ring",
+                    "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                    "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+                    "radius_m": 0.12,
+                    "charge_c": 4.0e-9,
+                }
+            ],
+        },
+        "sample_points": [{"x": 0.12, "y": 0.0, "z": 0.0}],
+    }
+
+    response = client.post("/api/field/evaluate", json=request)
+
+    assert response.status_code == 200
+    body = response.json()
+    sample = body["samples"][0]
+    contribution = sample["contributions"][0]
+    assert contribution["metadata"]["method"] == "discrete-ring"
+    assert any("finite-segment approximation" in warning for warning in contribution["warnings"])
+    assert any("near source api-warning-ring ring" in warning for warning in sample["warnings"])
+    assert any("near source api-warning-ring ring" in warning for warning in body["warnings"])
+
+
 def test_field_evaluate_rejects_unknown_quality_without_static_fallback():
     request = _single_point_request()
     request["quality"] = "fast-ish"

@@ -193,6 +193,81 @@ def test_preview_and_refined_ring_modes_report_quality_metadata():
     )
 
 
+def test_ring_contribution_warns_about_finite_segment_approximation():
+    scene = _scene(
+        [
+            {
+                "id": "warning-ring",
+                "kind": "ring",
+                "label": "Warning ring",
+                "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+                "radius_m": 0.1,
+                "charge_c": 2.0e-9,
+            }
+        ]
+    )
+
+    evaluation = evaluate_scene(scene, [(0.0, 0.0, 0.2)], quality="preview")
+
+    result = evaluation.samples[0]
+    contribution = result.contributions[0]
+    assert contribution.metadata["method"] == "discrete-ring"
+    assert contribution.metadata["segments"] == evaluation.metadata["ring_segments"]
+    assert any("finite-segment approximation" in warning for warning in contribution.warnings)
+    assert any("finite-segment approximation" in warning for warning in result.warnings)
+
+
+def test_ring_sample_on_ring_geometry_warns_about_near_source_result():
+    scene = _scene(
+        [
+            {
+                "id": "near-ring",
+                "kind": "ring",
+                "label": "Near ring",
+                "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+                "radius_m": 0.1,
+                "charge_c": 2.0e-9,
+            }
+        ]
+    )
+
+    evaluation = evaluate_scene(scene, [(0.1, 0.0, 0.0)], quality="preview")
+
+    result = evaluation.samples[0]
+    contribution = result.contributions[0]
+    assert math.isfinite(result.potential_v)
+    assert any("near source near-ring ring" in warning for warning in contribution.warnings)
+    assert any("near source near-ring ring" in warning for warning in result.warnings)
+
+
+def test_line_segment_sample_inside_segment_warns_about_near_source_result():
+    scene = _scene(
+        [
+            {
+                "id": "near-line",
+                "kind": "line_segment",
+                "label": "Near line",
+                "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "orientation": {"x": 0.0, "y": 0.0, "z": 1.0},
+                "length_m": 0.2,
+                "charge_c": 2.0e-9,
+            }
+        ]
+    )
+
+    evaluation = evaluate_scene(scene, [(0.0, 0.0, 0.0)], quality="preview")
+
+    result = evaluation.samples[0]
+    contribution = result.contributions[0]
+    assert math.isfinite(result.potential_v)
+    assert any(
+        "near source near-line line_segment" in warning for warning in contribution.warnings
+    )
+    assert any("near source near-line line_segment" in warning for warning in result.warnings)
+
+
 def test_all_release_one_sources_are_reported_with_contributions_or_limitations():
     scene = _scene(
         [

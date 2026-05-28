@@ -226,13 +226,23 @@ def _ring_contribution(
 ) -> SourceContribution:
     charge_c = _ring_charge_c(source)
     center = Vector3.from_position(source.position)
-    axis_u, axis_v, _unit_normal = orthonormal_basis_from_normal(
+    axis_u, axis_v, unit_normal = orthonormal_basis_from_normal(
         Vector3.from_position(source.normal)
     )
     dq = charge_c / segment_count
     potential = 0.0
     field = ZERO_VECTOR
-    warnings: list[str] = []
+    warnings: list[str] = [
+        (
+            f"Source {source.id} ring uses a {segment_count}-segment finite-segment "
+            "approximation; analytic ring precision is not claimed off axis."
+        )
+    ]
+    if _sample_is_near_ring(source, sample, center, unit_normal):
+        warnings.append(
+            f"Sample is near source {source.id} ring geometry; finite-segment result is "
+            "near singular and should be treated as a limitation."
+        )
     for index in range(segment_count):
         angle = 2.0 * math.pi * (index + 0.5) / segment_count
         charge_position = center + axis_u.scale(math.cos(angle) * source.radius_m)
@@ -277,6 +287,11 @@ def _line_segment_contribution(
             "approximation; analytic finite-line precision is not claimed."
         )
     ]
+    if _sample_is_near_line_segment(source, sample, center, axis):
+        warnings.append(
+            f"Sample is near source {source.id} line_segment geometry; finite-segment "
+            "result is near singular and should be treated as a limitation."
+        )
     for index in range(segment_count):
         charge_position = center + axis.scale(start_offset + index * step)
         partial = _point_charge_contribution(
@@ -431,6 +446,41 @@ def _shell_charge_c(source: SphericalShellSource) -> float:
     if source.charge_c is not None:
         return source.charge_c
     return source.surface_charge_density_c_per_m2 * 4.0 * math.pi * source.radius_m**2
+
+
+def _sample_is_near_ring(
+    source: RingSource,
+    sample: Vector3,
+    center: Vector3,
+    unit_normal: Vector3,
+) -> bool:
+    displacement = sample - center
+    plane_distance = displacement.dot(unit_normal)
+    in_plane = displacement - unit_normal.scale(plane_distance)
+    radial_distance = in_plane.magnitude()
+    return (
+        abs(plane_distance) <= MIN_SOURCE_DISTANCE_M
+        and abs(radial_distance - source.radius_m) <= MIN_SOURCE_DISTANCE_M
+    )
+
+
+def _sample_is_near_line_segment(
+    source: LineSegmentSource,
+    sample: Vector3,
+    center: Vector3,
+    axis: Vector3,
+) -> bool:
+    displacement = sample - center
+    projected_distance = displacement.dot(axis)
+    nearest_axis_point = center + axis.scale(projected_distance)
+    perpendicular_distance = (sample - nearest_axis_point).magnitude()
+    half_length = 0.5 * source.length_m
+    return (
+        perpendicular_distance <= MIN_SOURCE_DISTANCE_M
+        and -half_length - MIN_SOURCE_DISTANCE_M
+        <= projected_distance
+        <= half_length + MIN_SOURCE_DISTANCE_M
+    )
 
 
 def _zero_contribution(

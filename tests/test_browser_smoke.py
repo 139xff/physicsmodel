@@ -43,8 +43,19 @@ def page(live_server_url: str) -> Iterator[Page]:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
             page = browser.new_page(viewport={"width": 1440, "height": 900})
+            page_errors: list[str] = []
+            console_errors: list[str] = []
+            page.on("pageerror", lambda error: page_errors.append(str(error)))
+            page.on(
+                "console",
+                lambda message: (
+                    console_errors.append(message.text) if message.type == "error" else None
+                ),
+            )
             page.goto(live_server_url, wait_until="networkidle")
             yield page
+            assert page_errors == []
+            assert console_errors == []
             browser.close()
     except PlaywrightError as error:
         pytest.fail(
@@ -74,8 +85,8 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_role("heading", name="电磁工作台")).to_be_visible()
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
 
-    page.get_by_role("button", name="加入点电荷").click()
-    page.get_by_role("button", name="加入带电圆环").click()
+    page.locator("#add-point").click()
+    page.locator("#add-ring").click()
 
     expect(page.get_by_test_id("source-card-point-1")).to_contain_text("点电荷 1")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
@@ -105,9 +116,10 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     _assert_inside_viewbox(probe_y - 4)
     _assert_inside_viewbox(probe_y + 4)
 
-    _fill_number(page, "探针 x", "0.22")
-    _fill_number(page, "探针 y", "0.03")
-    _fill_number(page, "探针 z", "0.08")
+    page.locator("#probe-x").fill("0.22")
+    page.locator("#probe-y").fill("0.03")
+    page.locator("#probe-z").fill("0.08")
+    page.locator("#probe-z").press("Tab")
 
     expect(page.get_by_test_id("solver-status")).to_contain_text("已完成")
     expect(page.get_by_test_id("potential-value")).not_to_contain_text("暂无")
@@ -133,15 +145,15 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
-    for button_name, test_id in [
-        ("加入点电荷", "source-card-point-1"),
-        ("加入带电线段", "source-card-line-segment-1"),
-        ("加入带电圆环", "source-card-ring-1"),
-        ("加入带电圆盘", "source-card-disk-1"),
-        ("加入无限平面", "source-card-infinite-plane-1"),
-        ("加入球壳", "source-card-spherical-shell-1"),
+    for button_selector, test_id in [
+        ("#add-point", "source-card-point-1"),
+        ("#add-line-segment", "source-card-line-segment-1"),
+        ("#add-ring", "source-card-ring-1"),
+        ("#add-disk", "source-card-disk-1"),
+        ("#add-infinite-plane", "source-card-infinite-plane-1"),
+        ("#add-spherical-shell", "source-card-spherical-shell-1"),
     ]:
-        page.get_by_role("button", name=button_name).click()
+        page.locator(button_selector).click()
         expect(page.get_by_test_id(test_id)).to_be_visible()
 
     expect(page.get_by_test_id("source-count")).to_contain_text("6 个源")
@@ -150,14 +162,17 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.get_by_test_id("source-card-infinite-plane-1")).to_contain_text("面电荷密度")
     expect(page.get_by_test_id("source-card-spherical-shell-1")).to_contain_text("半径 m")
 
-    _fill_number(page, "line-segment-1 方向 x", "0")
-    _fill_number(page, "line-segment-1 方向 y", "1")
-    _fill_number(page, "line-segment-1 长度 m", "0.18")
-    _fill_number(page, "disk-1 法向 z", "1")
-    _fill_number(page, "infinite-plane-1 面电荷密度 C/m^2", "2e-9")
-    _fill_number(page, "spherical-shell-1 半径 m", "0.14")
+    page.locator('[data-source-id="line-segment-1"][data-field="orientation.x"]').fill("0")
+    page.locator('[data-source-id="line-segment-1"][data-field="orientation.y"]').fill("1")
+    page.locator('[data-source-id="line-segment-1"][data-field="length_m"]').fill("0.18")
+    page.locator('[data-source-id="disk-1"][data-field="normal.z"]').fill("1")
+    page.locator(
+        '[data-source-id="infinite-plane-1"][data-field="surface_charge_density_c_per_m2"]'
+    ).fill("2e-9")
+    page.locator('[data-source-id="spherical-shell-1"][data-field="radius_m"]').fill("0.14")
+    page.locator('[data-source-id="spherical-shell-1"][data-field="radius_m"]').press("Tab")
 
-    page.get_by_label("计算质量").select_option("refined")
+    page.locator("#quality-select").select_option("refined")
     expect(page.get_by_test_id("quality-value")).to_contain_text("refined")
     expect(page.get_by_test_id("solver-status")).to_contain_text("已完成")
 
@@ -174,8 +189,8 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.get_by_test_id("view-2d")).to_be_visible()
     expect(page.get_by_test_id("source-card-disk-1")).to_contain_text("带电圆盘 1")
 
-    page.get_by_label("场景预设").select_option("electric-dipole")
-    page.get_by_role("button", name="加载预设").click()
+    page.locator("#preset-select").select_option("electric-dipole")
+    page.locator("#preset-form button").click()
     expect(page.get_by_test_id("preset-status")).to_contain_text("已加载：Electric dipole")
     expect(page.get_by_test_id("source-count")).to_contain_text("2 个源")
     expect(page.get_by_test_id("source-card-dipole-positive")).to_contain_text("Positive pole")

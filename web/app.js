@@ -1,5 +1,4 @@
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { render3d, resize3d } from "./renderers/view3d.js";
 
 const runtimeStatus = document.querySelector("#runtime-status");
 const sourceList = document.querySelector("#source-list");
@@ -66,11 +65,6 @@ const KIND_LABELS = {
 let latestProbeRequestId = "";
 let latestOverlayRequestId = "";
 let requestSerial = 0;
-let sceneGroup;
-let camera;
-let renderer;
-let controls;
-
 function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) {
     return "n/a";
@@ -326,26 +320,6 @@ function mapToViewport(x, y) {
   };
 }
 
-function physicsNormalToThreeComponents(normal) {
-  const vector = { x: normal.x, y: normal.z, z: normal.y };
-  const length = Math.hypot(vector.x, vector.y, vector.z);
-  if (length === 0) {
-    return { x: 0, y: 1, z: 0 };
-  }
-  return { x: vector.x / length, y: vector.y / length, z: vector.z / length };
-}
-
-function threeVectorFromComponents(components) {
-  return new THREE.Vector3(components.x, components.y, components.z);
-}
-
-function formatThreeNormal(components) {
-  return [components.x, components.y, components.z]
-    .map((component) => (Math.abs(component) < 1e-9 ? 0 : component))
-    .map((component) => Number(component.toFixed(6)).toString())
-    .join(",");
-}
-
 function renderSource2d(source) {
   const point = mapToViewport(source.position.x, source.position.y);
   const label = escapeHtml(source.label);
@@ -479,103 +453,6 @@ function render2d() {
   `;
 }
 
-function ensure3d() {
-  if (renderer) {
-    return;
-  }
-  const width = view3d.clientWidth || 640;
-  const height = view3d.clientHeight || 520;
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(width, height);
-  view3d.appendChild(renderer.domElement);
-
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x09151c);
-  camera = new THREE.PerspectiveCamera(48, width / height, 0.01, 100);
-  camera.position.set(0.45, 0.38, 0.42);
-  controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-
-  scene.add(new THREE.GridHelper(0.8, 16, 0x305466, 0x223947));
-  scene.add(new THREE.AxesHelper(0.28));
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-  sceneGroup = new THREE.Group();
-  scene.add(sceneGroup);
-  renderer.userData.scene = scene;
-}
-
-function meshForSource(source) {
-  if (source.kind === "ring") {
-    const geometry = new THREE.TorusGeometry(source.radius_m, 0.004, 10, 72);
-    const material = new THREE.MeshBasicMaterial({ color: 0xf7ca6a });
-    const mesh = new THREE.Mesh(geometry, material);
-    const threeNormal = threeVectorFromComponents(physicsNormalToThreeComponents(source.normal));
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), threeNormal);
-    return mesh;
-  }
-  if (source.kind === "line_segment") {
-    const geometry = new THREE.CylinderGeometry(0.004, 0.004, source.length_m, 12);
-    const material = new THREE.MeshBasicMaterial({ color: 0x8fd0ff });
-    const mesh = new THREE.Mesh(geometry, material);
-    const direction = threeVectorFromComponents(physicsNormalToThreeComponents(source.orientation));
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-    return mesh;
-  }
-  if (source.kind === "disk" || source.kind === "infinite_plane") {
-    const radius = source.kind === "disk" ? source.radius_m : source.display_extent_m * 0.5;
-    const geometry = new THREE.CircleGeometry(radius, 72);
-    const material = new THREE.MeshBasicMaterial({
-      color: source.kind === "disk" ? 0x9fe870 : 0xa580ff,
-      opacity: 0.45,
-      side: THREE.DoubleSide,
-      transparent: true,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    const threeNormal = threeVectorFromComponents(physicsNormalToThreeComponents(source.normal));
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), threeNormal);
-    return mesh;
-  }
-  const geometry = new THREE.SphereGeometry(
-    source.kind === "spherical_shell" ? source.radius_m : 0.018,
-    24,
-    16,
-  );
-  const material = new THREE.MeshBasicMaterial({
-    color: source.charge_c >= 0 ? 0x48c3c8 : 0xff758f,
-    wireframe: source.kind === "spherical_shell",
-  });
-  return new THREE.Mesh(geometry, material);
-}
-
-function render3d() {
-  view3d.removeAttribute("data-ring-normal-three");
-  const firstRing = state.scene.sources.find((source) => source.kind === "ring");
-  if (firstRing) {
-    view3d.dataset.ringNormalThree = formatThreeNormal(
-      physicsNormalToThreeComponents(firstRing.normal),
-    );
-  }
-
-  ensure3d();
-  sceneGroup.clear();
-
-  for (const source of state.scene.sources) {
-    const mesh = meshForSource(source);
-    mesh.position.set(source.position.x, source.position.z, source.position.y);
-    sceneGroup.add(mesh);
-  }
-
-  const probeGeometry = new THREE.SphereGeometry(0.012, 16, 12);
-  const probeMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const probeMesh = new THREE.Mesh(probeGeometry, probeMaterial);
-  probeMesh.position.set(state.probe.x, state.probe.z, state.probe.y);
-  sceneGroup.add(probeMesh);
-
-  controls.update();
-  renderer.render(renderer.userData.scene, camera);
-}
-
 function renderProbe() {
   probePosition.textContent =
     `探针位置 (${formatFixed(state.probe.x)}, ${formatFixed(state.probe.y)}, ` +
@@ -632,7 +509,7 @@ function renderAll() {
   render2d();
   renderProbe();
   if (state.mode === "3D") {
-    render3d();
+    render3d(view3d, state);
   }
   renderResult();
   renderOverlaySummary();
@@ -824,15 +701,7 @@ sourceList.addEventListener("change", (event) => {
   }
 });
 window.addEventListener("resize", () => {
-  if (!renderer) {
-    return;
-  }
-  const width = view3d.clientWidth || 640;
-  const height = view3d.clientHeight || 520;
-  renderer.setSize(width, height);
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-  render3d();
+  resize3d(view3d, state);
 });
 
 renderAll();

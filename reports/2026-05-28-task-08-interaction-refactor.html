@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 08: Interaction Diagnosis And Frontend Module Reorganization - Engineering Task Report</title>
+  <style>
+    :root { color-scheme: light; --ink: #19202b; --muted: #566576; --line: #d3dce6; --panel: #f5f7fa; --accent: #0d5e63; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #fff; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { border-bottom: 3px solid var(--accent); margin-bottom: 2rem; padding-bottom: 1.25rem; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0 0 0.75rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; color: var(--muted); }
+    .status { background: #e7f4f1; border-radius: 999px; color: var(--accent); font-weight: 700; padding: 0.15rem 0.65rem; }
+    ul { margin-top: 0.5rem; padding-left: 1.4rem; }
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 36rem; width: 100%; }
+    caption { color: var(--muted); font-size: 0.95rem; text-align: left; padding: 0 0 0.5rem; }
+    th, td { border: 1px solid var(--line); padding: 0.6rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    code { font: 0.92em ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; }
+    .next { border-left: 4px solid var(--accent); background: var(--panel); padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Task 08: Interaction Diagnosis And Frontend Module Reorganization</h1>
+      <div class="meta">
+        <span class="status">DONE</span>
+        <span>Completed: <time datetime="2026-05-28T21:10:00+08:00">2026-05-28T21:10:00+08:00</time></span>
+      </div>
+    </header>
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Used subagent-driven diagnosis with Build Web Apps and Build Web Data Visualization guidance to separate page-structure findings from rendered interaction debugging.</li>
+        <li>Identified the interaction failure as a real 3D runtime error: the previous Three.js path wrote renderer.userData.scene even though renderer.userData was undefined.</li>
+        <li>Moved Three.js rendering into web/renderers/view3d.js and coordinate helpers into web/renderers/coordinates.js so app.js no longer owns all 3D scene lifecycle details.</li>
+        <li>Replaced renderer.userData scene storage with an explicit module-scoped threeScene variable and safer resize handling based on the rendered surface bounds.</li>
+        <li>Hardened Playwright browser tests to fail on pageerror and console error, and switched key interactions to stable id/data-field selectors instead of relying on Chinese accessible labels.</li>
+        <li>Preserved the Chinese Apple-style page layout and existing data-testid contracts while making the code path easier to extend with future visualization features.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>The full frontend was not split into every proposed module; API, state and 2D rendering are still in app.js and can be extracted in later slices.</li>
+        <li>This task did not add drag-to-move source/probe interactions; current user interaction remains buttons, forms, 2D overlay and 3D OrbitControls camera navigation.</li>
+        <li>No screenshot visual regression baseline was added; rendered QA is enforced through Playwright DOM, pageerror and interaction assertions.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Technical Stack</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Technology choices</caption>
+          <thead><tr><th scope="col">Concern</th><th scope="col">Choice</th></tr></thead>
+          <tbody>
+        <tr><td>Frontend debugging</td><td>Build Web Apps frontend-testing-debugging pattern: rendered app validation, console/pageerror checks and target interaction proof.</td></tr>
+        <tr><td>Scientific visualization</td><td>Build Web Data Visualization guidance: keep WebGL scene ownership explicit, preserve coordinate mappings and test rendered interaction state.</td></tr>
+        <tr><td>Runtime</td><td>Static ES modules with FastAPI and vendored Three.js; no npm or build tooling introduced.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Changed Files</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Files changed in this task</caption>
+          <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
+          <tbody>
+        <tr><td><code>web/app.js</code></td><td>Remove direct Three.js scene ownership from the main app file and call the extracted 3D renderer/resize helpers.</td></tr>
+        <tr><td><code>web/renderers/coordinates.js</code></td><td>Add reusable physics-to-Three normal conversion and stable normal formatting.</td></tr>
+        <tr><td><code>web/renderers/view3d.js</code></td><td>Own Three.js scene, camera, OrbitControls, source mesh creation, rendering and resize without renderer.userData.</td></tr>
+        <tr><td><code>tests/test_browser_smoke.py</code></td><td>Fail tests on browser pageerror/console error and use stable selectors for core interaction paths.</td></tr>
+        <tr><td><code>reports/2026-05-28-task-08-interaction-refactor.html</code></td><td>Record the diagnosis, fix, module reorganization, commands, evidence and residual risks.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Commands</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Commands executed</caption>
+          <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py -vv</code></td><td>GREEN</td><td>2 passed, with the updated browser fixture now checking pageerror and console error after 3D interaction.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>GREEN</td><td>63 passed, 2 known uvicorn/websockets deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>GREEN</td><td>All checks passed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Verification</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Verification evidence</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+        <tr><td>Interaction bug diagnosis</td><td>PASS</td><td>Subagent diagnosis reproduced a 3D click page error at renderer.userData.scene; the new 3D renderer avoids renderer.userData entirely.</td></tr>
+        <tr><td>3D switching</td><td>PASS</td><td>Browser smoke toggles 2D to 3D, sees the 3D view and ring normal attribute, and no pageerror is emitted.</td></tr>
+        <tr><td>Regression</td><td>PASS</td><td>Full suite passed: 63 passed.</td></tr>
+        <tr><td>Frontend organization</td><td>PASS</td><td>Three.js-specific lifecycle and coordinate conversion now live in dedicated ES modules under web/renderers/.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Known Risks And Limitations</h2>
+      <ul>
+        <li>PowerShell may display UTF-8 Chinese text as mojibake, but files are valid UTF-8 and Playwright/browser rendering uses the correct Chinese text.</li>
+        <li>The remaining app.js is still large; extracting API, state, source panel and 2D renderer modules should be a follow-up before adding heavier field-line/equipotential features.</li>
+        <li>3D rendering remains a vertical-slice scientific representation, not high-fidelity physical visualization or direct-manipulation editing.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p class="next">Extract API/state/2D/source-panel modules and add direct probe/source manipulation if that becomes the next prioritized interaction requirement.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -28,7 +28,10 @@ const probeInputs = {
   z: document.querySelector("#probe-z"),
 };
 const VIEWPORT_METERS_TO_UNITS = 180;
-const OVERLAY_SAMPLE_AXIS = [-0.18, -0.09, 0, 0.09, 0.18];
+const VIEWPORT_CENTER_UNITS = 50;
+const VIEWPORT_DEFAULT_SIZE_UNITS = 100;
+const VIEWPORT_PADDING_UNITS = 12;
+const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
 
 const state = {
   mode: "2D",
@@ -253,7 +256,7 @@ function renderHeatmap2d() {
   }
   const potentials = state.overlayResult.samples.map((s) => s.potential_v);
   const maxAbs = Math.max(...potentials.map(Math.abs), 1e-12);
-  const cellSize = VIEWPORT_METERS_TO_UNITS * 0.09;
+  const cellSize = VIEWPORT_METERS_TO_UNITS * overlayCellSizeMeters();
   const halfCell = cellSize / 2;
   return state.overlaySamples
     .map((sample, index) => {
@@ -369,9 +372,118 @@ function renderSourceList() {
 
 function mapToViewport(x, y) {
   return {
-    x: 50 + x * VIEWPORT_METERS_TO_UNITS,
-    y: 50 - y * VIEWPORT_METERS_TO_UNITS,
+    x: VIEWPORT_CENTER_UNITS + x * VIEWPORT_METERS_TO_UNITS,
+    y: VIEWPORT_CENTER_UNITS - y * VIEWPORT_METERS_TO_UNITS,
   };
+}
+
+function source2dRadiusUnits(source) {
+  if (source.kind === "point") {
+    return 7;
+  }
+  if (source.kind === "line_segment") {
+    return (source.length_m * VIEWPORT_METERS_TO_UNITS) / 2;
+  }
+  if (source.kind === "infinite_plane") {
+    return (source.display_extent_m * VIEWPORT_METERS_TO_UNITS) / 2;
+  }
+  if ("radius_m" in source) {
+    return source.radius_m * VIEWPORT_METERS_TO_UNITS;
+  }
+  return 0;
+}
+
+function addViewportBounds(bounds, x, y, margin = 0) {
+  bounds.minX = Math.min(bounds.minX, x - margin);
+  bounds.maxX = Math.max(bounds.maxX, x + margin);
+  bounds.minY = Math.min(bounds.minY, y - margin);
+  bounds.maxY = Math.max(bounds.maxY, y + margin);
+}
+
+function compute2dViewBox() {
+  const bounds = {
+    minX: 0,
+    minY: 0,
+    maxX: VIEWPORT_DEFAULT_SIZE_UNITS,
+    maxY: VIEWPORT_DEFAULT_SIZE_UNITS,
+  };
+
+  for (const source of state.scene.sources) {
+    const point = mapToViewport(source.position.x, source.position.y);
+    addViewportBounds(bounds, point.x, point.y, source2dRadiusUnits(source) + 14);
+  }
+
+  const probe = mapToViewport(state.probe.x, state.probe.y);
+  addViewportBounds(bounds, probe.x, probe.y, 10);
+
+  if (state.showHeatmap && state.overlaySamples.length > 0) {
+    const cellMargin = VIEWPORT_METERS_TO_UNITS * overlayCellSizeMeters() * 0.5;
+    for (const sample of state.overlaySamples) {
+      const point = mapToViewport(sample.x, sample.y);
+      addViewportBounds(bounds, point.x, point.y, cellMargin);
+    }
+  }
+
+  const minX = Math.floor(bounds.minX - VIEWPORT_PADDING_UNITS);
+  const minY = Math.floor(bounds.minY - VIEWPORT_PADDING_UNITS);
+  const maxX = Math.ceil(bounds.maxX + VIEWPORT_PADDING_UNITS);
+  const maxY = Math.ceil(bounds.maxY + VIEWPORT_PADDING_UNITS);
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: Math.max(VIEWPORT_DEFAULT_SIZE_UNITS, maxX - minX),
+    height: Math.max(VIEWPORT_DEFAULT_SIZE_UNITS, maxY - minY),
+  };
+}
+
+function sourceWorldRadius(source) {
+  if (source.kind === "point") {
+    return 0.04;
+  }
+  if (source.kind === "line_segment") {
+    return source.length_m * 0.5;
+  }
+  if (source.kind === "infinite_plane") {
+    return source.display_extent_m * 0.5;
+  }
+  if ("radius_m" in source) {
+    return source.radius_m;
+  }
+  return 0.04;
+}
+
+function compute2dWorldBounds() {
+  const bounds = {
+    minX: state.probe.x,
+    maxX: state.probe.x,
+    minY: state.probe.y,
+    maxY: state.probe.y,
+  };
+
+  for (const source of state.scene.sources) {
+    const radius = sourceWorldRadius(source);
+    bounds.minX = Math.min(bounds.minX, source.position.x - radius);
+    bounds.maxX = Math.max(bounds.maxX, source.position.x + radius);
+    bounds.minY = Math.min(bounds.minY, source.position.y - radius);
+    bounds.maxY = Math.max(bounds.maxY, source.position.y + radius);
+  }
+
+  const width = Math.max(bounds.maxX - bounds.minX, 0.36);
+  const height = Math.max(bounds.maxY - bounds.minY, 0.36);
+  const padding = Math.max(width, height) * 0.12;
+  return {
+    minX: bounds.minX - padding,
+    maxX: bounds.maxX + padding,
+    minY: bounds.minY - padding,
+    maxY: bounds.maxY + padding,
+  };
+}
+
+function overlayCellSizeMeters() {
+  const bounds = compute2dWorldBounds();
+  return Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 5;
 }
 
 function renderSource2d(source) {
@@ -480,17 +592,41 @@ function renderOverlay2d() {
 function render2d() {
   const sourceMarkup = state.scene.sources.map(renderSource2d).join("");
   const probe = mapToViewport(state.probe.x, state.probe.y);
+  const viewBox = compute2dViewBox();
 
   view2d.innerHTML = `
-    <svg class="plane-svg" viewBox="0 0 100 100" role="img" aria-label="Top-down electrostatic scene">
+    <svg
+      class="plane-svg"
+      viewBox="${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}"
+      role="img"
+      aria-label="Top-down electrostatic scene"
+    >
       <defs>
         <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
           <path d="M 10 0 L 0 0 0 10" fill="none"></path>
         </pattern>
       </defs>
-      <rect width="100" height="100" fill="url(#grid)"></rect>
-      <line class="axis-line" x1="0" y1="50" x2="100" y2="50"></line>
-      <line class="axis-line" x1="50" y1="0" x2="50" y2="100"></line>
+      <rect
+        x="${viewBox.minX}"
+        y="${viewBox.minY}"
+        width="${viewBox.width}"
+        height="${viewBox.height}"
+        fill="url(#grid)"
+      ></rect>
+      <line
+        class="axis-line"
+        x1="${viewBox.minX}"
+        y1="${VIEWPORT_CENTER_UNITS}"
+        x2="${viewBox.minX + viewBox.width}"
+        y2="${VIEWPORT_CENTER_UNITS}"
+      ></line>
+      <line
+        class="axis-line"
+        x1="${VIEWPORT_CENTER_UNITS}"
+        y1="${viewBox.minY}"
+        x2="${VIEWPORT_CENTER_UNITS}"
+        y2="${viewBox.minY + viewBox.height}"
+      ></line>
       ${renderHeatmap2d()}
       ${renderOverlay2d()}
       ${sourceMarkup}
@@ -619,8 +755,15 @@ async function evaluateProbe(requestId) {
 
 function overlaySamplePoints() {
   const samples = [];
-  for (const y of OVERLAY_SAMPLE_AXIS) {
-    for (const x of OVERLAY_SAMPLE_AXIS) {
+  const bounds = compute2dWorldBounds();
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const halfSpan = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 2;
+
+  for (const yStep of OVERLAY_SAMPLE_STEPS) {
+    for (const xStep of OVERLAY_SAMPLE_STEPS) {
+      const x = centerX + xStep * halfSpan;
+      const y = centerY + yStep * halfSpan;
       samples.push({ x, y, z: state.probe.z, unit: "m" });
     }
   }
@@ -760,12 +903,15 @@ sourceList.addEventListener("click", (event) => {
     removeSource(button.dataset.sourceId);
   }
 });
-sourceList.addEventListener("change", (event) => {
+function handleSourceInput(event) {
   const input = event.target;
   if (input instanceof HTMLInputElement) {
     updateSource(input.dataset.sourceId, input.dataset.field, input.value);
   }
-});
+}
+
+sourceList.addEventListener("input", handleSourceInput);
+sourceList.addEventListener("change", handleSourceInput);
 window.addEventListener("resize", () => {
   if (state.mode !== "3D") {
     return;

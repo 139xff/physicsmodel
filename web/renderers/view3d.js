@@ -8,10 +8,16 @@ let camera;
 let renderer;
 let controls;
 let threeScene;
+let gridHelper;
+let axesHelper;
 let animFrameId = null;
 
 function threeVectorFromComponents(components) {
   return new THREE.Vector3(components.x, components.y, components.z);
+}
+
+function threePointFromPosition(position) {
+  return new THREE.Vector3(position.x, position.z, position.y);
 }
 
 function surfaceSize(container) {
@@ -43,11 +49,82 @@ function ensure3d(view3d) {
     renderer.render(threeScene, camera);
   });
 
-  threeScene.add(new THREE.GridHelper(0.8, 16, 0x8ea3b7, 0xd3dce6));
-  threeScene.add(new THREE.AxesHelper(0.28));
+  gridHelper = new THREE.GridHelper(0.8, 16, 0x8ea3b7, 0xd3dce6);
+  axesHelper = new THREE.AxesHelper(0.28);
+  threeScene.add(gridHelper);
+  threeScene.add(axesHelper);
   threeScene.add(new THREE.AmbientLight(0xffffff, 0.85));
   sceneGroup = new THREE.Group();
   threeScene.add(sceneGroup);
+}
+
+function sourceBoundingRadius(source) {
+  if (source.kind === "point") {
+    return 0.018;
+  }
+  if (source.kind === "line_segment") {
+    return source.length_m * 0.5;
+  }
+  if (source.kind === "infinite_plane") {
+    return source.display_extent_m * 0.5;
+  }
+  if ("radius_m" in source) {
+    return source.radius_m;
+  }
+  return 0.018;
+}
+
+function computeSceneFrame(state) {
+  const entries = state.scene.sources.map((source) => ({
+    center: threePointFromPosition(source.position),
+    radius: sourceBoundingRadius(source),
+  }));
+  entries.push({ center: threePointFromPosition(state.probe), radius: 0.012 });
+
+  const box = new THREE.Box3();
+  for (const entry of entries) {
+    const radiusVector = new THREE.Vector3(entry.radius, entry.radius, entry.radius);
+    box.expandByPoint(entry.center.clone().sub(radiusVector));
+    box.expandByPoint(entry.center.clone().add(radiusVector));
+  }
+
+  const center = new THREE.Vector3();
+  const size = new THREE.Vector3();
+  box.getCenter(center);
+  box.getSize(size);
+
+  const radius = Math.max(
+    ...entries.map((entry) => entry.center.distanceTo(center) + entry.radius),
+    0.35,
+  );
+  return { center, radius, size };
+}
+
+function update3dFrame(view3d, state) {
+  const frame = computeSceneFrame(state);
+  const fovRadians = THREE.MathUtils.degToRad(camera.fov);
+  const distance = Math.max(0.7, frame.radius / Math.sin(fovRadians / 2));
+  const direction = new THREE.Vector3(0.62, 0.52, 0.58).normalize();
+
+  camera.position.copy(frame.center).add(direction.multiplyScalar(distance));
+  camera.near = Math.max(0.0001, Math.min(0.01, frame.radius / 1000));
+  camera.far = Math.max(100, distance + frame.radius * 4);
+  camera.updateProjectionMatrix();
+
+  controls.target.copy(frame.center);
+  controls.update();
+
+  const gridSize = Math.max(0.8, frame.radius * 2.4);
+  gridHelper.scale.setScalar(gridSize / 0.8);
+  gridHelper.position.set(frame.center.x, 0, frame.center.z);
+  axesHelper.scale.setScalar(Math.max(1, frame.radius / 0.28));
+  axesHelper.position.copy(frame.center);
+
+  view3d.dataset.sceneRadiusThree = Number(frame.radius.toPrecision(8)).toString();
+  view3d.dataset.cameraFarThree = Number(camera.far.toPrecision(8)).toString();
+  view3d.dataset.cameraTargetThree = [frame.center.x, frame.center.y, frame.center.z]
+    .map((component) => Number(component.toPrecision(8)).toString())
+    .join(",");
 }
 
 function startAnimLoop() {
@@ -156,16 +233,17 @@ export function render3d(view3d, state) {
 
   for (const source of state.scene.sources) {
     const mesh = meshForSource(source);
-    mesh.position.set(source.position.x, source.position.z, source.position.y);
+    mesh.position.copy(threePointFromPosition(source.position));
     sceneGroup.add(mesh);
   }
 
   const probeGeometry = new THREE.SphereGeometry(0.012, 16, 12);
   const probeMaterial = new THREE.MeshBasicMaterial({ color: 0x111827 });
   const probeMesh = new THREE.Mesh(probeGeometry, probeMaterial);
-  probeMesh.position.set(state.probe.x, state.probe.z, state.probe.y);
+  probeMesh.position.copy(threePointFromPosition(state.probe));
   sceneGroup.add(probeMesh);
 
+  update3dFrame(view3d, state);
   startAnimLoop();
   renderer.render(threeScene, camera);
 }

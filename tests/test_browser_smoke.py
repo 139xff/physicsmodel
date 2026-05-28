@@ -81,6 +81,14 @@ def _assert_inside_viewbox(value: float) -> None:
     assert 0 <= value <= 100
 
 
+def _assert_inside_svg_viewbox(page: Page, test_id: str, x: float, y: float) -> None:
+    value = page.get_by_test_id(test_id).locator("svg").get_attribute("viewBox")
+    assert value is not None
+    min_x, min_y, width, height = [float(part) for part in value.split()]
+    assert min_x <= x <= min_x + width
+    assert min_y <= y <= min_y + height
+
+
 def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -> None:
     expect(page.get_by_role("heading", name="电磁工作台")).to_be_visible()
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
@@ -142,6 +150,42 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("source-count")).to_contain_text("2 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("0.220")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
+
+
+def test_browser_views_frame_large_finite_coordinates(page: Page) -> None:
+    page.locator("#add-point").click()
+
+    page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("150")
+    page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-90")
+    page.locator('[data-source-id="point-1"][data-field="position.z"]').fill("45")
+    page.locator('[data-source-id="point-1"][data-field="position.z"]').press("Tab")
+
+    page.locator("#probe-x").fill("-125")
+    page.locator("#probe-y").fill("60")
+    page.locator("#probe-z").fill("-35")
+    page.locator("#probe-z").press("Tab")
+
+    point_x = _number_attr(page, "source-point-2d-point-1", "cx")
+    point_y = _number_attr(page, "source-point-2d-point-1", "cy")
+    point_radius = _number_attr(page, "source-point-2d-point-1", "r")
+    _assert_inside_svg_viewbox(page, "view-2d", point_x - point_radius, point_y)
+    _assert_inside_svg_viewbox(page, "view-2d", point_x + point_radius, point_y)
+    _assert_inside_svg_viewbox(page, "view-2d", point_x, point_y - point_radius)
+    _assert_inside_svg_viewbox(page, "view-2d", point_x, point_y + point_radius)
+
+    probe_x = _number_attr(page, "probe-marker-2d", "data-view-x")
+    probe_y = _number_attr(page, "probe-marker-2d", "data-view-y")
+    _assert_inside_svg_viewbox(page, "view-2d", probe_x - 4, probe_y)
+    _assert_inside_svg_viewbox(page, "view-2d", probe_x + 4, probe_y)
+    _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y - 4)
+    _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y + 4)
+
+    page.get_by_role("button", name="3D").click()
+    expect(page.get_by_test_id("view-3d")).to_be_visible()
+    scene_radius = _number_attr(page, "view-3d", "data-scene-radius-three")
+    camera_far = _number_attr(page, "view-3d", "data-camera-far-three")
+    assert scene_radius > 140
+    assert camera_far > scene_radius
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:

@@ -61,7 +61,8 @@ def test_root_serves_the_explicitly_scoped_workbench_shell():
     ):
         assert expected_copy in html
     assert '<script type="importmap">' in html
-    assert '"three": "/vendor/three.module.js"' in html
+    assert '"three": "./vendor/three.module.js"' in html
+    assert 'src="./app.js"' in html
 
 
 def test_static_assets_and_vendor_modules_are_served_locally():
@@ -89,7 +90,7 @@ def test_import_map_standard_orbit_controls_specifier_resolves_to_served_vendor_
 
     assert response.status_code == 200
     html = response.text
-    assert '"three/addons/": "/vendor/"' in html
+    assert '"three/addons/": "./vendor/"' in html
 
     resolved_orbit_controls = client.get("/vendor/controls/OrbitControls.js")
     assert resolved_orbit_controls.status_code == 200

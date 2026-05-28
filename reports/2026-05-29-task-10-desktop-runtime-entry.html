@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 10 - Desktop Runtime Entry</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: linear-gradient(135deg, #f7f9ff, #edf4ff);
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(100, 116, 139, 0.18);
+        border-radius: 24px;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.1);
+      }
+      h1, h2 {
+        margin-top: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0 28px;
+      }
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #eef4ff;
+      }
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: #eef2f7;
+      }
+      .ok {
+        color: #047857;
+        font-weight: 700;
+      }
+      .warn {
+        color: #b45309;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 10：独立桌面运行入口</h1>
+      <p><strong>完成时间：</strong>2026-05-29 01:06:20 +08:00</p>
+      <p><strong>状态：</strong><span class="ok">完成</span></p>
+
+      <h2>交付范围</h2>
+      <table>
+        <tr><th>项目</th><th>结果</th></tr>
+        <tr>
+          <td>桌面依赖</td>
+          <td>新增 <code>desktop</code> 可选依赖，使用 <code>PySide6</code> 与 Qt WebEngine。</td>
+        </tr>
+        <tr>
+          <td>桌面入口</td>
+          <td>新增 <code>em-workbench-desktop</code> 命令与 <code>src/em_workbench/desktop.py</code>。</td>
+        </tr>
+        <tr>
+          <td>Python bridge</td>
+          <td>新增 <code>src/em_workbench/desktop_bridge.py</code>，无需 HTTP 服务器即可读取配置、预设并调用求解器。</td>
+        </tr>
+        <tr>
+          <td>本地文件兼容</td>
+          <td><code>web/index.html</code> 的 CSS、ES module 与 Three.js import map 改为相对路径，支持桌面壳加载本地文件。</td>
+        </tr>
+        <tr>
+          <td>验证入口</td>
+          <td><code>em-workbench-desktop --check</code> 可验证桌面依赖，不打开 GUI。</td>
+        </tr>
+      </table>
+
+      <h2>延期范围</h2>
+      <table>
+        <tr><th>项目</th><th>说明</th></tr>
+        <tr><td>exe 打包</td><td>尚未执行 PyInstaller / Nuitka 打包；这是下一阶段。</td></tr>
+        <tr><td>安装器</td><td>尚未制作 Windows installer、图标、签名和自动更新。</td></tr>
+        <tr><td>可视化人工验收</td><td>本轮验证了 Qt WebEngine 可用与 bridge 逻辑，未在报告中附截图。</td></tr>
+      </table>
+
+      <h2>修改文件</h2>
+      <table>
+        <tr><th>文件</th><th>变更</th></tr>
+        <tr><td><code>pyproject.toml</code></td><td>增加 <code>desktop</code> extra 与 <code>em-workbench-desktop</code> 脚本。</td></tr>
+        <tr><td><code>uv.lock</code></td><td>锁定 PySide6 相关可选依赖。</td></tr>
+        <tr><td><code>src/em_workbench/desktop.py</code></td><td>新增 Qt WebEngine 桌面入口。</td></tr>
+        <tr><td><code>src/em_workbench/desktop_bridge.py</code></td><td>新增纯 Python bridge。</td></tr>
+        <tr><td><code>web/api-client.js</code></td><td>等待 Qt WebChannel bridge ready promise。</td></tr>
+        <tr><td><code>web/index.html</code></td><td>改用相对静态资源路径。</td></tr>
+        <tr><td><code>tests/test_desktop_bridge.py</code></td><td>新增无 HTTP 服务器 bridge 测试。</td></tr>
+        <tr><td><code>tests/test_app.py</code>, <code>tests/test_vendor_manifest.py</code></td><td>更新相对 import map 断言。</td></tr>
+      </table>
+
+      <h2>验证命令</h2>
+      <table>
+        <tr><th>命令</th><th>结果</th></tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe sync --extra desktop</code></td>
+          <td class="ok">成功安装桌面 extra；提示 hardlink fallback，不影响运行。</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --extra desktop python -c "from PySide6.QtWebEngineWidgets import QWebEngineView; from PySide6.QtWebChannel import QWebChannel; print('qt-webengine-ok')"</code></td>
+          <td class="ok">qt-webengine-ok</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --extra desktop em-workbench-desktop --check</code></td>
+          <td class="ok">desktop runtime ok</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td>
+          <td class="ok">All checks passed!</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td>
+          <td class="ok">66 passed, 2 warnings</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe export --locked --all-groups --no-emit-project --output-file requirements.txt</code></td>
+          <td class="ok">兼容 requirements 文件已按项目规则重新导出。</td>
+        </tr>
+      </table>
+
+      <h2>已知风险</h2>
+      <table>
+        <tr><th>风险</th><th>处理建议</th></tr>
+        <tr>
+          <td>PySide6 体积较大</td>
+          <td>打包阶段需要评估 exe 体积，并排除不需要的 Qt 模块。</td>
+        </tr>
+        <tr>
+          <td>GUI 启动命令会进入事件循环</td>
+          <td>已添加 <code>--check</code> 用于 CI/命令行验证；真实打开应用时使用无参数命令。</td>
+        </tr>
+      </table>
+
+      <h2>下一任务</h2>
+      <p>制作 Windows 桌面打包版本：选择 PyInstaller 或 Nuitka，加入图标和资源收集配置，产出可分享的预览版 <code>.exe</code>。</p>
+    </main>
+  </body>
+</html>

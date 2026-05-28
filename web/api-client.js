@@ -7,7 +7,9 @@ async function parseJsonResponse(response, fallbackMessage) {
 }
 
 async function callDesktopBridge(method, payload = null) {
-  const bridge = window.emWorkbenchBridge;
+  const bridge = window.emWorkbenchBridgeReady
+    ? await window.emWorkbenchBridgeReady
+    : window.emWorkbenchBridge;
   if (!bridge || typeof bridge[method] !== "function") {
     return null;
   }

@@ -11,6 +11,14 @@ dependencies = [
     "uvicorn[standard]>=0.35,<1",
 ]
 
+[project.optional-dependencies]
+desktop = [
+    "pyside6>=6.11.1",
+]
+
+[project.scripts]
+em-workbench-desktop = "em_workbench.desktop:main"
+
 [build-system]
 requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"

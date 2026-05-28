@@ -64,8 +64,8 @@ def test_browser_module_resolution_remains_local_and_offline_capable():
     application_js = (PROJECT_ROOT / "web" / "app.js").read_text(encoding="utf-8")
     orbit_controls_path = VENDOR_ROOT / "controls" / "OrbitControls.js"
 
-    assert '"three": "/vendor/three.module.js"' in index_html
-    assert '"three/addons/": "/vendor/"' in index_html
+    assert '"three": "./vendor/three.module.js"' in index_html
+    assert '"three/addons/": "./vendor/"' in index_html
     assert orbit_controls_path.is_file()
     assert not (VENDOR_ROOT / "OrbitControls.js").exists()
     orbit_controls = orbit_controls_path.read_text(encoding="utf-8")

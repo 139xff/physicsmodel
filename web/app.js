@@ -1,4 +1,4 @@
-import { render3d, resize3d } from "./renderers/view3d.js";
+import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js";
 
 const runtimeStatus = document.querySelector("#runtime-status");
 const sourceList = document.querySelector("#source-list");
@@ -48,6 +48,7 @@ const state = {
     sources: [],
   },
   probe: { x: 0.2, y: 0.03, z: 0.05 },
+  showHeatmap: false,
   lastResult: null,
   overlayResult: null,
   overlaySamples: [],
@@ -163,6 +164,15 @@ function addSource(kind) {
   scheduleEvaluation();
 }
 
+function removeSource(sourceId) {
+  state.scene.sources = state.scene.sources.filter((source) => source.id !== sourceId);
+  if (state.scene.sources.length === 0) {
+    setEmptyComputationState();
+  }
+  renderAll();
+  scheduleEvaluation();
+}
+
 function updateSource(sourceId, field, value) {
   const source = state.scene.sources.find((candidate) => candidate.id === sourceId);
   if (!source || !field) {
@@ -191,6 +201,9 @@ function setMode(mode) {
   modeLabel.textContent = mode;
   view2d.classList.toggle("hidden", mode !== "2D");
   view3d.classList.toggle("hidden", mode !== "3D");
+  if (mode !== "3D") {
+    stopAnimLoop();
+  }
   renderAll();
 }
 
@@ -209,6 +222,46 @@ function setQuality(value) {
   qualityValue.textContent = value;
   renderResult();
   scheduleEvaluation();
+}
+
+function toggleHeatmap() {
+  state.showHeatmap = !state.showHeatmap;
+  render2d();
+}
+
+function potentialColor(potential, maxAbs) {
+  if (maxAbs < 1e-30) {
+    return "rgb(255,255,255)";
+  }
+  const t = Math.max(-1, Math.min(1, potential / maxAbs));
+  if (t > 0) {
+    const r = Math.round(255 * (1 - t));
+    const g = Math.round(255 * (1 - t));
+    const b = Math.round(255 * (1 - 0.4 * t));
+    return `rgb(${r},${g},${b})`;
+  }
+  const s = -t;
+  const r = Math.round(255 * (1 - 0.4 * s));
+  const g = Math.round(255 * (1 - s));
+  const b = Math.round(255 * (1 - s));
+  return `rgb(${r},${g},${b})`;
+}
+
+function renderHeatmap2d() {
+  if (!state.showHeatmap || !state.overlayResult || state.overlaySamples.length === 0) {
+    return "";
+  }
+  const potentials = state.overlayResult.samples.map((s) => s.potential_v);
+  const maxAbs = Math.max(...potentials.map(Math.abs), 1e-12);
+  const cellSize = VIEWPORT_METERS_TO_UNITS * 0.09;
+  const halfCell = cellSize / 2;
+  return state.overlaySamples
+    .map((sample, index) => {
+      const point = mapToViewport(sample.x, sample.y);
+      const color = potentialColor(potentials[index], maxAbs);
+      return `<rect class="heatmap-cell" x="${point.x - halfCell}" y="${point.y - halfCell}" width="${cellSize}" height="${cellSize}" fill="${color}" rx="1"></rect>`;
+    })
+    .join("");
 }
 
 function nestedValue(source, field) {
@@ -294,6 +347,7 @@ function renderSourceList() {
         <article class="source-card" data-testid="source-card-${source.id}">
           <div class="source-card-heading">
             <strong>${label}</strong>
+            <button class="source-delete-button" type="button" data-source-id="${source.id}" title="移除此源">移除</button>
             <span>${KIND_LABELS[source.kind] ?? source.kind}</span>
           </div>
           <label>名称
@@ -437,6 +491,7 @@ function render2d() {
       <rect width="100" height="100" fill="url(#grid)"></rect>
       <line class="axis-line" x1="0" y1="50" x2="100" y2="50"></line>
       <line class="axis-line" x1="50" y1="0" x2="50" y2="100"></line>
+      ${renderHeatmap2d()}
       ${renderOverlay2d()}
       ${sourceMarkup}
       <g>
@@ -590,13 +645,18 @@ async function evaluateOverlay(requestId) {
   renderOverlaySummary();
 }
 
+let evaluationTimer = null;
+
 function scheduleEvaluation() {
   requestSerial += 1;
   latestProbeRequestId = `ui-probe-${requestSerial}`;
   latestOverlayRequestId = `ui-overlay-${requestSerial}`;
   const probeRequestId = latestProbeRequestId;
   const overlayRequestId = latestOverlayRequestId;
-  window.setTimeout(() => {
+  if (evaluationTimer) {
+    window.clearTimeout(evaluationTimer);
+  }
+  evaluationTimer = window.setTimeout(() => {
     evaluateProbe(probeRequestId).catch((error) => {
       if (probeRequestId === latestProbeRequestId) {
         solverStatus.textContent = error.message;
@@ -607,7 +667,7 @@ function scheduleEvaluation() {
         overlayStatus.textContent = error.message;
       }
     });
-  }, 30);
+  }, 180);
 }
 
 function refreshSourceIndexes() {
@@ -631,6 +691,7 @@ async function loadPresetOptions() {
 async function loadSelectedPreset() {
   const presetId = presetSelect.value;
   if (!presetId) {
+    presetStatus.textContent = "请先选择一个预设场景。";
     return;
   }
   presetStatus.textContent = `正在加载 ${presetId}...`;
@@ -680,7 +741,12 @@ document
 button2d.addEventListener("click", () => setMode("2D"));
 button3d.addEventListener("click", () => setMode("3D"));
 qualitySelect.addEventListener("change", () => setQuality(qualitySelect.value));
-document.querySelector("#probe-form").addEventListener("input", setProbeFromInputs);
+document.querySelector("#toggle-heatmap").addEventListener("click", () => {
+  const button = document.querySelector("#toggle-heatmap");
+  toggleHeatmap();
+  button.classList.toggle("active", state.showHeatmap);
+  button.textContent = state.showHeatmap ? "隐藏电势热力图" : "显示电势热力图";
+});
 document.querySelector("#probe-form").addEventListener("change", setProbeFromInputs);
 presetForm.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -688,10 +754,10 @@ presetForm.addEventListener("submit", (event) => {
     presetStatus.textContent = error.message;
   });
 });
-sourceList.addEventListener("input", (event) => {
-  const input = event.target;
-  if (input instanceof HTMLInputElement) {
-    updateSource(input.dataset.sourceId, input.dataset.field, input.value);
+sourceList.addEventListener("click", (event) => {
+  const button = event.target.closest(".source-delete-button");
+  if (button) {
+    removeSource(button.dataset.sourceId);
   }
 });
 sourceList.addEventListener("change", (event) => {
@@ -701,6 +767,9 @@ sourceList.addEventListener("change", (event) => {
   }
 });
 window.addEventListener("resize", () => {
+  if (state.mode !== "3D") {
+    return;
+  }
   resize3d(view3d, state);
 });
 

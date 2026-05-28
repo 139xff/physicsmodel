@@ -8,6 +8,7 @@ let camera;
 let renderer;
 let controls;
 let threeScene;
+let animFrameId = null;
 
 function threeVectorFromComponents(components) {
   return new THREE.Vector3(components.x, components.y, components.z);
@@ -38,12 +39,34 @@ function ensure3d(view3d) {
   camera.position.set(0.45, 0.38, 0.42);
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.addEventListener("change", () => {
+    renderer.render(threeScene, camera);
+  });
 
   threeScene.add(new THREE.GridHelper(0.8, 16, 0x8ea3b7, 0xd3dce6));
   threeScene.add(new THREE.AxesHelper(0.28));
   threeScene.add(new THREE.AmbientLight(0xffffff, 0.85));
   sceneGroup = new THREE.Group();
   threeScene.add(sceneGroup);
+}
+
+function startAnimLoop() {
+  if (animFrameId !== null) {
+    return;
+  }
+  function animate() {
+    animFrameId = requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(threeScene, camera);
+  }
+  animate();
+}
+
+export function stopAnimLoop() {
+  if (animFrameId !== null) {
+    cancelAnimationFrame(animFrameId);
+    animFrameId = null;
+  }
 }
 
 function meshForSource(source) {
@@ -92,6 +115,21 @@ function meshForSource(source) {
   return new THREE.Mesh(geometry, material);
 }
 
+function _disposeMesh(child) {
+  if (child.geometry) {
+    child.geometry.dispose();
+  }
+  if (child.material) {
+    if (Array.isArray(child.material)) {
+      for (const mat of child.material) {
+        mat.dispose();
+      }
+    } else {
+      child.material.dispose();
+    }
+  }
+}
+
 export function render3d(view3d, state) {
   view3d.removeAttribute("data-ring-normal-three");
   const firstRing = state.scene.sources.find((source) => source.kind === "ring");
@@ -102,7 +140,19 @@ export function render3d(view3d, state) {
   }
 
   ensure3d(view3d);
-  sceneGroup.clear();
+
+  const { width, height } = surfaceSize(view3d);
+  const canvas = renderer.domElement;
+  if (canvas.width !== width || canvas.height !== height) {
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  }
+
+  while (sceneGroup.children.length > 0) {
+    _disposeMesh(sceneGroup.children[0]);
+    sceneGroup.remove(sceneGroup.children[0]);
+  }
 
   for (const source of state.scene.sources) {
     const mesh = meshForSource(source);
@@ -116,17 +166,20 @@ export function render3d(view3d, state) {
   probeMesh.position.set(state.probe.x, state.probe.z, state.probe.y);
   sceneGroup.add(probeMesh);
 
-  controls.update();
+  startAnimLoop();
   renderer.render(threeScene, camera);
 }
 
-export function resize3d(view3d, state) {
+export function resize3d(view3d, _state) {
   if (!renderer || !camera) {
     return;
   }
   const { width, height } = surfaceSize(view3d);
+  if (width === 0 || height === 0) {
+    return;
+  }
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  render3d(view3d, state);
+  renderer.render(threeScene, camera);
 }

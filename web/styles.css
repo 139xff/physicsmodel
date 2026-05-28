@@ -256,6 +256,33 @@ summary:focus-visible {
   transform: translateY(-1px);
 }
 
+.heatmap-toggle {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 640;
+  margin-bottom: 10px;
+  min-height: 40px;
+  padding: 9px 14px;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.heatmap-toggle:hover {
+  border-color: rgba(0, 113, 227, 0.38);
+}
+
+.heatmap-toggle.active {
+  background: linear-gradient(180deg, #0a84ff, #0071e3);
+  color: #fff;
+}
+
+.heatmap-cell {
+  opacity: 0.48;
+}
+
 .empty-state {
   background: rgba(255, 255, 255, 0.48);
   border: 1px dashed var(--line-bright);
@@ -307,6 +334,25 @@ summary:focus-visible {
 .source-card-heading strong {
   font-size: 0.92rem;
   font-weight: 700;
+}
+
+.source-delete-button {
+  background: linear-gradient(180deg, rgba(255, 90, 114, 0.12), rgba(255, 90, 114, 0.08));
+  border: 1px solid rgba(255, 90, 114, 0.22);
+  border-radius: 8px;
+  color: #c53030;
+  font-size: 0.7rem;
+  font-weight: 680;
+  margin-left: auto;
+  margin-right: 8px;
+  min-height: 28px;
+  padding: 4px 10px;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.source-delete-button:hover {
+  background: rgba(255, 90, 114, 0.22);
+  border-color: rgba(255, 90, 114, 0.4);
 }
 
 .source-card-heading span,

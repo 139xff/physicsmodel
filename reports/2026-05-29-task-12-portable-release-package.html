@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 12 - Portable Release Package</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f5f7fb;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(100, 116, 139, 0.18);
+        border-radius: 24px;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.1);
+      }
+      h1, h2 {
+        margin-top: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0 28px;
+      }
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #eef4ff;
+      }
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: #eef2f7;
+      }
+      .ok {
+        color: #047857;
+        font-weight: 700;
+      }
+      .warn {
+        color: #b45309;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 12：即下即用便携发布包</h1>
+      <p><strong>完成时间：</strong>2026-05-29 01:21:19 +08:00</p>
+      <p><strong>状态：</strong><span class="ok">完成</span></p>
+
+      <h2>交付范围</h2>
+      <table>
+        <tr><th>项目</th><th>结果</th></tr>
+        <tr>
+          <td>便携说明</td>
+          <td>新增 <code>packaging/PORTABLE_README.txt</code>，说明解压、双击、SmartScreen 提醒和注意事项。</td>
+        </tr>
+        <tr>
+          <td>版本化压缩包</td>
+          <td>构建脚本现在自动生成 <code>EMWorkbench-0.1.0-windows-x64-portable.zip</code>。</td>
+        </tr>
+        <tr>
+          <td>包内 README</td>
+          <td>构建脚本会把说明复制为 <code>dist/EMWorkbench/README.txt</code>。</td>
+        </tr>
+        <tr>
+          <td>真实解压验证</td>
+          <td>已从 zip 解压到临时目录，并运行解压后的 <code>EMWorkbench.exe --check</code>。</td>
+        </tr>
+      </table>
+
+      <h2>延期范围</h2>
+      <table>
+        <tr><th>项目</th><th>说明</th></tr>
+        <tr><td>代码签名</td><td>当前仍是未签名预览版，Windows 可能显示未知发布者提醒。</td></tr>
+        <tr><td>安装器</td><td>当前是便携 zip，不是 MSI/安装包。</td></tr>
+      </table>
+
+      <h2>修改文件</h2>
+      <table>
+        <tr><th>文件</th><th>变更</th></tr>
+        <tr><td><code>packaging/PORTABLE_README.txt</code></td><td>新增用户说明。</td></tr>
+        <tr><td><code>scripts/build_desktop.ps1</code></td><td>自动复制 README 并生成版本化 zip。</td></tr>
+        <tr><td><code>reports/2026-05-29-task-12-portable-release-package.html</code></td><td>新增本任务报告。</td></tr>
+      </table>
+
+      <h2>验证命令</h2>
+      <table>
+        <tr><th>命令</th><th>结果</th></tr>
+        <tr>
+          <td><code>powershell -ExecutionPolicy Bypass -File scripts\build_desktop.ps1</code></td>
+          <td class="ok">生成 <code>D:\physicsmodel_real\dist\EMWorkbench-0.1.0-windows-x64-portable.zip</code>。</td>
+        </tr>
+        <tr>
+          <td><code>Start-Process .\dist\EMWorkbench\EMWorkbench.exe --check -Wait -PassThru</code></td>
+          <td class="ok">退出码 0。</td>
+        </tr>
+        <tr>
+          <td><code>Expand-Archive ...; Start-Process .\dist\portable-smoke\EMWorkbench\EMWorkbench.exe --check</code></td>
+          <td class="ok">解压后的副本退出码 0。</td>
+        </tr>
+      </table>
+
+      <h2>发布产物</h2>
+      <table>
+        <tr><th>路径</th><th>说明</th></tr>
+        <tr>
+          <td><code>D:\physicsmodel_real\dist\EMWorkbench-0.1.0-windows-x64-portable.zip</code></td>
+          <td>推荐发送给朋友的即下即用压缩包，约 225 MB。</td>
+        </tr>
+      </table>
+
+      <h2>下一任务</h2>
+      <p>推送 GitHub 后，可在 GitHub Releases 上传该 zip；正式版再补图标、签名和安装器。</p>
+    </main>
+  </body>
+</html>

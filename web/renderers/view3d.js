@@ -104,9 +104,9 @@ function meshForSource(source) {
   }
 
   const geometry = new THREE.SphereGeometry(
-    source.kind === "spherical_shell" ? source.radius_m : 0.018,
-    24,
+    source.kind === "spherical_shell" ? source.radius_m : 0.005,
     16,
+    12,
   );
   const material = new THREE.MeshBasicMaterial({
     color: source.charge_c >= 0 ? 0x0071e3 : 0xff5a72,
@@ -127,6 +127,31 @@ function _disposeMesh(child) {
     } else {
       child.material.dispose();
     }
+  }
+}
+
+const ARROW_COLOR = 0x374151;
+const ARROW_SCALE = 0.028;
+
+function _addFieldArrows(parent, state) {
+  if (!state.overlayResult || state.overlaySamples.length === 0) {
+    return;
+  }
+  const magnitudes = state.overlayResult.samples.map((s) => s.field_magnitude_v_per_m);
+  const maxMag = Math.max(...magnitudes, 1);
+  for (let i = 0; i < state.overlayResult.samples.length; i += 1) {
+    const sample = state.overlayResult.samples[i];
+    const pt = state.overlaySamples[i];
+    const field = sample.field_v_per_m;
+    const mag = magnitudes[i];
+    if (mag < 1e-30) {
+      continue;
+    }
+    const dir = new THREE.Vector3(field.x, field.z, field.y).normalize();
+    const len = ARROW_SCALE * (1.0 + 4.0 * (mag / maxMag));
+    const origin = new THREE.Vector3(pt.x, pt.z, pt.y);
+    const arrow = new THREE.ArrowHelper(dir, origin, len, ARROW_COLOR, len * 0.28, len * 0.16);
+    parent.add(arrow);
   }
 }
 
@@ -160,11 +185,17 @@ export function render3d(view3d, state) {
     sceneGroup.add(mesh);
   }
 
-  const probeGeometry = new THREE.SphereGeometry(0.012, 16, 12);
-  const probeMaterial = new THREE.MeshBasicMaterial({ color: 0x111827 });
+  const probeGeometry = new THREE.SphereGeometry(0.006, 12, 8);
+  const probeMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff3b30,
+    transparent: true,
+    opacity: 0.7,
+  });
   const probeMesh = new THREE.Mesh(probeGeometry, probeMaterial);
   probeMesh.position.set(state.probe.x, state.probe.z, state.probe.y);
   sceneGroup.add(probeMesh);
+
+  _addFieldArrows(sceneGroup, state);
 
   startAnimLoop();
   renderer.render(threeScene, camera);

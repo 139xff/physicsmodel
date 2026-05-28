@@ -236,6 +236,144 @@ def test_sources_validate_finite_si_values_positive_dimensions_and_nonzero_direc
         adapter.validate_python(source)
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        {
+            "id": "line-huge-orientation",
+            "kind": "line_segment",
+            "label": "Huge finite orientation",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "orientation": {"x": 1e308, "y": 1e308, "z": 0.0},
+            "length_m": 1.0,
+            "charge_c": 1.0,
+        },
+        {
+            "id": "ring-huge-normal",
+            "kind": "ring",
+            "label": "Huge finite normal",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "normal": {"x": 0.0, "y": -1e308, "z": 1e308},
+            "radius_m": 1.0,
+            "charge_c": 1.0,
+        },
+    ],
+)
+def test_huge_finite_direction_vectors_normalize_without_collapsing_to_zero(source: dict):
+    adapter = TypeAdapter(ElectrostaticSource)
+
+    validated = adapter.validate_python(source)
+    vector = validated.orientation if isinstance(validated, LineSegmentSource) else validated.normal
+    magnitude = math.hypot(vector.x, vector.y, vector.z)
+
+    assert magnitude == pytest.approx(1.0)
+    assert any(component != 0.0 for component in (vector.x, vector.y, vector.z))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        {
+            "id": "point-position-string",
+            "kind": "point",
+            "label": "String position",
+            "position": {"x": "0.0", "y": 0.0, "z": 0.0},
+            "charge_c": 1.0e-9,
+        },
+        {
+            "id": "point-position-bool",
+            "kind": "point",
+            "label": "Bool position",
+            "position": {"x": True, "y": 0.0, "z": 0.0},
+            "charge_c": 1.0e-9,
+        },
+        {
+            "id": "point-charge-string",
+            "kind": "point",
+            "label": "String charge",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "charge_c": "1e-9",
+        },
+        {
+            "id": "point-charge-bool",
+            "kind": "point",
+            "label": "Bool charge",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "charge_c": True,
+        },
+        {
+            "id": "line-dimension-string",
+            "kind": "line_segment",
+            "label": "String length",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "orientation": {"x": 0.0, "y": 0.0, "z": 1.0},
+            "length_m": "1.0",
+            "charge_c": 1.0e-9,
+        },
+        {
+            "id": "line-dimension-bool",
+            "kind": "line_segment",
+            "label": "Bool length",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "orientation": {"x": 0.0, "y": 0.0, "z": 1.0},
+            "length_m": True,
+            "charge_c": 1.0e-9,
+        },
+        {
+            "id": "plane-density-string",
+            "kind": "infinite_plane",
+            "label": "String density",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+            "display_extent_m": 1.0,
+            "surface_charge_density_c_per_m2": "1e-9",
+        },
+        {
+            "id": "plane-density-bool",
+            "kind": "infinite_plane",
+            "label": "Bool density",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+            "display_extent_m": 1.0,
+            "surface_charge_density_c_per_m2": False,
+        },
+    ],
+)
+def test_si_numeric_fields_reject_bool_and_string_coercion(source: dict):
+    adapter = TypeAdapter(ElectrostaticSource)
+
+    with pytest.raises(ValidationError):
+        adapter.validate_python(source)
+
+
+def test_si_numeric_fields_accept_integer_json_numbers_without_string_coercion():
+    source = {
+        "id": "line-integer-json-numbers",
+        "kind": "line_segment",
+        "label": "Integer JSON values",
+        "position": {"x": 0, "y": 0, "z": 0},
+        "orientation": {"x": 0, "y": 0, "z": 2},
+        "length_m": 1,
+        "charge_c": 1,
+    }
+
+    validated = TypeAdapter(ElectrostaticSource).validate_python(source)
+
+    assert isinstance(validated, LineSegmentSource)
+    assert validated.position.x == 0.0
+    assert validated.length_m == 1.0
+    assert validated.charge_c == 1.0
+    assert validated.orientation.model_dump() == {"x": 0.0, "y": 0.0, "z": 1.0}
+
+
+def test_scene_rejects_duplicate_source_ids():
+    scene = _six_source_scene()
+    scene["sources"][1]["id"] = scene["sources"][0]["id"]
+
+    with pytest.raises(ValidationError, match="Duplicate source id"):
+        Scene.model_validate(scene)
+
+
 def test_presets_are_stable_editable_scene_json_with_required_release_one_cases():
     summaries = list_presets()
 

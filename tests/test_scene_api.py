@@ -161,6 +161,34 @@ def test_scene_validation_rejects_invalid_source_contracts_with_422():
     assert any("greater than 0" in str(item).lower() for item in detail)
 
 
+def test_scene_validation_rejects_duplicate_source_ids_with_422():
+    duplicate_scene = {
+        "id": "duplicate-source-scene",
+        "title": "Duplicate source scene",
+        "sources": [
+            {
+                "id": "same-source",
+                "kind": "point",
+                "label": "First point",
+                "position": {"x": 0, "y": 0, "z": 0},
+                "charge_c": 1,
+            },
+            {
+                "id": "same-source",
+                "kind": "point",
+                "label": "Second point",
+                "position": {"x": 1, "y": 0, "z": 0},
+                "charge_c": -1,
+            },
+        ],
+    }
+
+    response = client.post("/api/scene/validate", json=duplicate_scene)
+
+    assert response.status_code == 422
+    assert "duplicate source id" in str(response.json()["detail"]).lower()
+
+
 def test_missing_preset_returns_404_without_falling_through_to_static_shell():
     response = client.get("/api/presets/not-a-preset")
 

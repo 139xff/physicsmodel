@@ -22,7 +22,7 @@ PositiveMeters = Annotated[FiniteFloat, Field(gt=0)]
 class StrictModel(BaseModel):
     """Base model that rejects accidental contract drift."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
 
 
 class Position(StrictModel):
@@ -43,7 +43,9 @@ class UnitVector3(StrictModel):
 
     @model_validator(mode="after")
     def normalize(self) -> UnitVector3:
-        magnitude = math.sqrt((self.x * self.x) + (self.y * self.y) + (self.z * self.z))
+        magnitude = math.hypot(self.x, self.y, self.z)
+        if not math.isfinite(magnitude):
+            raise ValueError("Direction vector magnitude must be finite.")
         if magnitude == 0.0:
             raise ValueError("Direction vector cannot be zero.")
         self.x = self.x / magnitude
@@ -189,6 +191,15 @@ class Scene(StrictModel):
     id: Annotated[str, Field(min_length=1)]
     title: Annotated[str, Field(min_length=1)]
     sources: list[ElectrostaticSource] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_unique_source_ids(self) -> Scene:
+        seen: set[str] = set()
+        for source in self.sources:
+            if source.id in seen:
+                raise ValueError(f"Duplicate source id: {source.id}.")
+            seen.add(source.id)
+        return self
 
 
 class PresetSummary(StrictModel):

@@ -546,7 +546,7 @@ function renderSource2d(source) {
         data-testid="source-point-2d-${source.id}"
         cx="${point.x}"
         cy="${point.y}"
-        r="7"
+        r="1.5"
       ></circle>
       <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
     </g>

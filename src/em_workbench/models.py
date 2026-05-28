@@ -43,14 +43,19 @@ class UnitVector3(StrictModel):
 
     @model_validator(mode="after")
     def normalize(self) -> UnitVector3:
-        magnitude = math.hypot(self.x, self.y, self.z)
-        if not math.isfinite(magnitude):
-            raise ValueError("Direction vector magnitude must be finite.")
-        if magnitude == 0.0:
+        components = (self.x, self.y, self.z)
+        max_abs = max(abs(component) for component in components)
+        if not math.isfinite(max_abs):
+            raise ValueError("Direction vector components must be finite.")
+        if max_abs == 0.0:
             raise ValueError("Direction vector cannot be zero.")
-        self.x = self.x / magnitude
-        self.y = self.y / magnitude
-        self.z = self.z / magnitude
+        scaled = tuple(component / max_abs for component in components)
+        scaled_magnitude = math.hypot(*scaled)
+        if not math.isfinite(scaled_magnitude) or scaled_magnitude == 0.0:
+            raise ValueError("Direction vector magnitude must be finite and nonzero.")
+        self.x = scaled[0] / scaled_magnitude
+        self.y = scaled[1] / scaled_magnitude
+        self.z = scaled[2] / scaled_magnitude
         return self
 
 

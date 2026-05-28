@@ -30,14 +30,14 @@
       <h1>Task 03: Typed scene contracts and source editing API</h1>
       <div class="meta">
         <span class="status">DONE_AFTER_REVIEW_FIX</span>
-        <span>Completed: <time datetime="2026-05-28T09:14:00+08:00">2026-05-28T09:14:00+08:00</time></span>
+        <span>Completed: <time datetime="2026-05-28T09:20:41+08:00">2026-05-28T09:20:41+08:00</time></span>
       </div>
     </header>
     <section>
       <h2>Scope Delivered</h2>
       <ul>
         <li>Added Pydantic v2 editable scene contracts for point charges, line segments, rings, disks, infinite planes, and spherical shells.</li>
-        <li>Normalized nonzero orientation and normal vectors with overflow-stable math.hypot handling for huge finite inputs.</li>
+        <li>Normalized nonzero orientation and normal vectors with max-absolute-component scaling so huge finite values up to sys.float_info.max do not overflow or collapse to zero.</li>
         <li>Enabled strict numeric validation so bool and string inputs are rejected for SI numeric fields while integer JSON numbers remain valid.</li>
         <li>Enforced positive dimensions, finite charge values, exactly-one total-charge-or-density rules where meaningful, and unique source IDs within each scene.</li>
         <li>Added stable preset summary/detail endpoints and a scene validation endpoint that returns normalized ordinary scene JSON without persistence or solver output.</li>
@@ -62,7 +62,7 @@
         <tr><td>Contracts</td><td>Pydantic v2 strict models with discriminated unions on the source kind field</td></tr>
         <tr><td>API</td><td>FastAPI GET preset endpoints and POST scene validation using typed request/response models</td></tr>
         <tr><td>Presets</td><td>Checked-in Python preset payloads validated into ordinary editable Scene models</td></tr>
-        <tr><td>Quality repair</td><td>Review regressions for huge vector normalization, strict numeric inputs, and duplicate source IDs</td></tr>
+        <tr><td>Quality repair</td><td>Review regressions for max-float vector normalization, strict numeric inputs, and duplicate source IDs</td></tr>
           </tbody>
         </table>
       </div>
@@ -74,10 +74,10 @@
           <caption>Files changed in this task</caption>
           <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
           <tbody>
-        <tr><td><code>src/em_workbench/models.py</code></td><td>Define SI scene contracts, source union variants, strict numeric validation, stable vector normalization, unique source IDs, preset DTOs, and scene validation responses.</td></tr>
+        <tr><td><code>src/em_workbench/models.py</code></td><td>Define SI scene contracts, source union variants, strict numeric validation, max-abs scaled vector normalization, unique source IDs, preset DTOs, and scene validation responses.</td></tr>
         <tr><td><code>src/em_workbench/presets.py</code></td><td>Add five editable Release 1 electrostatics presets and stable summary/detail lookup helpers.</td></tr>
         <tr><td><code>src/em_workbench/app.py</code></td><td>Expose /api/presets, /api/presets/{id}, and /api/scene/validate without enabling solver behavior.</td></tr>
-        <tr><td><code>tests/test_models.py</code></td><td>Cover all six source contracts plus review regressions for huge vectors, strict numeric rejection, integer numeric acceptance, duplicate IDs, and editable presets.</td></tr>
+        <tr><td><code>tests/test_models.py</code></td><td>Cover all six source contracts plus review regressions for sys.float_info.max vectors, strict numeric rejection, integer numeric acceptance, duplicate IDs, and editable presets.</td></tr>
         <tr><td><code>tests/test_scene_api.py</code></td><td>Cover preset listing/detail, editable scene validation, normalized API output, invalid 422 responses, duplicate-ID 422 responses, and preset 404s.</td></tr>
         <tr><td><code>reports/2026-05-28-task-03-scene-contracts.html</code></td><td>Record Task 3 scope, RED/GREEN evidence, quality repair, verification, risks, and next task.</td></tr>
           </tbody>
@@ -92,9 +92,10 @@
           <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
           <tbody>
         <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_models.py tests\test_scene_api.py</code></td><td>RED (initial Task 3)</td><td>Initial Task 3 run failed during collection with ModuleNotFoundError: No module named &#x27;em_workbench.models&#x27;.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_models.py tests\test_scene_api.py</code></td><td>RED (quality repair)</td><td>Review regression tests failed with 12 failed and 17 passed: huge finite vectors normalized to zero, bool/string inputs were coerced, and duplicate source IDs were accepted/API returned 200.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_models.py tests\test_scene_api.py</code></td><td>GREEN (quality repair)</td><td>After strict validation, stable normalization, and duplicate-ID checks, focused verification reported 29 passed in 0.28s.</td></tr>
-        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>PASS</td><td>Full regression verification reported 43 passed in 1.12s.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_models.py tests\test_scene_api.py</code></td><td>RED (strictness quality repair)</td><td>Review regression tests failed with 12 failed and 17 passed: huge finite vectors normalized to zero, bool/string inputs were coerced, and duplicate source IDs were accepted/API returned 200.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_models.py tests\test_scene_api.py</code></td><td>RED (max-float quality repair)</td><td>sys.float_info.max direction regressions failed with 2 failed and 29 passed because math.hypot returned an infinite magnitude for finite components.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_models.py tests\test_scene_api.py</code></td><td>GREEN (max-float quality repair)</td><td>After max-abs scaled normalization, focused verification reported 31 passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>PASS</td><td>Full regression verification reported 45 passed.</td></tr>
         <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src scripts tests</code></td><td>PASS</td><td>Ruff reported All checks passed.</td></tr>
         <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\render_task_report.py --input - --output reports\2026-05-28-task-03-scene-contracts.html</code></td><td>PASS</td><td>Generated this updated standalone accessible HTML task report.</td></tr>
           </tbody>
@@ -108,9 +109,9 @@
           <caption>Verification evidence</caption>
           <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
           <tbody>
-        <tr><td>TDD RED</td><td>PASS</td><td>The quality repair tests failed before implementation with 12 focused failures for the reviewed contract gaps.</td></tr>
-        <tr><td>Focused Task 3 tests</td><td>PASS</td><td>29 passed for tests/test_models.py and tests/test_scene_api.py.</td></tr>
-        <tr><td>Full regression tests</td><td>PASS</td><td>43 passed across the repository.</td></tr>
+        <tr><td>TDD RED</td><td>PASS</td><td>The max-float repair tests failed before implementation with 2 focused failures for finite direction components near sys.float_info.max.</td></tr>
+        <tr><td>Focused Task 3 tests</td><td>PASS</td><td>31 passed for tests/test_models.py and tests/test_scene_api.py.</td></tr>
+        <tr><td>Full regression tests</td><td>PASS</td><td>45 passed across the repository.</td></tr>
         <tr><td>Lint</td><td>PASS</td><td>Ruff reported All checks passed for src, scripts, and tests.</td></tr>
         <tr><td>Browser evidence</td><td>DEFERRED</td><td>Task 3 adds JSON contracts and API validation only; browser interaction evidence remains Task 5 scope.</td></tr>
           </tbody>

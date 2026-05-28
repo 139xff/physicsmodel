@@ -1,4 +1,5 @@
 import math
+import sys
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -268,6 +269,41 @@ def test_huge_finite_direction_vectors_normalize_without_collapsing_to_zero(sour
 
     assert magnitude == pytest.approx(1.0)
     assert any(component != 0.0 for component in (vector.x, vector.y, vector.z))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        {
+            "id": "line-max-float-orientation",
+            "kind": "line_segment",
+            "label": "Max finite orientation",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "orientation": {"x": sys.float_info.max, "y": sys.float_info.max, "z": 0.0},
+            "length_m": 1.0,
+            "charge_c": 1.0,
+        },
+        {
+            "id": "ring-max-float-normal",
+            "kind": "ring",
+            "label": "Max finite normal",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "normal": {"x": 0.0, "y": -sys.float_info.max, "z": sys.float_info.max},
+            "radius_m": 1.0,
+            "charge_c": 1.0,
+        },
+    ],
+)
+def test_max_finite_direction_vectors_normalize_without_overflow_rejection(source: dict):
+    adapter = TypeAdapter(ElectrostaticSource)
+
+    validated = adapter.validate_python(source)
+    vector = validated.orientation if isinstance(validated, LineSegmentSource) else validated.normal
+    components = (vector.x, vector.y, vector.z)
+
+    assert all(math.isfinite(component) for component in components)
+    assert math.hypot(*components) == pytest.approx(1.0)
+    assert any(component != 0.0 for component in components)
 
 
 @pytest.mark.parametrize(

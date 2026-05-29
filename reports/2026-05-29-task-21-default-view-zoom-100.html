@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 21 - 默认视图倍率 100</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>默认视图倍率 100</h1>
+    <p>本次变更将 2D 和 3D 视图的默认进入倍率设置为 100。</p>
+
+    <section>
+      <h2>实现内容</h2>
+      <ul>
+        <li>页面初次进入 2D 时默认倍率为 <code>100</code>。</li>
+        <li>每次切回 2D 时重置为 <code>100</code> 倍，并保持原点居中。</li>
+        <li>每次进入 3D 时重置相机默认倍率为 <code>100</code>。</li>
+        <li>2D 仍可继续向内放大，没有人为最大倍率上限。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证</h2>
+      <ul>
+        <li>浏览器测试验证 2D 初始 <code>viewBox</code> 为 100 倍放大状态。</li>
+        <li>浏览器测试验证 3D 视图公开的相机倍率为 <code>100</code>。</li>
+      </ul>
+    </section>
+  </body>
+</html>

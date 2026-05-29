@@ -1,5 +1,5 @@
 import { evaluateField, getConfig, getPreset, listPresets } from "./api-client.js";
-import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js";
+import { render3d, reset3dView, resize3d, stopAnimLoop } from "./renderers/view3d.js";
 
 const runtimeStatus = document.querySelector("#runtime-status");
 const sourceList = document.querySelector("#source-list");
@@ -34,6 +34,7 @@ const VIEWPORT_GRID_STEP_UNITS = 1;
 const VIEWPORT_MIN_UNITS = -VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS;
 const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2;
 const VIEWPORT_MIN_ZOOM = 1;
+const DEFAULT_VIEW_ZOOM = 100;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
 
@@ -55,7 +56,7 @@ const state = {
     sources: [],
   },
   probe: { x: 0.2, y: 0.03, z: 0.05 },
-  view2d: { centerX: 0, centerY: 0, zoom: 1 },
+  view2d: { centerX: 0, centerY: 0, zoom: DEFAULT_VIEW_ZOOM },
   showHeatmap: false,
   lastResult: null,
   overlayResult: null,
@@ -209,7 +210,12 @@ function setMode(mode) {
   modeLabel.textContent = mode;
   view2d.classList.toggle("hidden", mode !== "2D");
   view3d.classList.toggle("hidden", mode !== "3D");
-  if (mode !== "3D") {
+  if (mode === "2D") {
+    state.view2d.zoom = DEFAULT_VIEW_ZOOM;
+  }
+  if (mode === "3D") {
+    reset3dView(view3d);
+  } else {
     stopAnimLoop();
   }
   renderAll();

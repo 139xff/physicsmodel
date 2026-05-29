@@ -161,18 +161,18 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
 def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     page.locator("#add-point").click()
 
-    page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("9.5")
-    page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-9")
+    page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("0.08")
+    page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-0.08")
     page.locator('[data-source-id="point-1"][data-field="position.z"]').fill("0")
     page.locator('[data-source-id="point-1"][data-field="position.z"]').press("Tab")
 
-    page.locator("#probe-x").fill("-9.5")
-    page.locator("#probe-y").fill("8.5")
+    page.locator("#probe-x").fill("-0.05")
+    page.locator("#probe-y").fill("0.045")
     page.locator("#probe-z").fill("0")
     page.locator("#probe-z").press("Tab")
 
     view_box = page.get_by_test_id("view-2d").locator("svg").get_attribute("viewBox")
-    assert view_box == "-1000 -1000 2000 2000"
+    assert view_box == "-10 -10 20 20"
 
     grid = page.locator("#grid")
     expect(grid).to_have_attribute("width", "1")
@@ -181,8 +181,8 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
     point_radius = _number_attr(page, "source-point-2d-point-1", "r")
-    assert point_x == 950
-    assert point_y == 900
+    assert point_x == 8
+    assert point_y == 8
     assert point_radius == 1.5
     _assert_inside_svg_viewbox(page, "view-2d", point_x - point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x + point_radius, point_y)
@@ -191,8 +191,8 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
 
     probe_x = _number_attr(page, "probe-marker-2d", "data-view-x")
     probe_y = _number_attr(page, "probe-marker-2d", "data-view-y")
-    assert probe_x == -950
-    assert probe_y == -850
+    assert probe_x == -5
+    assert probe_y == -4.5
     _assert_inside_svg_viewbox(page, "view-2d", probe_x - 4, probe_y)
     _assert_inside_svg_viewbox(page, "view-2d", probe_x + 4, probe_y)
     _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y - 4)
@@ -205,16 +205,19 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-divisions", "2000")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-axis-min-meters", "-10")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-axis-max-meters", "10")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-camera-zoom", "100")
 
 
 def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     initial_min_x, initial_min_y, initial_width, initial_height = _svg_viewbox(page)
     assert (initial_min_x, initial_min_y, initial_width, initial_height) == (
-        -1000,
-        -1000,
-        2000,
-        2000,
+        -10,
+        -10,
+        20,
+        20,
     )
+    initial_zoom = page.get_by_test_id("view-2d").locator("svg").get_attribute("data-zoom")
+    assert initial_zoom == "100"
 
     surface = page.get_by_test_id("view-2d")
     box = surface.bounding_box()

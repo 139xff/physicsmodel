@@ -15,6 +15,7 @@ const GRID_AXIS_LIMIT_M = 10;
 const GRID_SIZE_M = GRID_AXIS_LIMIT_M * 2;
 const GRID_CELL_SIZE_M = 0.01;
 const GRID_DIVISIONS = GRID_SIZE_M / GRID_CELL_SIZE_M;
+const DEFAULT_CAMERA_ZOOM = 100;
 const MIN_DISPLAY_MARKER_RADIUS = 0.005;
 const AXIS_COLORS = {
   x: 0xff4d4f,
@@ -109,6 +110,8 @@ function ensure3d(view3d) {
   threeScene.background = new THREE.Color(0xf7f9fc);
   camera = new THREE.PerspectiveCamera(48, width / height, 0.01, 100);
   camera.position.set(12, 10, 12);
+  camera.zoom = DEFAULT_CAMERA_ZOOM;
+  camera.updateProjectionMatrix();
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.target.set(0, 0, 0);
@@ -139,6 +142,17 @@ function update3dFrame(view3d) {
   view3d.dataset.axisLimitMeters = GRID_AXIS_LIMIT_M.toString();
   view3d.dataset.axisMinMeters = (-GRID_AXIS_LIMIT_M).toString();
   view3d.dataset.axisMaxMeters = GRID_AXIS_LIMIT_M.toString();
+  view3d.dataset.cameraZoom = camera.zoom.toString();
+}
+
+export function reset3dView(view3d) {
+  ensure3d(view3d);
+  camera.position.set(12, 10, 12);
+  camera.zoom = DEFAULT_CAMERA_ZOOM;
+  camera.updateProjectionMatrix();
+  controls.target.set(0, 0, 0);
+  controls.update();
+  view3d.dataset.cameraZoom = camera.zoom.toString();
 }
 
 function startAnimLoop() {

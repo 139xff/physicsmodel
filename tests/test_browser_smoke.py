@@ -155,14 +155,14 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
 def test_browser_views_frame_large_finite_coordinates(page: Page) -> None:
     page.locator("#add-point").click()
 
-    page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("150")
-    page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-90")
-    page.locator('[data-source-id="point-1"][data-field="position.z"]').fill("45")
+    page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("1e100")
+    page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-9e99")
+    page.locator('[data-source-id="point-1"][data-field="position.z"]').fill("4.5e99")
     page.locator('[data-source-id="point-1"][data-field="position.z"]').press("Tab")
 
-    page.locator("#probe-x").fill("-125")
-    page.locator("#probe-y").fill("60")
-    page.locator("#probe-z").fill("-35")
+    page.locator("#probe-x").fill("-8e99")
+    page.locator("#probe-y").fill("6e99")
+    page.locator("#probe-z").fill("-3.5e99")
     page.locator("#probe-z").press("Tab")
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
@@ -184,7 +184,7 @@ def test_browser_views_frame_large_finite_coordinates(page: Page) -> None:
     expect(page.get_by_test_id("view-3d")).to_be_visible()
     scene_radius = _number_attr(page, "view-3d", "data-scene-radius-three")
     camera_far = _number_attr(page, "view-3d", "data-camera-far-three")
-    assert scene_radius > 140
+    assert 0.1 < scene_radius < 10
     assert camera_far > scene_radius
 
 

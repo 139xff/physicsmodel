@@ -11,13 +11,23 @@ let threeScene;
 let gridHelper;
 let axesHelper;
 let animFrameId = null;
+const DISPLAY_SCENE_RADIUS = 0.45;
+const MIN_DISPLAY_MARKER_RADIUS = 0.005;
+const MIN_WORLD_SPAN_M = 0.36;
 
 function threeVectorFromComponents(components) {
   return new THREE.Vector3(components.x, components.y, components.z);
 }
 
-function threePointFromPosition(position) {
-  return new THREE.Vector3(position.x, position.z, position.y);
+function threePointFromPosition(position, transform) {
+  if (!transform) {
+    return new THREE.Vector3(position.x, position.z, position.y);
+  }
+  return new THREE.Vector3(
+    (position.x / transform.scaleBase - transform.centerXNorm) * transform.unitsPerNorm,
+    (position.z / transform.scaleBase - transform.centerZNorm) * transform.unitsPerNorm,
+    (position.y / transform.scaleBase - transform.centerYNorm) * transform.unitsPerNorm,
+  );
 }
 
 function surfaceSize(container) {
@@ -74,12 +84,81 @@ function sourceBoundingRadius(source) {
   return 0.018;
 }
 
-function computeSceneFrame(state) {
-  const entries = state.scene.sources.map((source) => ({
-    center: threePointFromPosition(source.position),
+function collect3dFrameItems(state) {
+  const items = state.scene.sources.map((source) => ({
+    position: source.position,
     radius: sourceBoundingRadius(source),
   }));
-  entries.push({ center: threePointFromPosition(state.probe), radius: 0.012 });
+  items.push({ position: state.probe, radius: 0.012 });
+  return items;
+}
+
+function frameScaleBase(items) {
+  const values = [MIN_WORLD_SPAN_M];
+  for (const item of items) {
+    values.push(
+      Math.abs(item.position.x),
+      Math.abs(item.position.y),
+      Math.abs(item.position.z),
+      Math.abs(item.radius),
+    );
+  }
+  return Math.max(...values.filter((value) => Number.isFinite(value)));
+}
+
+function compute3dDisplayTransform(state) {
+  const items = collect3dFrameItems(state);
+  const scaleBase = frameScaleBase(items);
+  const bounds = {
+    minX: Infinity,
+    maxX: -Infinity,
+    minY: Infinity,
+    maxY: -Infinity,
+    minZ: Infinity,
+    maxZ: -Infinity,
+  };
+
+  for (const item of items) {
+    const radiusNorm = item.radius / scaleBase;
+    const xNorm = item.position.x / scaleBase;
+    const yNorm = item.position.y / scaleBase;
+    const zNorm = item.position.z / scaleBase;
+    bounds.minX = Math.min(bounds.minX, xNorm - radiusNorm);
+    bounds.maxX = Math.max(bounds.maxX, xNorm + radiusNorm);
+    bounds.minY = Math.min(bounds.minY, yNorm - radiusNorm);
+    bounds.maxY = Math.max(bounds.maxY, yNorm + radiusNorm);
+    bounds.minZ = Math.min(bounds.minZ, zNorm - radiusNorm);
+    bounds.maxZ = Math.max(bounds.maxZ, zNorm + radiusNorm);
+  }
+
+  const minSpanNorm = MIN_WORLD_SPAN_M / scaleBase;
+  const spanXNorm = Math.max(bounds.maxX - bounds.minX, minSpanNorm);
+  const spanYNorm = Math.max(bounds.maxY - bounds.minY, minSpanNorm);
+  const spanZNorm = Math.max(bounds.maxZ - bounds.minZ, minSpanNorm);
+  const halfSpanNorm = Math.max(spanXNorm, spanYNorm, spanZNorm) * 0.62;
+
+  return {
+    scaleBase,
+    centerXNorm: (bounds.minX + bounds.maxX) / 2,
+    centerYNorm: (bounds.minY + bounds.maxY) / 2,
+    centerZNorm: (bounds.minZ + bounds.maxZ) / 2,
+    unitsPerNorm: DISPLAY_SCENE_RADIUS / halfSpanNorm,
+  };
+}
+
+function radiusToDisplay(radius, transform, minimum = 0) {
+  return Math.max(minimum, (radius / transform.scaleBase) * transform.unitsPerNorm);
+}
+
+function computeSceneFrame(state, transform) {
+  const entries = state.scene.sources.map((source) => ({
+    center: threePointFromPosition(source.position, transform),
+    radius: radiusToDisplay(sourceBoundingRadius(source), transform, MIN_DISPLAY_MARKER_RADIUS),
+  }));
+  entries.push({
+    center: threePointFromPosition(state.probe, transform),
+    radius: radiusToDisplay(0.012, transform, MIN_DISPLAY_MARKER_RADIUS),
+  });
 
   const box = new THREE.Box3();
   for (const entry of entries) {
@@ -100,8 +179,8 @@ function computeSceneFrame(state) {
   return { center, radius, size };
 }
 
-function update3dFrame(view3d, state) {
-  const frame = computeSceneFrame(state);
+function update3dFrame(view3d, state, transform) {
+  const frame = computeSceneFrame(state, transform);
   const fovRadians = THREE.MathUtils.degToRad(camera.fov);
   const distance = Math.max(0.7, frame.radius / Math.sin(fovRadians / 2));
   const direction = new THREE.Vector3(0.62, 0.52, 0.58).normalize();
@@ -146,9 +225,10 @@ export function stopAnimLoop() {
   }
 }
 
-function meshForSource(source) {
+function meshForSource(source, transform) {
   if (source.kind === "ring") {
-    const geometry = new THREE.TorusGeometry(source.radius_m, 0.004, 10, 72);
+    const radius = radiusToDisplay(source.radius_m, transform, MIN_DISPLAY_MARKER_RADIUS);
+    const geometry = new THREE.TorusGeometry(radius, Math.max(radius * 0.05, 0.003), 10, 72);
     const material = new THREE.MeshBasicMaterial({ color: 0xb7791f });
     const mesh = new THREE.Mesh(geometry, material);
     const threeNormal = threeVectorFromComponents(physicsNormalToThreeComponents(source.normal));
@@ -157,7 +237,8 @@ function meshForSource(source) {
   }
 
   if (source.kind === "line_segment") {
-    const geometry = new THREE.CylinderGeometry(0.004, 0.004, source.length_m, 12);
+    const length = radiusToDisplay(source.length_m, transform, MIN_DISPLAY_MARKER_RADIUS * 2);
+    const geometry = new THREE.CylinderGeometry(0.004, 0.004, length, 12);
     const material = new THREE.MeshBasicMaterial({ color: 0x0071e3 });
     const mesh = new THREE.Mesh(geometry, material);
     const direction = threeVectorFromComponents(physicsNormalToThreeComponents(source.orientation));
@@ -166,7 +247,11 @@ function meshForSource(source) {
   }
 
   if (source.kind === "disk" || source.kind === "infinite_plane") {
-    const radius = source.kind === "disk" ? source.radius_m : source.display_extent_m * 0.5;
+    const radius = radiusToDisplay(
+      source.kind === "disk" ? source.radius_m : source.display_extent_m * 0.5,
+      transform,
+      MIN_DISPLAY_MARKER_RADIUS,
+    );
     const geometry = new THREE.CircleGeometry(radius, 72);
     const material = new THREE.MeshBasicMaterial({
       color: source.kind === "disk" ? 0x0f766e : 0x6366f1,
@@ -181,7 +266,9 @@ function meshForSource(source) {
   }
 
   const geometry = new THREE.SphereGeometry(
-    source.kind === "spherical_shell" ? source.radius_m : 0.005,
+    source.kind === "spherical_shell"
+      ? radiusToDisplay(source.radius_m, transform, MIN_DISPLAY_MARKER_RADIUS)
+      : MIN_DISPLAY_MARKER_RADIUS,
     16,
     12,
   );
@@ -210,7 +297,7 @@ function _disposeMesh(child) {
 const ARROW_COLOR = 0x374151;
 const ARROW_SCALE = 0.028;
 
-function _addFieldArrows(parent, state) {
+function _addFieldArrows(parent, state, transform) {
   if (!state.overlayResult || state.overlaySamples.length === 0) {
     return;
   }
@@ -226,13 +313,14 @@ function _addFieldArrows(parent, state) {
     }
     const dir = new THREE.Vector3(field.x, field.z, field.y).normalize();
     const len = ARROW_SCALE * (1.0 + 4.0 * (mag / maxMag));
-    const origin = new THREE.Vector3(pt.x, pt.z, pt.y);
+    const origin = threePointFromPosition(pt, transform);
     const arrow = new THREE.ArrowHelper(dir, origin, len, ARROW_COLOR, len * 0.28, len * 0.16);
     parent.add(arrow);
   }
 }
 
 export function render3d(view3d, state) {
+  const transform = compute3dDisplayTransform(state);
   view3d.removeAttribute("data-ring-normal-three");
   const firstRing = state.scene.sources.find((source) => source.kind === "ring");
   if (firstRing) {
@@ -257,23 +345,23 @@ export function render3d(view3d, state) {
   }
 
   for (const source of state.scene.sources) {
-    const mesh = meshForSource(source);
-    mesh.position.copy(threePointFromPosition(source.position));
+    const mesh = meshForSource(source, transform);
+    mesh.position.copy(threePointFromPosition(source.position, transform));
     sceneGroup.add(mesh);
   }
 
-  const probeGeometry = new THREE.SphereGeometry(0.006, 12, 8);
+  const probeGeometry = new THREE.SphereGeometry(MIN_DISPLAY_MARKER_RADIUS, 12, 8);
   const probeMaterial = new THREE.MeshBasicMaterial({
     color: 0xff3b30,
     transparent: true,
     opacity: 0.7,
   });
   const probeMesh = new THREE.Mesh(probeGeometry, probeMaterial);
-  probeMesh.position.copy(threePointFromPosition(state.probe));
+  probeMesh.position.copy(threePointFromPosition(state.probe, transform));
   sceneGroup.add(probeMesh);
 
-  _addFieldArrows(sceneGroup, state);
-  update3dFrame(view3d, state);
+  _addFieldArrows(sceneGroup, state, transform);
+  update3dFrame(view3d, state, transform);
   startAnimLoop();
   renderer.render(threeScene, camera);
 }

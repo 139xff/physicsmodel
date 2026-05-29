@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 14: Unbounded Coordinate Rendering - Engineering Task Report</title>
+  <style>
+    :root { color-scheme: light; --ink: #19202b; --muted: #566576; --line: #d3dce6; --panel: #f5f7fa; --accent: #0d5e63; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #fff; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header { border-bottom: 3px solid var(--accent); margin-bottom: 2rem; padding-bottom: 1.25rem; }
+    h1 { font-size: clamp(1.6rem, 3vw, 2.3rem); margin: 0 0 0.75rem; }
+    h2 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; color: var(--muted); }
+    .status { background: #e7f4f1; border-radius: 999px; color: var(--accent); font-weight: 700; padding: 0.15rem 0.65rem; }
+    ul { margin-top: 0.5rem; padding-left: 1.4rem; }
+    .table-scroll { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 36rem; width: 100%; }
+    caption { color: var(--muted); font-size: 0.95rem; text-align: left; padding: 0 0 0.5rem; }
+    th, td { border: 1px solid var(--line); padding: 0.6rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--panel); }
+    code { font: 0.92em ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; }
+    .next { border-left: 4px solid var(--accent); background: var(--panel); padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Task 14: Unbounded Coordinate Rendering</h1>
+      <div class="meta">
+        <span class="status">DONE</span>
+        <span>Completed: <time datetime="2026-05-29T01:45:00+08:00">2026-05-29T01:45:00+08:00</time></span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Replaced fixed 2D meter-to-SVG scaling with a normalized viewport transform so very large finite coordinates render inside the stable 0 0 100 100 SVG frame.</li>
+        <li>Changed 3D rendering to normalize physical coordinates into a stable display coordinate system before creating Three.js meshes, arrows, grid, axes, and camera framing.</li>
+        <li>Preserved physical scene values for API calls and input fields; only rendered coordinates are normalized.</li>
+        <li>Strengthened browser regression coverage from hundred-scale coordinates to 1e100-scale finite coordinates.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>Literal Infinity and NaN remain invalid scene values because the solver and JSON contracts require finite numbers.</li>
+        <li>Manual pan/zoom and a 3D camera lock/reset control remain follow-up interaction improvements.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Files changed in this task</caption>
+          <thead><tr><th scope="col">Path</th><th scope="col">Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>web/app.js</code></td><td>Add normalized 2D viewport transforms for source geometry, probe marker, overlays, heatmap cells, and axes.</td></tr>
+            <tr><td><code>web/renderers/view3d.js</code></td><td>Add normalized 3D display transforms for meshes, probe marker, field arrows, grid, axes, and camera framing.</td></tr>
+            <tr><td><code>tests/test_browser_smoke.py</code></td><td>Use 1e100-scale finite coordinate values in the large-coordinate browser regression.</td></tr>
+            <tr><td><code>reports/2026-05-29-task-14-unbounded-coordinate-rendering.html</code></td><td>Record scope, commands, verification, and remaining limitations.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Commands</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Commands executed</caption>
+          <thead><tr><th scope="col">Command</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py -k large_finite -vv</code></td><td>PASS</td><td>1 passed, 2 deselected, 2 known uvicorn/websockets deprecation warnings.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider tests\test_browser_smoke.py -vv</code></td><td>PASS</td><td>3 browser smoke tests passed.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td>PASS</td><td>All checks passed.</td></tr>
+            <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest -p no:cacheprovider</code></td><td>PASS</td><td>67 passed, 2 known uvicorn/websockets deprecation warnings. TEMP/TMP were pointed at .tools\pytest-tmp to avoid the local AppData temp permission issue.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Verification</h2>
+      <div class="table-scroll">
+        <table>
+          <caption>Verification evidence</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Outcome</th><th scope="col">Evidence</th></tr></thead>
+          <tbody>
+            <tr><td>1e100-scale 2D/3D coordinate rendering</td><td>PASS</td><td>Browser smoke verifies the source and probe remain inside the 2D SVG view and the 3D scene radius remains bounded.</td></tr>
+            <tr><td>Existing browser workflows</td><td>PASS</td><td>Source editing, 2D/3D switching, overlays, presets, solver output, and stale-response checks still pass.</td></tr>
+            <tr><td>Full regression</td><td>PASS</td><td>67 passed.</td></tr>
+            <tr><td>Lint</td><td>PASS</td><td>Ruff reported all checks passed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Known Risks And Limitations</h2>
+      <ul>
+        <li>Very large finite values are supported for rendering through normalization; solver precision at extreme scales still follows floating-point limits and may produce physically tiny fields.</li>
+        <li>Auto-framing can still reset the 3D camera after edits; a user-controlled camera lock should be considered if that becomes distracting.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p class="next">Add explicit viewport controls so users can pan, zoom, reset, or lock automatic framing.</p>
+    </section>
+  </main>
+</body>
+</html>

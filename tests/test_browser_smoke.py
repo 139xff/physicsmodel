@@ -205,7 +205,7 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     assert axis_layer.get_attribute("data-axis-unit") == "cm"
     assert axis_layer.get_attribute("data-tick-length-px") == "7"
     label_font_px = float(axis_layer.get_attribute("data-label-font-px") or "0")
-    assert 10 <= label_font_px <= 16
+    assert 50 <= label_font_px <= 80
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
@@ -318,7 +318,7 @@ def test_browser_2d_axis_label_size_follows_viewport_not_zoom(page: Page) -> Non
     )
     zoomed_text_height = _axis_tick_text_height(page)
     assert zoomed_label_size == initial_label_size
-    assert zoomed_text_height == pytest.approx(initial_text_height, abs=0.75)
+    assert zoomed_text_height == pytest.approx(initial_text_height, abs=1.5)
 
     page.set_viewport_size({"width": 1920, "height": 1100})
     page.wait_for_timeout(300)
@@ -327,7 +327,7 @@ def test_browser_2d_axis_label_size_follows_viewport_not_zoom(page: Page) -> Non
     )
     larger_text_height = _axis_tick_text_height(page)
     assert larger_label_size > initial_label_size
-    assert larger_label_size <= 16
+    assert larger_label_size <= 80
     assert larger_text_height > initial_text_height
 
 

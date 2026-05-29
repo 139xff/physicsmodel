@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>任务报告：2D 刻度数字随视窗尺寸调整</title>
+    <style>
+      body {
+        color: #1f2937;
+        font-family: system-ui, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        max-width: 880px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>任务报告：2D 刻度数字随视窗尺寸调整</h1>
+    <p>日期：2026-05-30</p>
+    <h2>完成内容</h2>
+    <ul>
+      <li>2D 坐标轴刻度数字的目标像素大小改为根据空间视窗尺寸自动计算。</li>
+      <li>缩放 2D 坐标系时，刻度数字屏幕大小保持不变。</li>
+      <li>空间视窗变大或变小时，刻度数字在 <code>10px</code> 到 <code>16px</code> 范围内按比例调整。</li>
+      <li>补充浏览器测试，覆盖缩放不变和窗口放大后字体变大的行为。</li>
+    </ul>
+  </body>
+</html>

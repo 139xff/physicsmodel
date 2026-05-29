@@ -46,7 +46,9 @@ const AXIS_TICK_TARGET_COUNT = 16;
 const AXIS_TICK_LENGTH_PX = 7;
 const AXIS_ARROW_LENGTH_PX = 12;
 const AXIS_ARROW_WIDTH_PX = 7;
-const AXIS_LABEL_FONT_PX = 11;
+const AXIS_LABEL_FONT_MIN_PX = 10;
+const AXIS_LABEL_FONT_MAX_PX = 16;
+const AXIS_LABEL_FONT_VIEWPORT_RATIO = 0.018;
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
 
 const state = {
@@ -625,6 +627,10 @@ function screenScaleForViewBox(viewBox) {
   const widthPx = Math.max(1, rect.width || view2d.clientWidth || 640);
   const heightPx = Math.max(1, rect.height || view2d.clientHeight || 520);
   return {
+    fontPx: Math.min(
+      AXIS_LABEL_FONT_MAX_PX,
+      Math.max(AXIS_LABEL_FONT_MIN_PX, Math.min(widthPx, heightPx) * AXIS_LABEL_FONT_VIEWPORT_RATIO),
+    ),
     xUnitsPerPx: viewBox.width / widthPx,
     yUnitsPerPx: viewBox.height / heightPx,
   };
@@ -676,7 +682,8 @@ function render2dAxes(viewBox, axisOrigin) {
   const arrowLengthY = AXIS_ARROW_LENGTH_PX * scale.yUnitsPerPx;
   const arrowHalfWidthX = (AXIS_ARROW_WIDTH_PX * scale.xUnitsPerPx) / 2;
   const arrowHalfWidthY = (AXIS_ARROW_WIDTH_PX * scale.yUnitsPerPx) / 2;
-  const fontSize = AXIS_LABEL_FONT_PX * scale.yUnitsPerPx;
+  const fontSize = scale.fontPx * scale.yUnitsPerPx;
+  const textStrokeWidth = 0.7 * scale.yUnitsPerPx;
   const labelGapX = 9 * scale.xUnitsPerPx;
   const labelGapY = 10 * scale.yUnitsPerPx;
   const minXCm = viewBox.minX;
@@ -691,7 +698,7 @@ function render2dAxes(viewBox, axisOrigin) {
       return `
         <g class="axis-tick axis-tick-x" data-testid="axis-tick-2d-x">
           <line x1="${x}" y1="${axisOrigin.y - tickHalfY}" x2="${x}" y2="${axisOrigin.y + tickHalfY}"></line>
-          <text x="${x}" y="${axisOrigin.y + tickHalfY + labelGapY}" font-size="${fontSize}" text-anchor="middle">${formatAxisTick(tick)}</text>
+          <text x="${x}" y="${axisOrigin.y + tickHalfY + labelGapY}" style="font-size: ${fontSize}px; stroke-width: ${textStrokeWidth}px;" text-anchor="middle">${formatAxisTick(tick)}</text>
         </g>
       `;
     })
@@ -702,7 +709,7 @@ function render2dAxes(viewBox, axisOrigin) {
       return `
         <g class="axis-tick axis-tick-y" data-testid="axis-tick-2d-y">
           <line x1="${axisOrigin.x - tickHalfX}" y1="${y}" x2="${axisOrigin.x + tickHalfX}" y2="${y}"></line>
-          <text x="${axisOrigin.x + tickHalfX + labelGapX}" y="${y + fontSize * 0.35}" font-size="${fontSize}" text-anchor="start">${formatAxisTick(tick)}</text>
+          <text x="${axisOrigin.x + tickHalfX + labelGapX}" y="${y + fontSize * 0.35}" style="font-size: ${fontSize}px; stroke-width: ${textStrokeWidth}px;" text-anchor="start">${formatAxisTick(tick)}</text>
         </g>
       `;
     })
@@ -717,7 +724,7 @@ function render2dAxes(viewBox, axisOrigin) {
       data-y-tick-count="${yTickData.ticks.length}"
       data-axis-unit="cm"
       data-tick-length-px="${AXIS_TICK_LENGTH_PX}"
-      data-label-font-px="${AXIS_LABEL_FONT_PX}"
+      data-label-font-px="${scale.fontPx.toFixed(2)}"
     >
       <line
         class="axis-line axis-line-x"
@@ -1104,10 +1111,11 @@ function handleSourceInput(event) {
 sourceList.addEventListener("input", handleSourceInput);
 sourceList.addEventListener("change", handleSourceInput);
 window.addEventListener("resize", () => {
-  if (state.mode !== "3D") {
-    return;
+  if (state.mode === "2D") {
+    render2d();
+  } else if (state.mode === "3D") {
+    resize3d(view3d, state);
   }
-  resize3d(view3d, state);
 });
 
 renderAll();

@@ -95,6 +95,13 @@ def _svg_viewbox(page: Page) -> tuple[float, float, float, float]:
     return tuple(float(part) for part in value.split())
 
 
+def _axis_tick_text_height(page: Page) -> float:
+    height = page.locator("[data-testid='axis-tick-2d-x'] text").first.evaluate(
+        "element => element.getBoundingClientRect().height"
+    )
+    return float(height)
+
+
 def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -> None:
     expect(page.get_by_role("heading", name="电磁工作台")).to_be_visible()
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
@@ -197,7 +204,8 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     assert 0 < y_tick_count <= 20
     assert axis_layer.get_attribute("data-axis-unit") == "cm"
     assert axis_layer.get_attribute("data-tick-length-px") == "7"
-    assert axis_layer.get_attribute("data-label-font-px") == "11"
+    label_font_px = float(axis_layer.get_attribute("data-label-font-px") or "0")
+    assert 10 <= label_font_px <= 16
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
@@ -292,6 +300,35 @@ def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     assert deep_zoom_height < second_height
     assert deep_zoom_min_x == -deep_zoom_width / 2
     assert deep_zoom_min_y == -deep_zoom_height / 2
+
+
+def test_browser_2d_axis_label_size_follows_viewport_not_zoom(page: Page) -> None:
+    initial_axis_layer = page.get_by_test_id("axis-layer-2d")
+    initial_label_size = float(initial_axis_layer.get_attribute("data-label-font-px") or "0")
+    initial_text_height = _axis_tick_text_height(page)
+
+    surface = page.get_by_test_id("view-2d")
+    box = surface.bounding_box()
+    assert box is not None
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.mouse.wheel(0, -700)
+
+    zoomed_label_size = float(
+        page.get_by_test_id("axis-layer-2d").get_attribute("data-label-font-px") or "0"
+    )
+    zoomed_text_height = _axis_tick_text_height(page)
+    assert zoomed_label_size == initial_label_size
+    assert zoomed_text_height == pytest.approx(initial_text_height, abs=0.75)
+
+    page.set_viewport_size({"width": 1920, "height": 1100})
+    page.wait_for_timeout(300)
+    larger_label_size = float(
+        page.get_by_test_id("axis-layer-2d").get_attribute("data-label-font-px") or "0"
+    )
+    larger_text_height = _axis_tick_text_height(page)
+    assert larger_label_size > initial_label_size
+    assert larger_label_size <= 16
+    assert larger_text_height > initial_text_height
 
 
 def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:

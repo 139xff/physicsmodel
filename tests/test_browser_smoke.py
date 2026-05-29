@@ -78,7 +78,7 @@ def _number_attr(page: Page, test_id: str, attribute: str) -> float:
 
 
 def _assert_inside_viewbox(value: float) -> None:
-    assert 0 <= value <= 100
+    assert -1000 <= value <= 1000
 
 
 def _assert_inside_svg_viewbox(page: Page, test_id: str, x: float, y: float) -> None:
@@ -152,22 +152,32 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
 
 
-def test_browser_views_frame_large_finite_coordinates(page: Page) -> None:
+def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     page.locator("#add-point").click()
 
-    page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("1e100")
-    page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-9e99")
-    page.locator('[data-source-id="point-1"][data-field="position.z"]').fill("4.5e99")
+    page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("9.5")
+    page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-9")
+    page.locator('[data-source-id="point-1"][data-field="position.z"]').fill("0")
     page.locator('[data-source-id="point-1"][data-field="position.z"]').press("Tab")
 
-    page.locator("#probe-x").fill("-8e99")
-    page.locator("#probe-y").fill("6e99")
-    page.locator("#probe-z").fill("-3.5e99")
+    page.locator("#probe-x").fill("-9.5")
+    page.locator("#probe-y").fill("8.5")
+    page.locator("#probe-z").fill("0")
     page.locator("#probe-z").press("Tab")
+
+    view_box = page.get_by_test_id("view-2d").locator("svg").get_attribute("viewBox")
+    assert view_box == "-1000 -1000 2000 2000"
+
+    grid = page.locator("#grid")
+    expect(grid).to_have_attribute("width", "1")
+    expect(grid).to_have_attribute("height", "1")
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
     point_radius = _number_attr(page, "source-point-2d-point-1", "r")
+    assert point_x == 950
+    assert point_y == 900
+    assert point_radius == 1.5
     _assert_inside_svg_viewbox(page, "view-2d", point_x - point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x + point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x, point_y - point_radius)
@@ -175,6 +185,8 @@ def test_browser_views_frame_large_finite_coordinates(page: Page) -> None:
 
     probe_x = _number_attr(page, "probe-marker-2d", "data-view-x")
     probe_y = _number_attr(page, "probe-marker-2d", "data-view-y")
+    assert probe_x == -950
+    assert probe_y == -850
     _assert_inside_svg_viewbox(page, "view-2d", probe_x - 4, probe_y)
     _assert_inside_svg_viewbox(page, "view-2d", probe_x + 4, probe_y)
     _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y - 4)
@@ -182,10 +194,9 @@ def test_browser_views_frame_large_finite_coordinates(page: Page) -> None:
 
     page.get_by_role("button", name="3D").click()
     expect(page.get_by_test_id("view-3d")).to_be_visible()
-    scene_radius = _number_attr(page, "view-3d", "data-scene-radius-three")
-    camera_far = _number_attr(page, "view-3d", "data-camera-far-three")
-    assert 0.1 < scene_radius < 10
-    assert camera_far > scene_radius
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-size-meters", "20")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-cell-size-meters", "0.01")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-divisions", "2000")
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:

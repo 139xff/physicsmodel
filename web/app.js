@@ -28,12 +28,11 @@ const probeInputs = {
   y: document.querySelector("#probe-y"),
   z: document.querySelector("#probe-z"),
 };
-const VIEWPORT_METERS_TO_UNITS = 180;
-const VIEWPORT_CENTER_UNITS = 50;
-const VIEWPORT_DEFAULT_SIZE_UNITS = 100;
-const VIEWPORT_PADDING_UNITS = 12;
-const VIEWPORT_CONTENT_RADIUS_UNITS = 38;
-const MIN_WORLD_VIEW_SPAN_M = 0.36;
+const VIEWPORT_AXIS_LIMIT_M = 10;
+const VIEWPORT_METERS_TO_UNITS = 100;
+const VIEWPORT_GRID_STEP_UNITS = 1;
+const VIEWPORT_MIN_UNITS = -VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS;
+const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
 
@@ -254,17 +253,17 @@ function potentialColor(potential, maxAbs) {
   return `rgb(${r},${g},${b})`;
 }
 
-function renderHeatmap2d(transform) {
+function renderHeatmap2d() {
   if (!state.showHeatmap || !state.overlayResult || state.overlaySamples.length === 0) {
     return "";
   }
   const potentials = state.overlayResult.samples.map((s) => s.potential_v);
   const maxAbs = Math.max(...potentials.map(Math.abs), 1e-12);
-  const cellSize = radiusToViewport(overlayCellSizeMeters() * 0.5, transform) * 2;
+  const cellSize = radiusToViewport(overlayCellSizeMeters() * 0.5) * 2;
   const halfCell = cellSize / 2;
   return state.overlaySamples
     .map((sample, index) => {
-      const point = mapToViewport(sample.x, sample.y, transform);
+      const point = mapToViewport(sample.x, sample.y);
       const color = potentialColor(potentials[index], maxAbs);
       return `<rect class="heatmap-cell" x="${point.x - halfCell}" y="${point.y - halfCell}" width="${cellSize}" height="${cellSize}" fill="${color}" rx="1"></rect>`;
     })
@@ -409,105 +408,45 @@ function sourceWorldRadius(source) {
   return 0.04;
 }
 
-function collect2dFrameItems(includeOverlay = false) {
-  const items = [{ x: state.probe.x, y: state.probe.y, radius: 0.04 }];
-  for (const source of state.scene.sources) {
-    items.push({
-      x: source.position.x,
-      y: source.position.y,
-      radius: sourceWorldRadius(source),
-    });
-  }
-  if (includeOverlay && state.overlaySamples.length > 0) {
-    const overlayRadius = overlayCellSizeMeters(false) * 0.5;
-    for (const sample of state.overlaySamples) {
-      items.push({ x: sample.x, y: sample.y, radius: overlayRadius });
-    }
-  }
-  return items;
-}
-
-function frameScaleBase(items) {
-  const values = [MIN_WORLD_VIEW_SPAN_M];
-  for (const item of items) {
-    values.push(Math.abs(item.x), Math.abs(item.y), Math.abs(item.radius));
-  }
-  return Math.max(...values.filter((value) => Number.isFinite(value)));
-}
-
-function compute2dViewportTransform(includeOverlay = true) {
-  const items = collect2dFrameItems(includeOverlay && state.showHeatmap);
-  const scaleBase = frameScaleBase(items);
-  const bounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
-
-  for (const item of items) {
-    const radiusNorm = item.radius / scaleBase;
-    const xNorm = item.x / scaleBase;
-    const yNorm = item.y / scaleBase;
-    bounds.minX = Math.min(bounds.minX, xNorm - radiusNorm);
-    bounds.maxX = Math.max(bounds.maxX, xNorm + radiusNorm);
-    bounds.minY = Math.min(bounds.minY, yNorm - radiusNorm);
-    bounds.maxY = Math.max(bounds.maxY, yNorm + radiusNorm);
-  }
-
-  const minSpanNorm = MIN_WORLD_VIEW_SPAN_M / scaleBase;
-  const spanXNorm = Math.max(bounds.maxX - bounds.minX, minSpanNorm);
-  const spanYNorm = Math.max(bounds.maxY - bounds.minY, minSpanNorm);
-  const halfSpanNorm = Math.max(spanXNorm, spanYNorm) * 0.62;
-  const centerXNorm = (bounds.minX + bounds.maxX) / 2;
-  const centerYNorm = (bounds.minY + bounds.maxY) / 2;
-
+function mapToViewport(x, y) {
   return {
-    scaleBase,
-    centerXNorm,
-    centerYNorm,
-    unitsPerNorm: VIEWPORT_CONTENT_RADIUS_UNITS / halfSpanNorm,
+    x: x * VIEWPORT_METERS_TO_UNITS,
+    y: -y * VIEWPORT_METERS_TO_UNITS,
   };
 }
 
-function mapToViewport(x, y, transform = compute2dViewportTransform()) {
-  return {
-    x: VIEWPORT_CENTER_UNITS + (x / transform.scaleBase - transform.centerXNorm) * transform.unitsPerNorm,
-    y: VIEWPORT_CENTER_UNITS - (y / transform.scaleBase - transform.centerYNorm) * transform.unitsPerNorm,
-  };
-}
-
-function radiusToViewport(radius, transform, minimum = 0) {
-  return Math.max(minimum, (radius / transform.scaleBase) * transform.unitsPerNorm);
+function radiusToViewport(radius, minimum = 0) {
+  return Math.max(minimum, radius * VIEWPORT_METERS_TO_UNITS);
 }
 
 function compute2dViewBox() {
   return {
-    minX: 0,
-    minY: 0,
-    width: VIEWPORT_DEFAULT_SIZE_UNITS,
-    height: VIEWPORT_DEFAULT_SIZE_UNITS,
+    minX: VIEWPORT_MIN_UNITS,
+    minY: VIEWPORT_MIN_UNITS,
+    width: VIEWPORT_SIZE_UNITS,
+    height: VIEWPORT_SIZE_UNITS,
   };
 }
 
 function compute2dWorldBounds() {
-  const transform = compute2dViewportTransform(false);
-  const halfSpanM = (VIEWPORT_CONTENT_RADIUS_UNITS / transform.unitsPerNorm) * transform.scaleBase;
-  const centerX = transform.centerXNorm * transform.scaleBase;
-  const centerY = transform.centerYNorm * transform.scaleBase;
   return {
-    minX: centerX - halfSpanM,
-    maxX: centerX + halfSpanM,
-    minY: centerY - halfSpanM,
-    maxY: centerY + halfSpanM,
+    minX: -VIEWPORT_AXIS_LIMIT_M,
+    maxX: VIEWPORT_AXIS_LIMIT_M,
+    minY: -VIEWPORT_AXIS_LIMIT_M,
+    maxY: VIEWPORT_AXIS_LIMIT_M,
   };
 }
 
-function overlayCellSizeMeters(includeOverlay = false) {
+function overlayCellSizeMeters() {
   const bounds = compute2dWorldBounds();
   return Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 5;
 }
 
-function renderSource2d(source, transform) {
-  const point = mapToViewport(source.position.x, source.position.y, transform);
+function renderSource2d(source) {
+  const point = mapToViewport(source.position.x, source.position.y);
   const label = escapeHtml(source.label);
   if (source.kind === "line_segment") {
-    const halfLength = radiusToViewport(source.length_m / 2, transform);
+    const halfLength = radiusToViewport(source.length_m / 2);
     const angle = Math.atan2(source.orientation.y, source.orientation.x);
     const dx = Math.cos(angle) * halfLength;
     const dy = Math.sin(angle) * halfLength;
@@ -527,7 +466,7 @@ function renderSource2d(source, transform) {
   }
   if (source.kind === "ring" || source.kind === "disk" || source.kind === "spherical_shell") {
     const className = `source-${source.kind.replaceAll("_", "-")}`;
-    const radius = radiusToViewport(source.radius_m, transform, MIN_VISIBLE_MARKER_RADIUS_UNITS);
+    const radius = radiusToViewport(source.radius_m, MIN_VISIBLE_MARKER_RADIUS_UNITS);
     return `
       <g data-testid="source-${source.kind.replaceAll("_", "-")}-group-2d-${source.id}">
         <circle
@@ -542,7 +481,7 @@ function renderSource2d(source, transform) {
     `;
   }
   if (source.kind === "infinite_plane") {
-    const extent = radiusToViewport(source.display_extent_m / 2, transform);
+    const extent = radiusToViewport(source.display_extent_m / 2);
     return `
       <g data-testid="source-infinite-plane-group-2d-${source.id}">
         <rect
@@ -571,7 +510,7 @@ function renderSource2d(source, transform) {
   `;
 }
 
-function renderOverlay2d(transform) {
+function renderOverlay2d() {
   if (!state.overlayResult || state.overlaySamples.length === 0) {
     return '<g data-testid="overlay-vector-layer" data-vector-count="0"></g>';
   }
@@ -579,11 +518,7 @@ function renderOverlay2d(transform) {
   const maxMagnitude = Math.max(...magnitudes, 1);
   const vectors = state.overlayResult.samples
     .map((sample, index) => {
-      const point = mapToViewport(
-        state.overlaySamples[index].x,
-        state.overlaySamples[index].y,
-        transform,
-      );
+      const point = mapToViewport(state.overlaySamples[index].x, state.overlaySamples[index].y);
       const field = sample.field_v_per_m;
       const xyMagnitude = Math.hypot(field.x, field.y);
       const scale = xyMagnitude > 0 ? Math.min(5.5, 1.5 + 4 * (xyMagnitude / maxMagnitude)) : 0;
@@ -612,11 +547,10 @@ function renderOverlay2d(transform) {
 }
 
 function render2d() {
-  const transform = compute2dViewportTransform();
-  const sourceMarkup = state.scene.sources.map((source) => renderSource2d(source, transform)).join("");
-  const probe = mapToViewport(state.probe.x, state.probe.y, transform);
+  const sourceMarkup = state.scene.sources.map((source) => renderSource2d(source)).join("");
+  const probe = mapToViewport(state.probe.x, state.probe.y);
   const viewBox = compute2dViewBox();
-  const axisOrigin = mapToViewport(0, 0, transform);
+  const axisOrigin = mapToViewport(0, 0);
 
   view2d.innerHTML = `
     <svg
@@ -626,8 +560,8 @@ function render2d() {
       aria-label="Top-down electrostatic scene"
     >
       <defs>
-        <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-          <path d="M 10 0 L 0 0 0 10" fill="none"></path>
+        <pattern id="grid" width="${VIEWPORT_GRID_STEP_UNITS}" height="${VIEWPORT_GRID_STEP_UNITS}" patternUnits="userSpaceOnUse">
+          <path d="M ${VIEWPORT_GRID_STEP_UNITS} 0 L 0 0 0 ${VIEWPORT_GRID_STEP_UNITS}" fill="none"></path>
         </pattern>
       </defs>
       <rect
@@ -651,8 +585,8 @@ function render2d() {
         x2="${axisOrigin.x}"
         y2="${viewBox.minY + viewBox.height}"
       ></line>
-      ${renderHeatmap2d(transform)}
-      ${renderOverlay2d(transform)}
+      ${renderHeatmap2d()}
+      ${renderOverlay2d()}
       ${sourceMarkup}
       <g>
         <path

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 15 - 固定厘米网格视图</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      h1 {
+        margin-bottom: 8px;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 2px 5px;
+        border-radius: 4px;
+      }
+      ul {
+        padding-left: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>固定厘米网格视图</h1>
+    <p>本次变更将原先用于“超大/无限坐标”的动态归一化视图，调整为固定物理范围的坐标网格。</p>
+
+    <section>
+      <h2>目标</h2>
+      <ul>
+        <li>X 轴和 Y 轴向外延伸到 10m，即视图范围为 -10m 到 10m。</li>
+        <li>X/Y 组成的网格面每一格固定为 1cm。</li>
+        <li>通过固定网格面积和扩大物理范围，不再使用无限大坐标或自动归一化显示。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>实现</h2>
+      <ul>
+        <li>二维视图使用厘米作为 SVG 绘制单位，<code>viewBox</code> 固定为 <code>-1000 -1000 2000 2000</code>。</li>
+        <li>二维网格的 <code>pattern</code> 固定为 1 个 SVG 单位，即 1cm。</li>
+        <li>三维视图使用固定 <code>GridHelper</code>：20m 总宽度、2000 等分，每格 0.01m。</li>
+        <li>三维摄像机不再根据源或探针位置自动缩放场景，网格中心固定在原点。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证</h2>
+      <ul>
+        <li>浏览器测试确认二维 viewBox、1cm 网格、边界内坐标映射和三维网格元数据。</li>
+        <li>保留源对象、探针、叠加场向量、2D/3D 切换等原有交互行为。</li>
+      </ul>
+    </section>
+  </body>
+</html>

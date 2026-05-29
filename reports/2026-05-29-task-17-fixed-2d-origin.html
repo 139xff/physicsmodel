@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 17 - 固定 2D 原点</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>固定 2D 原点</h1>
+    <p>本次变更修复 2D 视图缩放时原点会偏离中心的问题。</p>
+
+    <section>
+      <h2>实现内容</h2>
+      <ul>
+        <li>2D 视图中心固定为坐标原点 <code>(0, 0)</code>。</li>
+        <li>滚轮缩放只改变缩放倍率，不再根据鼠标位置移动视图中心。</li>
+        <li>移除 2D 拖动平移交互，避免原点被拖离平面中心。</li>
+        <li>固定网格规则保持不变：初始范围仍为 X/Y 各 -10m 到 10m，每格 1cm。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证</h2>
+      <ul>
+        <li>浏览器测试验证缩放后 <code>viewBox</code> 始终关于原点对称。</li>
+        <li>浏览器测试验证鼠标在非中心位置继续缩放时，原点依然保持在视图中心。</li>
+      </ul>
+    </section>
+  </body>
+</html>

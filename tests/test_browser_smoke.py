@@ -205,7 +205,7 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-divisions", "2000")
 
 
-def test_browser_2d_view_supports_zoom_and_pan(page: Page) -> None:
+def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     initial_min_x, initial_min_y, initial_width, initial_height = _svg_viewbox(page)
     assert (initial_min_x, initial_min_y, initial_width, initial_height) == (
         -1000,
@@ -230,15 +230,16 @@ def test_browser_2d_view_supports_zoom_and_pan(page: Page) -> None:
     assert zoomed_height < initial_height
     assert zoomed_min_x > initial_min_x
     assert zoomed_min_y > initial_min_y
+    assert zoomed_min_x == -zoomed_width / 2
+    assert zoomed_min_y == -zoomed_height / 2
 
-    page.mouse.down()
-    page.mouse.move(center_x - 120, center_y - 80)
-    page.mouse.up()
-    panned_min_x, panned_min_y, panned_width, panned_height = _svg_viewbox(page)
-    assert panned_width == zoomed_width
-    assert panned_height == zoomed_height
-    assert panned_min_x > zoomed_min_x
-    assert panned_min_y > zoomed_min_y
+    page.mouse.move(center_x + 180, center_y + 120)
+    page.mouse.wheel(0, -500)
+    second_min_x, second_min_y, second_width, second_height = _svg_viewbox(page)
+    assert second_width < zoomed_width
+    assert second_height < zoomed_height
+    assert second_min_x == -second_width / 2
+    assert second_min_y == -second_height / 2
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:

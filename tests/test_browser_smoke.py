@@ -179,9 +179,21 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     grid = page.locator("#grid")
     expect(grid).to_have_attribute("width", "1")
     expect(grid).to_have_attribute("height", "1")
-    expect(page.get_by_test_id("axis-label-2d-x")).to_contain_text("+X")
-    expect(page.get_by_test_id("axis-label-2d-y")).to_contain_text("+Y")
-    expect(page.get_by_test_id("axis-label-2d-z")).to_contain_text("+Z")
+    expect(page.get_by_test_id("axis-label-2d-x")).to_have_count(0)
+    expect(page.get_by_test_id("axis-label-2d-y")).to_have_count(0)
+    expect(page.get_by_test_id("axis-label-2d-z")).to_have_count(0)
+    expect(page.get_by_test_id("axis-line-2d-x")).to_have_class("axis-line axis-line-x")
+    expect(page.get_by_test_id("axis-line-2d-y")).to_have_class("axis-line axis-line-y")
+    expect(page.get_by_test_id("axis-arrow-2d-x")).to_be_visible()
+    expect(page.get_by_test_id("axis-arrow-2d-y")).to_be_visible()
+
+    axis_layer = page.get_by_test_id("axis-layer-2d")
+    x_tick_count = int(axis_layer.get_attribute("data-x-tick-count") or "0")
+    y_tick_count = int(axis_layer.get_attribute("data-y-tick-count") or "0")
+    assert 0 < x_tick_count <= 20
+    assert 0 < y_tick_count <= 20
+    assert axis_layer.get_attribute("data-tick-length-px") == "7"
+    assert axis_layer.get_attribute("data-label-font-px") == "11"
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
@@ -239,6 +251,9 @@ def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     )
     initial_zoom = page.get_by_test_id("view-2d").locator("svg").get_attribute("data-zoom")
     assert initial_zoom == "100"
+    initial_axis_layer = page.get_by_test_id("axis-layer-2d")
+    initial_tick_length = initial_axis_layer.get_attribute("data-tick-length-px")
+    initial_label_size = initial_axis_layer.get_attribute("data-label-font-px")
 
     surface = page.get_by_test_id("view-2d")
     box = surface.bounding_box()
@@ -250,8 +265,13 @@ def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     page.mouse.wheel(0, -700)
     zoomed_min_x, zoomed_min_y, zoomed_width, zoomed_height = _svg_viewbox(page)
     zoom_attr = surface.locator("svg").get_attribute("data-zoom")
+    zoomed_axis_layer = page.get_by_test_id("axis-layer-2d")
     assert zoom_attr is not None
     assert float(zoom_attr) > 1
+    assert zoomed_axis_layer.get_attribute("data-tick-length-px") == initial_tick_length
+    assert zoomed_axis_layer.get_attribute("data-label-font-px") == initial_label_size
+    assert int(zoomed_axis_layer.get_attribute("data-x-tick-count") or "0") <= 20
+    assert int(zoomed_axis_layer.get_attribute("data-y-tick-count") or "0") <= 20
     assert zoomed_width < initial_width
     assert zoomed_height < initial_height
     assert zoomed_min_x > initial_min_x

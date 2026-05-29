@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>任务报告：2D 坐标轴正方向与自适应刻度</title>
+    <style>
+      body {
+        color: #1f2937;
+        font-family: system-ui, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        max-width: 880px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>任务报告：2D 坐标轴正方向与自适应刻度</h1>
+    <p>日期：2026-05-30</p>
+    <h2>完成内容</h2>
+    <ul>
+      <li>移除 2D 视图中的 <code>+X</code>、<code>+Y</code>、<code>+Z</code> 文字标识。</li>
+      <li>将 2D X 轴设置为红色，Y 轴设置为蓝色，并在正方向增加箭头。</li>
+      <li>根据当前窗口可见范围自动生成均匀刻度，单轴刻度数量控制在 20 个以内。</li>
+      <li>刻度线、刻度文字和箭头按当前视口比例换算，缩放时屏幕显示大小保持稳定。</li>
+      <li>保留 3D 视图原有 <code>+X/+Y/+Z</code> 方向标识。</li>
+    </ul>
+  </body>
+</html>

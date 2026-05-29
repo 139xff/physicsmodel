@@ -524,32 +524,40 @@ summary:focus-visible {
 }
 
 .axis-line {
-  stroke: rgba(0, 113, 227, 0.22);
+  stroke-linecap: round;
+  stroke-width: 1.15;
+  vector-effect: non-scaling-stroke;
+}
+
+.axis-line-x,
+.axis-arrow-x {
+  fill: #d92d20;
+  stroke: #d92d20;
+}
+
+.axis-line-y,
+.axis-arrow-y {
+  fill: #175cd3;
+  stroke: #175cd3;
+}
+
+.axis-tick line {
+  stroke: rgba(17, 24, 39, 0.55);
+  stroke-linecap: round;
+  stroke-width: 0.9;
+  vector-effect: non-scaling-stroke;
+}
+
+.axis-tick text {
+  fill: #475467;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
   stroke-width: 0.35;
 }
 
-.axis-direction-label {
-  paint-order: stroke;
-  stroke: rgba(255, 255, 255, 0.9);
-  stroke-width: 0.45;
-}
-
-.axis-direction-label-x {
-  fill: #d92d20;
-}
-
-.axis-direction-label-y {
-  fill: #175cd3;
-}
-
-.axis-direction-label-z .axis-direction-label {
-  fill: #079455;
-}
-
-.axis-z-dot {
-  fill: #079455;
-  stroke: rgba(255, 255, 255, 0.92);
-  stroke-width: 0.25;
+.axis-arrow {
+  stroke-width: 0;
 }
 
 .source-point {

@@ -62,7 +62,7 @@ def test_root_serves_the_explicitly_scoped_workbench_shell():
         assert expected_copy in html
     assert '<script type="importmap">' in html
     assert '"three": "./vendor/three.module.js"' in html
-    assert 'src="./app.js?v=20260530-probe-size"' in html
+    assert 'src="./app.js?v=20260530-axis-ticks"' in html
 
 
 def test_static_assets_and_vendor_modules_are_served_locally():

@@ -38,6 +38,12 @@ const VIEWPORT_MIN_ZOOM = 1;
 const DEFAULT_VIEW_ZOOM = 100;
 const POINT_MARKER_RADIUS_UNITS = 1.5;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
+const MAX_AXIS_TICKS = 20;
+const AXIS_TICK_TARGET_COUNT = 16;
+const AXIS_TICK_LENGTH_PX = 7;
+const AXIS_ARROW_LENGTH_PX = 12;
+const AXIS_ARROW_WIDTH_PX = 7;
+const AXIS_LABEL_FONT_PX = 11;
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
 
 const state = {
@@ -593,35 +599,142 @@ function renderOverlay2d() {
   `;
 }
 
+function screenScaleForViewBox(viewBox) {
+  const rect = view2d.getBoundingClientRect();
+  const widthPx = Math.max(1, rect.width || view2d.clientWidth || 640);
+  const heightPx = Math.max(1, rect.height || view2d.clientHeight || 520);
+  return {
+    xUnitsPerPx: viewBox.width / widthPx,
+    yUnitsPerPx: viewBox.height / heightPx,
+  };
+}
+
+function niceAxisStep(spanMeters) {
+  const rawStep = Math.max(spanMeters / AXIS_TICK_TARGET_COUNT, 1e-9);
+  const exponent = Math.floor(Math.log10(rawStep));
+  const base = 10 ** exponent;
+  for (const multiplier of [1, 2, 5, 10]) {
+    const step = multiplier * base;
+    if (Math.floor(spanMeters / step) + 1 <= MAX_AXIS_TICKS) {
+      return step;
+    }
+  }
+  return 10 * base;
+}
+
+function formatAxisTick(value) {
+  if (Math.abs(value) < 1e-10) {
+    return "0";
+  }
+  if (Math.abs(value) >= 10) {
+    return value.toFixed(0);
+  }
+  if (Math.abs(value) >= 1) {
+    return value.toFixed(1).replace(/\.0$/, "");
+  }
+  return value.toFixed(2).replace(/0$/, "").replace(/\.0$/, "");
+}
+
+function generateAxisTicks(minMeters, maxMeters) {
+  const span = maxMeters - minMeters;
+  const step = niceAxisStep(span);
+  const ticks = [];
+  let value = Math.ceil(minMeters / step) * step;
+  while (value <= maxMeters + step * 0.001 && ticks.length < MAX_AXIS_TICKS) {
+    ticks.push(Number(value.toFixed(10)));
+    value += step;
+  }
+  return { ticks, step };
+}
+
+function render2dAxes(viewBox, axisOrigin) {
+  const scale = screenScaleForViewBox(viewBox);
+  const tickHalfX = (AXIS_TICK_LENGTH_PX * scale.xUnitsPerPx) / 2;
+  const tickHalfY = (AXIS_TICK_LENGTH_PX * scale.yUnitsPerPx) / 2;
+  const arrowLengthX = AXIS_ARROW_LENGTH_PX * scale.xUnitsPerPx;
+  const arrowLengthY = AXIS_ARROW_LENGTH_PX * scale.yUnitsPerPx;
+  const arrowHalfWidthX = (AXIS_ARROW_WIDTH_PX * scale.xUnitsPerPx) / 2;
+  const arrowHalfWidthY = (AXIS_ARROW_WIDTH_PX * scale.yUnitsPerPx) / 2;
+  const fontSize = AXIS_LABEL_FONT_PX * scale.yUnitsPerPx;
+  const labelGapX = 9 * scale.xUnitsPerPx;
+  const labelGapY = 10 * scale.yUnitsPerPx;
+  const minXMeters = viewBox.minX / VIEWPORT_METERS_TO_UNITS;
+  const maxXMeters = (viewBox.minX + viewBox.width) / VIEWPORT_METERS_TO_UNITS;
+  const minYMeters = -(viewBox.minY + viewBox.height) / VIEWPORT_METERS_TO_UNITS;
+  const maxYMeters = -viewBox.minY / VIEWPORT_METERS_TO_UNITS;
+  const xTickData = generateAxisTicks(minXMeters, maxXMeters);
+  const yTickData = generateAxisTicks(minYMeters, maxYMeters);
+  const xTicks = xTickData.ticks
+    .map((tick) => {
+      const x = tick * VIEWPORT_METERS_TO_UNITS;
+      return `
+        <g class="axis-tick axis-tick-x" data-testid="axis-tick-2d-x">
+          <line x1="${x}" y1="${axisOrigin.y - tickHalfY}" x2="${x}" y2="${axisOrigin.y + tickHalfY}"></line>
+          <text x="${x}" y="${axisOrigin.y + tickHalfY + labelGapY}" font-size="${fontSize}" text-anchor="middle">${formatAxisTick(tick)}</text>
+        </g>
+      `;
+    })
+    .join("");
+  const yTicks = yTickData.ticks
+    .map((tick) => {
+      const y = -tick * VIEWPORT_METERS_TO_UNITS;
+      return `
+        <g class="axis-tick axis-tick-y" data-testid="axis-tick-2d-y">
+          <line x1="${axisOrigin.x - tickHalfX}" y1="${y}" x2="${axisOrigin.x + tickHalfX}" y2="${y}"></line>
+          <text x="${axisOrigin.x + tickHalfX + labelGapX}" y="${y + fontSize * 0.35}" font-size="${fontSize}" text-anchor="start">${formatAxisTick(tick)}</text>
+        </g>
+      `;
+    })
+    .join("");
+  const xMax = viewBox.minX + viewBox.width;
+  const yMin = viewBox.minY;
+  return `
+    <g
+      class="axis-layer"
+      data-testid="axis-layer-2d"
+      data-x-tick-count="${xTickData.ticks.length}"
+      data-y-tick-count="${yTickData.ticks.length}"
+      data-tick-length-px="${AXIS_TICK_LENGTH_PX}"
+      data-label-font-px="${AXIS_LABEL_FONT_PX}"
+    >
+      <line
+        class="axis-line axis-line-x"
+        data-testid="axis-line-2d-x"
+        x1="${viewBox.minX}"
+        y1="${axisOrigin.y}"
+        x2="${xMax}"
+        y2="${axisOrigin.y}"
+      ></line>
+      <line
+        class="axis-line axis-line-y"
+        data-testid="axis-line-2d-y"
+        x1="${axisOrigin.x}"
+        y1="${viewBox.minY}"
+        x2="${axisOrigin.x}"
+        y2="${viewBox.minY + viewBox.height}"
+      ></line>
+      <path
+        class="axis-arrow axis-arrow-x"
+        data-testid="axis-arrow-2d-x"
+        d="M ${xMax} ${axisOrigin.y} L ${xMax - arrowLengthX} ${axisOrigin.y - arrowHalfWidthY} L ${xMax - arrowLengthX} ${axisOrigin.y + arrowHalfWidthY} Z"
+      ></path>
+      <path
+        class="axis-arrow axis-arrow-y"
+        data-testid="axis-arrow-2d-y"
+        d="M ${axisOrigin.x} ${yMin} L ${axisOrigin.x - arrowHalfWidthX} ${yMin + arrowLengthY} L ${axisOrigin.x + arrowHalfWidthX} ${yMin + arrowLengthY} Z"
+      ></path>
+      ${xTicks}
+      ${yTicks}
+    </g>
+  `;
+}
+
 function render2d() {
   const sourceMarkup = state.scene.sources.map((source) => renderSource2d(source)).join("");
   const probe = mapToViewport(state.probe.x, state.probe.y);
   const probeRadius = POINT_MARKER_RADIUS_UNITS;
   const viewBox = compute2dViewBox();
   const axisOrigin = mapToViewport(0, 0);
-  const labelPadding = Math.min(viewBox.width, viewBox.height) * 0.05;
-  const labelFontSize = Math.min(viewBox.width, viewBox.height) * 0.07;
-  const labelMinX = viewBox.minX + labelPadding;
-  const labelMaxX = viewBox.minX + viewBox.width - labelPadding;
-  const labelMinY = viewBox.minY + labelPadding;
-  const axisLabelX = {
-    x: labelMaxX,
-    y: Math.min(
-      viewBox.minY + viewBox.height - labelPadding,
-      Math.max(viewBox.minY + labelFontSize, axisOrigin.y - labelPadding),
-    ),
-  };
-  const axisLabelY = {
-    x: Math.min(
-      viewBox.minX + viewBox.width - labelPadding * 2,
-      Math.max(viewBox.minX + labelPadding, axisOrigin.x + labelPadding),
-    ),
-    y: labelMinY + labelFontSize,
-  };
-  const axisLabelZ = {
-    x: labelMinX,
-    y: labelMinY + labelFontSize,
-  };
 
   view2d.innerHTML = `
     <svg
@@ -643,53 +756,7 @@ function render2d() {
         height="${viewBox.height}"
         fill="url(#grid)"
       ></rect>
-      <line
-        class="axis-line"
-        x1="${viewBox.minX}"
-        y1="${axisOrigin.y}"
-        x2="${viewBox.minX + viewBox.width}"
-        y2="${axisOrigin.y}"
-      ></line>
-      <line
-        class="axis-line"
-        x1="${axisOrigin.x}"
-        y1="${viewBox.minY}"
-        x2="${axisOrigin.x}"
-        y2="${viewBox.minY + viewBox.height}"
-      ></line>
-      <g class="axis-direction-labels" aria-label="Positive axis directions">
-        <text
-          class="axis-direction-label axis-direction-label-x"
-          data-testid="axis-label-2d-x"
-          x="${axisLabelX.x}"
-          y="${axisLabelX.y}"
-          font-size="${labelFontSize}"
-          text-anchor="end"
-        >+X</text>
-        <text
-          class="axis-direction-label axis-direction-label-y"
-          data-testid="axis-label-2d-y"
-          x="${axisLabelY.x}"
-          y="${axisLabelY.y}"
-          font-size="${labelFontSize}"
-          text-anchor="start"
-        >+Y</text>
-        <g class="axis-direction-label-z" data-testid="axis-label-2d-z">
-          <circle
-            class="axis-z-dot"
-            cx="${axisLabelZ.x}"
-            cy="${axisLabelZ.y - labelFontSize * 0.25}"
-            r="${labelFontSize * 0.28}"
-          ></circle>
-          <text
-            class="axis-direction-label"
-            x="${axisLabelZ.x + labelFontSize * 0.55}"
-            y="${axisLabelZ.y}"
-            font-size="${labelFontSize}"
-            text-anchor="start"
-          >+Z</text>
-        </g>
-      </g>
+      ${render2dAxes(viewBox, axisOrigin)}
       ${renderHeatmap2d()}
       ${renderOverlay2d()}
       ${sourceMarkup}

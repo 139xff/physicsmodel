@@ -528,6 +528,30 @@ summary:focus-visible {
   stroke-width: 0.35;
 }
 
+.axis-direction-label {
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 0.45;
+}
+
+.axis-direction-label-x {
+  fill: #d92d20;
+}
+
+.axis-direction-label-y {
+  fill: #175cd3;
+}
+
+.axis-direction-label-z .axis-direction-label {
+  fill: #079455;
+}
+
+.axis-z-dot {
+  fill: #079455;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.25;
+}
+
 .source-point {
   fill: var(--accent);
   filter: drop-shadow(0 2px 4px rgba(0, 113, 227, 0.35));

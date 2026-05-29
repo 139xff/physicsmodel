@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>任务报告：坐标正方向标识与手柄视角保持</title>
+    <style>
+      body {
+        color: #1f2937;
+        font-family: system-ui, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        max-width: 880px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+      li {
+        margin: 6px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>任务报告：坐标正方向标识与手柄视角保持</h1>
+    <p>日期：2026-05-29</p>
+
+    <h2>完成内容</h2>
+    <ul>
+      <li>在 2D 视图中增加 <code>+X</code>、<code>+Y</code>、<code>+Z</code> 正方向标识。</li>
+      <li>在 3D 视图中增加固定于坐标轴正方向末端的 <code>+X</code>、<code>+Y</code>、<code>+Z</code> 标识。</li>
+      <li>拆分 3D 默认视角重置逻辑：进入 3D 视图时仍保持默认 100 倍倍率，普通重绘和点击手柄不再重置相机。</li>
+      <li>手柄按钮现在只切换平移交互模式，不会导致 2D 或 3D 视角回到默认位置。</li>
+    </ul>
+
+    <h2>验证结果</h2>
+    <ul>
+      <li><code>pytest tests/test_browser_smoke.py</code>：5 passed。</li>
+      <li><code>ruff check .</code>：All checks passed。</li>
+      <li><code>pytest</code>：69 passed。</li>
+      <li>本地页面检查通过：2D/3D 坐标正方向标识和手柄模式状态正常。</li>
+    </ul>
+  </body>
+</html>

@@ -10,6 +10,7 @@ let controls;
 let threeScene;
 let gridHelper;
 let axesHelper;
+let axisLabelGroup;
 let animFrameId = null;
 const GRID_AXIS_LIMIT_M = 10;
 const GRID_SIZE_M = GRID_AXIS_LIMIT_M * 2;
@@ -102,6 +103,51 @@ function createFullAxesHelper(size) {
   return helper;
 }
 
+function createAxisLabel(text, color) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.font = "700 30px system-ui, sans-serif";
+  context.fillStyle = color;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.name = `axis-label-${text.replace("+", "positive-").toLowerCase()}`;
+  sprite.scale.set(1.2, 0.6, 1);
+  return sprite;
+}
+
+function createAxisLabelGroup(size) {
+  const group = new THREE.Group();
+  group.name = "positive-axis-labels";
+
+  const xLabel = createAxisLabel("+X", "#ff4d4f");
+  xLabel.position.set(size + 0.45, 0, 0);
+  group.add(xLabel);
+
+  const yLabel = createAxisLabel("+Y", "#2563eb");
+  yLabel.position.set(0, 0, size + 0.45);
+  group.add(yLabel);
+
+  const zLabel = createAxisLabel("+Z", "#22c55e");
+  zLabel.position.set(0, size + 0.45, 0);
+  group.add(zLabel);
+
+  return group;
+}
+
 function surfaceSize(container) {
   const rect = container.getBoundingClientRect();
   return {
@@ -140,30 +186,42 @@ function ensure3d(view3d) {
 
   gridHelper = new THREE.GridHelper(GRID_SIZE_M, GRID_DIVISIONS, 0x8ea3b7, 0xd3dce6);
   axesHelper = createFullAxesHelper(GRID_AXIS_LIMIT_M);
+  axisLabelGroup = createAxisLabelGroup(GRID_AXIS_LIMIT_M);
   threeScene.add(gridHelper);
   threeScene.add(axesHelper);
+  threeScene.add(axisLabelGroup);
   threeScene.add(new THREE.AmbientLight(0xffffff, 0.85));
   sceneGroup = new THREE.Group();
   threeScene.add(sceneGroup);
 }
 
-function update3dFrame(view3d) {
+function reset3dView() {
+  camera.position.set(12, 10, 12);
+  camera.zoom = DEFAULT_CAMERA_ZOOM;
+  controls.target.set(0, 0, 0);
+}
+
+function update3dFrame(view3d, options = {}) {
   camera.near = CAMERA_NEAR_M;
   camera.far = CAMERA_FAR_M;
-  camera.zoom = DEFAULT_CAMERA_ZOOM;
+  if (options.resetView) {
+    reset3dView();
+  }
   camera.updateProjectionMatrix();
-  camera.position.set(12, 10, 12);
-  controls.target.set(0, 0, 0);
   controls.update();
   gridHelper.position.set(0, 0, 0);
   axesHelper.position.set(0, 0, 0);
+  axisLabelGroup.position.set(0, 0, 0);
   view3d.dataset.gridSizeMeters = GRID_SIZE_M.toString();
   view3d.dataset.gridCellSizeMeters = GRID_CELL_SIZE_M.toString();
   view3d.dataset.gridDivisions = GRID_DIVISIONS.toString();
   view3d.dataset.axisLimitMeters = GRID_AXIS_LIMIT_M.toString();
   view3d.dataset.axisMinMeters = (-GRID_AXIS_LIMIT_M).toString();
   view3d.dataset.axisMaxMeters = GRID_AXIS_LIMIT_M.toString();
+  view3d.dataset.axisLabels = "+X,+Y,+Z";
   view3d.dataset.cameraZoom = camera.zoom.toString();
+  view3d.dataset.cameraPosition = `${camera.position.x.toFixed(4)},${camera.position.y.toFixed(4)},${camera.position.z.toFixed(4)}`;
+  view3d.dataset.cameraTarget = `${controls.target.x.toFixed(4)},${controls.target.y.toFixed(4)},${controls.target.z.toFixed(4)}`;
   view3d.dataset.cameraFarMeters = camera.far.toString();
   view3d.dataset.controlsMaxDistanceMeters = controls.maxDistance.toString();
   view3d.dataset.panMode = controls.mouseButtons.LEFT === THREE.MOUSE.PAN ? "true" : "false";
@@ -332,7 +390,7 @@ export function render3d(view3d, state, options = {}) {
   sceneGroup.add(probeMesh);
 
   _addFieldArrows(sceneGroup, state);
-  update3dFrame(view3d);
+  update3dFrame(view3d, { resetView: Boolean(options.resetView) });
   startAnimLoop();
   renderer.render(threeScene, camera);
 }

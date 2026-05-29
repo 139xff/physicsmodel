@@ -1,5 +1,5 @@
 import { evaluateField, getConfig, getPreset, listPresets } from "./api-client.js";
-import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-pan-tool";
+import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-axis-labels-pan-preserve";
 
 const runtimeStatus = document.querySelector("#runtime-status");
 const sourceList = document.querySelector("#source-list");
@@ -221,7 +221,7 @@ function setMode(mode) {
   if (mode !== "3D") {
     stopAnimLoop();
   }
-  renderAll();
+  renderAll({ reset3dView: mode === "3D" });
 }
 
 function renderPanTool() {
@@ -234,7 +234,9 @@ function renderPanTool() {
 function togglePanMode() {
   state.panMode = !state.panMode;
   renderPanTool();
-  renderAll();
+  if (state.mode === "3D") {
+    render3d(view3d, state, { panMode: state.panMode, resetView: false });
+  }
 }
 
 function setProbeFromInputs() {
@@ -595,6 +597,29 @@ function render2d() {
   const probe = mapToViewport(state.probe.x, state.probe.y);
   const viewBox = compute2dViewBox();
   const axisOrigin = mapToViewport(0, 0);
+  const labelPadding = Math.min(viewBox.width, viewBox.height) * 0.05;
+  const labelFontSize = Math.min(viewBox.width, viewBox.height) * 0.07;
+  const labelMinX = viewBox.minX + labelPadding;
+  const labelMaxX = viewBox.minX + viewBox.width - labelPadding;
+  const labelMinY = viewBox.minY + labelPadding;
+  const axisLabelX = {
+    x: labelMaxX,
+    y: Math.min(
+      viewBox.minY + viewBox.height - labelPadding,
+      Math.max(viewBox.minY + labelFontSize, axisOrigin.y - labelPadding),
+    ),
+  };
+  const axisLabelY = {
+    x: Math.min(
+      viewBox.minX + viewBox.width - labelPadding * 2,
+      Math.max(viewBox.minX + labelPadding, axisOrigin.x + labelPadding),
+    ),
+    y: labelMinY + labelFontSize,
+  };
+  const axisLabelZ = {
+    x: labelMinX,
+    y: labelMinY + labelFontSize,
+  };
 
   view2d.innerHTML = `
     <svg
@@ -630,6 +655,39 @@ function render2d() {
         x2="${axisOrigin.x}"
         y2="${viewBox.minY + viewBox.height}"
       ></line>
+      <g class="axis-direction-labels" aria-label="Positive axis directions">
+        <text
+          class="axis-direction-label axis-direction-label-x"
+          data-testid="axis-label-2d-x"
+          x="${axisLabelX.x}"
+          y="${axisLabelX.y}"
+          font-size="${labelFontSize}"
+          text-anchor="end"
+        >+X</text>
+        <text
+          class="axis-direction-label axis-direction-label-y"
+          data-testid="axis-label-2d-y"
+          x="${axisLabelY.x}"
+          y="${axisLabelY.y}"
+          font-size="${labelFontSize}"
+          text-anchor="start"
+        >+Y</text>
+        <g class="axis-direction-label-z" data-testid="axis-label-2d-z">
+          <circle
+            class="axis-z-dot"
+            cx="${axisLabelZ.x}"
+            cy="${axisLabelZ.y - labelFontSize * 0.25}"
+            r="${labelFontSize * 0.28}"
+          ></circle>
+          <text
+            class="axis-direction-label"
+            x="${axisLabelZ.x + labelFontSize * 0.55}"
+            y="${axisLabelZ.y}"
+            font-size="${labelFontSize}"
+            text-anchor="start"
+          >+Z</text>
+        </g>
+      </g>
       ${renderHeatmap2d()}
       ${renderOverlay2d()}
       ${sourceMarkup}
@@ -750,12 +808,15 @@ function renderOverlaySummary() {
     "这是离散采样摘要，不是场线或等势线提取。";
 }
 
-function renderAll() {
+function renderAll(options = {}) {
   renderSourceList();
   render2d();
   renderProbe();
   if (state.mode === "3D") {
-    render3d(view3d, state, { panMode: state.panMode });
+    render3d(view3d, state, {
+      panMode: state.panMode,
+      resetView: Boolean(options.reset3dView),
+    });
   }
   renderResult();
   renderOverlaySummary();

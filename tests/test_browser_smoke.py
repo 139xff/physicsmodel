@@ -177,6 +177,9 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     grid = page.locator("#grid")
     expect(grid).to_have_attribute("width", "1")
     expect(grid).to_have_attribute("height", "1")
+    expect(page.get_by_test_id("axis-label-2d-x")).to_contain_text("+X")
+    expect(page.get_by_test_id("axis-label-2d-y")).to_contain_text("+Y")
+    expect(page.get_by_test_id("axis-label-2d-z")).to_contain_text("+Z")
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
@@ -205,6 +208,7 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-divisions", "2000")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-axis-min-meters", "-10")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-axis-max-meters", "10")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-axis-labels", "+X,+Y,+Z")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-camera-zoom", "100")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-camera-far-meters", "10000")
     expect(page.get_by_test_id("view-3d")).to_have_attribute(
@@ -288,6 +292,14 @@ def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
     assert panned_height == initial_height
     assert panned_min_x > initial_min_x
     assert panned_min_y > initial_min_y
+
+    panned_view_box = _svg_viewbox(page)
+    pan_tool.click()
+    expect(pan_tool).to_have_attribute("aria-pressed", "false")
+    assert _svg_viewbox(page) == panned_view_box
+    pan_tool.click()
+    expect(pan_tool).to_have_attribute("aria-pressed", "true")
+    assert _svg_viewbox(page) == panned_view_box
 
     grid = page.locator("#grid")
     expect(grid).to_have_attribute("width", "1")

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 13 - README Documentation</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f5f7fb;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(100, 116, 139, 0.18);
+        border-radius: 24px;
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.1);
+      }
+      h1, h2 { margin-top: 0; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0 28px;
+      }
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: #eef4ff; }
+      code {
+        padding: 2px 6px;
+        border-radius: 8px;
+        background: #eef2f7;
+      }
+      .ok { color: #047857; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 13：README 文档补全</h1>
+      <p><strong>完成时间：</strong>2026-05-29 +08:00</p>
+      <p><strong>状态：</strong><span class="ok">完成</span></p>
+
+      <h2>交付范围</h2>
+      <table>
+        <tr><th>项目</th><th>结果</th></tr>
+        <tr><td>英文 README</td><td>新增 <code>README.md</code>，说明项目定位、功能、开发、桌面运行、打包和验证。</td></tr>
+        <tr><td>中文 README</td><td>新增 <code>README-ZH.md</code>，面向中文使用者说明即下即用包和开发流程。</td></tr>
+        <tr><td>互链</td><td>两份 README 顶部互相链接，方便 GitHub 浏览。</td></tr>
+      </table>
+
+      <h2>修改文件</h2>
+      <table>
+        <tr><th>文件</th><th>变更</th></tr>
+        <tr><td><code>README.md</code></td><td>新增英文项目说明。</td></tr>
+        <tr><td><code>README-ZH.md</code></td><td>新增中文项目说明。</td></tr>
+        <tr><td><code>reports/2026-05-29-task-13-readme-docs.html</code></td><td>新增本任务报告。</td></tr>
+      </table>
+
+      <h2>验证命令</h2>
+      <table>
+        <tr><th>命令</th><th>结果</th></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="ok">All checks passed!</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td class="ok">66 passed, 2 warnings</td></tr>
+      </table>
+
+      <h2>下一任务</h2>
+      <p>如需公开发布，下一步是在 GitHub Releases 上传 <code>EMWorkbench-0.1.0-windows-x64-portable.zip</code>。</p>
+    </main>
+  </body>
+</html>

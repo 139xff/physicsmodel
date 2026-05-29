@@ -100,6 +100,7 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
 
     page.locator("#add-point").click()
+    page.locator("#add-line-segment").click()
     page.locator("#add-ring").click()
 
     expect(page.get_by_test_id("source-card-point-1")).to_contain_text("点电荷 1")
@@ -110,27 +111,29 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
     point_radius = _number_attr(page, "source-point-2d-point-1", "r")
+    assert point_radius == 0.2
     _assert_inside_viewbox(point_x - point_radius)
     _assert_inside_viewbox(point_x + point_radius)
     _assert_inside_viewbox(point_y - point_radius)
     _assert_inside_viewbox(point_y + point_radius)
 
+    line_x1 = _number_attr(page, "source-line-segment-2d-line-segment-1", "x1")
+    line_x2 = _number_attr(page, "source-line-segment-2d-line-segment-1", "x2")
+    line_y1 = _number_attr(page, "source-line-segment-2d-line-segment-1", "y1")
+    line_y2 = _number_attr(page, "source-line-segment-2d-line-segment-1", "y2")
+    line_length = ((line_x2 - line_x1) ** 2 + (line_y2 - line_y1) ** 2) ** 0.5
+    assert line_length == pytest.approx(0.4)
+
     ring_x = _number_attr(page, "source-ring-2d-ring-1", "cx")
     ring_y = _number_attr(page, "source-ring-2d-ring-1", "cy")
     ring_radius = _number_attr(page, "source-ring-2d-ring-1", "r")
+    assert ring_radius == 0.2
     _assert_inside_viewbox(ring_x - ring_radius)
     _assert_inside_viewbox(ring_x + ring_radius)
     _assert_inside_viewbox(ring_y - ring_radius)
     _assert_inside_viewbox(ring_y + ring_radius)
 
-    probe_x = _number_attr(page, "probe-marker-2d", "data-view-x")
-    probe_y = _number_attr(page, "probe-marker-2d", "data-view-y")
-    probe_radius = _number_attr(page, "probe-marker-2d", "data-marker-radius")
-    assert probe_radius == point_radius
-    _assert_inside_viewbox(probe_x - probe_radius)
-    _assert_inside_viewbox(probe_x + probe_radius)
-    _assert_inside_viewbox(probe_y - probe_radius)
-    _assert_inside_viewbox(probe_y + probe_radius)
+    expect(page.get_by_test_id("probe-marker-2d")).to_have_count(0)
 
     page.locator("#probe-x").fill("0.22")
     page.locator("#probe-y").fill("0.03")
@@ -149,13 +152,13 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("view-3d")).to_be_visible()
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-ring-normal-three", "0,1,0")
     expect(page.get_by_test_id("mode-label")).to_contain_text("3D")
-    expect(page.get_by_test_id("source-count")).to_contain_text("2 个源")
+    expect(page.get_by_test_id("source-count")).to_contain_text("3 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("0.220")
     expect(page.get_by_test_id("potential-value")).not_to_contain_text("暂无")
 
     page.get_by_role("button", name="2D").click()
     expect(page.get_by_test_id("view-2d")).to_be_visible()
-    expect(page.get_by_test_id("source-count")).to_contain_text("2 个源")
+    expect(page.get_by_test_id("source-count")).to_contain_text("3 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("0.220")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
 
@@ -192,6 +195,7 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     y_tick_count = int(axis_layer.get_attribute("data-y-tick-count") or "0")
     assert 0 < x_tick_count <= 20
     assert 0 < y_tick_count <= 20
+    assert axis_layer.get_attribute("data-axis-unit") == "cm"
     assert axis_layer.get_attribute("data-tick-length-px") == "7"
     assert axis_layer.get_attribute("data-label-font-px") == "11"
 
@@ -200,22 +204,13 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     point_radius = _number_attr(page, "source-point-2d-point-1", "r")
     assert point_x == 8
     assert point_y == 8
-    assert point_radius == 1.5
+    assert point_radius == 0.2
     _assert_inside_svg_viewbox(page, "view-2d", point_x - point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x + point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x, point_y - point_radius)
     _assert_inside_svg_viewbox(page, "view-2d", point_x, point_y + point_radius)
 
-    probe_x = _number_attr(page, "probe-marker-2d", "data-view-x")
-    probe_y = _number_attr(page, "probe-marker-2d", "data-view-y")
-    probe_radius = _number_attr(page, "probe-marker-2d", "data-marker-radius")
-    assert probe_x == -5
-    assert probe_y == -4.5
-    assert probe_radius == point_radius
-    _assert_inside_svg_viewbox(page, "view-2d", probe_x - probe_radius, probe_y)
-    _assert_inside_svg_viewbox(page, "view-2d", probe_x + probe_radius, probe_y)
-    _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y - probe_radius)
-    _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y + probe_radius)
+    expect(page.get_by_test_id("probe-marker-2d")).to_have_count(0)
 
     page.get_by_role("button", name="3D").click()
     expect(page.get_by_test_id("view-3d")).to_be_visible()
@@ -349,16 +344,22 @@ def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
+    expect(page.locator("#add-infinite-plane")).to_be_hidden()
     for button_selector, test_id in [
         ("#add-point", "source-card-point-1"),
         ("#add-line-segment", "source-card-line-segment-1"),
         ("#add-ring", "source-card-ring-1"),
         ("#add-disk", "source-card-disk-1"),
-        ("#add-infinite-plane", "source-card-infinite-plane-1"),
         ("#add-spherical-shell", "source-card-spherical-shell-1"),
     ]:
         page.locator(button_selector).click()
         expect(page.get_by_test_id(test_id)).to_be_visible()
+
+    expect(page.get_by_test_id("source-count")).to_contain_text("5 个源")
+    page.get_by_role("button", name="3D").click()
+    expect(page.locator("#add-infinite-plane")).to_be_visible()
+    page.locator("#add-infinite-plane").click()
+    expect(page.get_by_test_id("source-card-infinite-plane-1")).to_be_visible()
 
     expect(page.get_by_test_id("source-count")).to_contain_text("6 个源")
     expect(page.get_by_test_id("source-card-line-segment-1")).to_contain_text("方向")

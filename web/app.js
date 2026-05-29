@@ -10,6 +10,7 @@ const view3d = document.querySelector("#view-3d");
 const button2d = document.querySelector("#view-2d-button");
 const button3d = document.querySelector("#view-3d-button");
 const panToolButton = document.querySelector("#pan-tool");
+const addInfinitePlaneButton = document.querySelector("#add-infinite-plane");
 const solverStatus = document.querySelector("[data-testid='solver-status']");
 const overlayStatus = document.querySelector("[data-testid='overlay-status']");
 const overlaySummary = document.querySelector("[data-testid='overlay-summary']");
@@ -36,7 +37,9 @@ const VIEWPORT_MIN_UNITS = -VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS;
 const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2;
 const VIEWPORT_MIN_ZOOM = 1;
 const DEFAULT_VIEW_ZOOM = 100;
-const POINT_MARKER_RADIUS_UNITS = 1.5;
+const POINT_MARKER_RADIUS_UNITS = 0.2;
+const LINE_SEGMENT_DISPLAY_LENGTH_UNITS = 0.4;
+const RING_DISPLAY_RADIUS_UNITS = 0.2;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const MAX_AXIS_TICKS = 20;
 const AXIS_TICK_TARGET_COUNT = 16;
@@ -220,6 +223,7 @@ function setMode(mode) {
   modeLabel.textContent = mode;
   view2d.classList.toggle("hidden", mode !== "2D");
   view3d.classList.toggle("hidden", mode !== "3D");
+  addInfinitePlaneButton.classList.toggle("hidden", mode === "2D");
   if (mode === "2D") {
     state.view2d.zoom = DEFAULT_VIEW_ZOOM;
     state.view2d.centerX = 0;
@@ -499,7 +503,7 @@ function renderSource2d(source) {
   const point = mapToViewport(source.position.x, source.position.y);
   const label = escapeHtml(source.label);
   if (source.kind === "line_segment") {
-    const halfLength = radiusToViewport(source.length_m / 2);
+    const halfLength = LINE_SEGMENT_DISPLAY_LENGTH_UNITS / 2;
     const angle = Math.atan2(source.orientation.y, source.orientation.x);
     const dx = Math.cos(angle) * halfLength;
     const dy = Math.sin(angle) * halfLength;
@@ -508,6 +512,7 @@ function renderSource2d(source) {
         <line
           class="source-line-segment"
           data-testid="source-line-segment-2d-${source.id}"
+          data-display-length-cm="${LINE_SEGMENT_DISPLAY_LENGTH_UNITS}"
           x1="${point.x - dx}"
           y1="${point.y + dy}"
           x2="${point.x + dx}"
@@ -517,7 +522,22 @@ function renderSource2d(source) {
       </g>
     `;
   }
-  if (source.kind === "ring" || source.kind === "disk" || source.kind === "spherical_shell") {
+  if (source.kind === "ring") {
+    return `
+      <g data-testid="source-ring-group-2d-${source.id}">
+        <circle
+          class="source-ring"
+          data-testid="source-ring-2d-${source.id}"
+          data-display-diameter-cm="${RING_DISPLAY_RADIUS_UNITS * 2}"
+          cx="${point.x}"
+          cy="${point.y}"
+          r="${RING_DISPLAY_RADIUS_UNITS}"
+        ></circle>
+        <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
+      </g>
+    `;
+  }
+  if (source.kind === "disk" || source.kind === "spherical_shell") {
     const className = `source-${source.kind.replaceAll("_", "-")}`;
     const radius = radiusToViewport(source.radius_m, MIN_VISIBLE_MARKER_RADIUS_UNITS);
     return `
@@ -554,6 +574,7 @@ function renderSource2d(source) {
       <circle
         class="source-point"
         data-testid="source-point-2d-${source.id}"
+        data-display-radius-cm="${POINT_MARKER_RADIUS_UNITS}"
         cx="${point.x}"
         cy="${point.y}"
         r="${POINT_MARKER_RADIUS_UNITS}"
@@ -609,13 +630,13 @@ function screenScaleForViewBox(viewBox) {
   };
 }
 
-function niceAxisStep(spanMeters) {
-  const rawStep = Math.max(spanMeters / AXIS_TICK_TARGET_COUNT, 1e-9);
+function niceAxisStep(spanCm) {
+  const rawStep = Math.max(spanCm / AXIS_TICK_TARGET_COUNT, 1e-9);
   const exponent = Math.floor(Math.log10(rawStep));
   const base = 10 ** exponent;
   for (const multiplier of [1, 2, 5, 10]) {
     const step = multiplier * base;
-    if (Math.floor(spanMeters / step) + 1 <= MAX_AXIS_TICKS) {
+    if (Math.floor(spanCm / step) + 1 <= MAX_AXIS_TICKS) {
       return step;
     }
   }
@@ -635,12 +656,12 @@ function formatAxisTick(value) {
   return value.toFixed(2).replace(/0$/, "").replace(/\.0$/, "");
 }
 
-function generateAxisTicks(minMeters, maxMeters) {
-  const span = maxMeters - minMeters;
+function generateAxisTicks(minCm, maxCm) {
+  const span = maxCm - minCm;
   const step = niceAxisStep(span);
   const ticks = [];
-  let value = Math.ceil(minMeters / step) * step;
-  while (value <= maxMeters + step * 0.001 && ticks.length < MAX_AXIS_TICKS) {
+  let value = Math.ceil(minCm / step) * step;
+  while (value <= maxCm + step * 0.001 && ticks.length < MAX_AXIS_TICKS) {
     ticks.push(Number(value.toFixed(10)));
     value += step;
   }
@@ -658,15 +679,15 @@ function render2dAxes(viewBox, axisOrigin) {
   const fontSize = AXIS_LABEL_FONT_PX * scale.yUnitsPerPx;
   const labelGapX = 9 * scale.xUnitsPerPx;
   const labelGapY = 10 * scale.yUnitsPerPx;
-  const minXMeters = viewBox.minX / VIEWPORT_METERS_TO_UNITS;
-  const maxXMeters = (viewBox.minX + viewBox.width) / VIEWPORT_METERS_TO_UNITS;
-  const minYMeters = -(viewBox.minY + viewBox.height) / VIEWPORT_METERS_TO_UNITS;
-  const maxYMeters = -viewBox.minY / VIEWPORT_METERS_TO_UNITS;
-  const xTickData = generateAxisTicks(minXMeters, maxXMeters);
-  const yTickData = generateAxisTicks(minYMeters, maxYMeters);
+  const minXCm = viewBox.minX;
+  const maxXCm = viewBox.minX + viewBox.width;
+  const minYCm = -(viewBox.minY + viewBox.height);
+  const maxYCm = -viewBox.minY;
+  const xTickData = generateAxisTicks(minXCm, maxXCm);
+  const yTickData = generateAxisTicks(minYCm, maxYCm);
   const xTicks = xTickData.ticks
     .map((tick) => {
-      const x = tick * VIEWPORT_METERS_TO_UNITS;
+      const x = tick;
       return `
         <g class="axis-tick axis-tick-x" data-testid="axis-tick-2d-x">
           <line x1="${x}" y1="${axisOrigin.y - tickHalfY}" x2="${x}" y2="${axisOrigin.y + tickHalfY}"></line>
@@ -677,7 +698,7 @@ function render2dAxes(viewBox, axisOrigin) {
     .join("");
   const yTicks = yTickData.ticks
     .map((tick) => {
-      const y = -tick * VIEWPORT_METERS_TO_UNITS;
+      const y = -tick;
       return `
         <g class="axis-tick axis-tick-y" data-testid="axis-tick-2d-y">
           <line x1="${axisOrigin.x - tickHalfX}" y1="${y}" x2="${axisOrigin.x + tickHalfX}" y2="${y}"></line>
@@ -694,6 +715,7 @@ function render2dAxes(viewBox, axisOrigin) {
       data-testid="axis-layer-2d"
       data-x-tick-count="${xTickData.ticks.length}"
       data-y-tick-count="${yTickData.ticks.length}"
+      data-axis-unit="cm"
       data-tick-length-px="${AXIS_TICK_LENGTH_PX}"
       data-label-font-px="${AXIS_LABEL_FONT_PX}"
     >
@@ -731,8 +753,6 @@ function render2dAxes(viewBox, axisOrigin) {
 
 function render2d() {
   const sourceMarkup = state.scene.sources.map((source) => renderSource2d(source)).join("");
-  const probe = mapToViewport(state.probe.x, state.probe.y);
-  const probeRadius = POINT_MARKER_RADIUS_UNITS;
   const viewBox = compute2dViewBox();
   const axisOrigin = mapToViewport(0, 0);
 
@@ -760,17 +780,6 @@ function render2d() {
       ${renderHeatmap2d()}
       ${renderOverlay2d()}
       ${sourceMarkup}
-      <g>
-        <path
-          class="probe-marker"
-          data-testid="probe-marker-2d"
-          data-view-x="${probe.x}"
-          data-view-y="${probe.y}"
-          data-marker-radius="${probeRadius}"
-          d="M ${probe.x - probeRadius} ${probe.y} L ${probe.x + probeRadius} ${probe.y} M ${probe.x} ${probe.y - probeRadius} L ${probe.x} ${probe.y + probeRadius}"
-        ></path>
-        <text x="${probe.x + probeRadius + 2}" y="${probe.y + probeRadius + 2}">Probe</text>
-      </g>
     </svg>
   `;
 }
@@ -1103,6 +1112,7 @@ window.addEventListener("resize", () => {
 
 renderAll();
 renderPanTool();
+addInfinitePlaneButton.classList.add("hidden");
 initialiseShell().catch(() => {
   runtimeStatus.textContent =
     "本地运行配置暂不可用；当前界面状态仍可继续保留。";

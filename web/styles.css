@@ -458,9 +458,16 @@ summary:focus-visible {
 }
 
 .plane-svg {
+  cursor: grab;
   display: block;
   height: 100%;
+  touch-action: none;
+  user-select: none;
   width: 100%;
+}
+
+.view-surface.is-panning .plane-svg {
+  cursor: grabbing;
 }
 
 .plane-svg pattern path {

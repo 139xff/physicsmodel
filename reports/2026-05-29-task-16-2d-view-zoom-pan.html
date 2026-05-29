@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 16 - 2D 视图缩放和平移</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>2D 视图缩放和平移</h1>
+    <p>本次变更让 2D 坐标网格具备类似 3D 视图的交互查看能力。</p>
+
+    <section>
+      <h2>实现内容</h2>
+      <ul>
+        <li>鼠标滚轮可在 2D 视图内缩放，缩放中心跟随鼠标位置。</li>
+        <li>按住鼠标左键拖动可平移 2D 视图。</li>
+        <li>缩放和平移只改变视图窗口，不改变固定的物理坐标映射：1cm 仍然对应 1 个网格单位。</li>
+        <li>视图被限制在 -10m 到 10m 的固定网格范围内，避免拖出有效网格面。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证</h2>
+      <ul>
+        <li>新增浏览器测试，验证滚轮缩放会收窄 <code>viewBox</code> 并提升缩放倍率。</li>
+        <li>新增浏览器测试，验证拖动平移会改变 <code>viewBox</code> 位置。</li>
+      </ul>
+    </section>
+  </body>
+</html>

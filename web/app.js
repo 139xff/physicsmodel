@@ -33,6 +33,9 @@ const VIEWPORT_METERS_TO_UNITS = 100;
 const VIEWPORT_GRID_STEP_UNITS = 1;
 const VIEWPORT_MIN_UNITS = -VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS;
 const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2;
+const VIEWPORT_MAX_UNITS = VIEWPORT_MIN_UNITS + VIEWPORT_SIZE_UNITS;
+const VIEWPORT_MIN_ZOOM = 1;
+const VIEWPORT_MAX_ZOOM = 80;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
 
@@ -54,6 +57,7 @@ const state = {
     sources: [],
   },
   probe: { x: 0.2, y: 0.03, z: 0.05 },
+  view2d: { centerX: 0, centerY: 0, zoom: 1 },
   showHeatmap: false,
   lastResult: null,
   overlayResult: null,
@@ -72,6 +76,7 @@ const KIND_LABELS = {
 let latestProbeRequestId = "";
 let latestOverlayRequestId = "";
 let requestSerial = 0;
+let active2dDrag = null;
 function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) {
     return "n/a";
@@ -419,12 +424,34 @@ function radiusToViewport(radius, minimum = 0) {
   return Math.max(minimum, radius * VIEWPORT_METERS_TO_UNITS);
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function clamp2dView() {
+  state.view2d.zoom = clamp(state.view2d.zoom, VIEWPORT_MIN_ZOOM, VIEWPORT_MAX_ZOOM);
+  const halfSpan = VIEWPORT_SIZE_UNITS / (2 * state.view2d.zoom);
+  state.view2d.centerX = clamp(
+    state.view2d.centerX,
+    VIEWPORT_MIN_UNITS + halfSpan,
+    VIEWPORT_MAX_UNITS - halfSpan,
+  );
+  state.view2d.centerY = clamp(
+    state.view2d.centerY,
+    VIEWPORT_MIN_UNITS + halfSpan,
+    VIEWPORT_MAX_UNITS - halfSpan,
+  );
+}
+
 function compute2dViewBox() {
+  clamp2dView();
+  const width = VIEWPORT_SIZE_UNITS / state.view2d.zoom;
+  const height = VIEWPORT_SIZE_UNITS / state.view2d.zoom;
   return {
-    minX: VIEWPORT_MIN_UNITS,
-    minY: VIEWPORT_MIN_UNITS,
-    width: VIEWPORT_SIZE_UNITS,
-    height: VIEWPORT_SIZE_UNITS,
+    minX: state.view2d.centerX - width / 2,
+    minY: state.view2d.centerY - height / 2,
+    width,
+    height,
   };
 }
 
@@ -556,6 +583,7 @@ function render2d() {
     <svg
       class="plane-svg"
       viewBox="${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}"
+      data-zoom="${state.view2d.zoom}"
       role="img"
       aria-label="Top-down electrostatic scene"
     >
@@ -600,6 +628,89 @@ function render2d() {
       </g>
     </svg>
   `;
+}
+
+function viewportPointFromClient(clientX, clientY) {
+  const svg = view2d.querySelector("svg");
+  if (!svg) {
+    return null;
+  }
+  const rect = svg.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return null;
+  }
+  const viewBox = compute2dViewBox();
+  return {
+    x: viewBox.minX + ((clientX - rect.left) / rect.width) * viewBox.width,
+    y: viewBox.minY + ((clientY - rect.top) / rect.height) * viewBox.height,
+    normX: (clientX - rect.left) / rect.width,
+    normY: (clientY - rect.top) / rect.height,
+    viewBox,
+  };
+}
+
+function zoom2dAt(clientX, clientY, deltaY) {
+  const point = viewportPointFromClient(clientX, clientY);
+  if (!point) {
+    return;
+  }
+  const nextZoom = clamp(
+    state.view2d.zoom * Math.exp(-deltaY * 0.0012),
+    VIEWPORT_MIN_ZOOM,
+    VIEWPORT_MAX_ZOOM,
+  );
+  const nextWidth = VIEWPORT_SIZE_UNITS / nextZoom;
+  const nextHeight = VIEWPORT_SIZE_UNITS / nextZoom;
+  state.view2d.zoom = nextZoom;
+  state.view2d.centerX = point.x - (point.normX - 0.5) * nextWidth;
+  state.view2d.centerY = point.y - (point.normY - 0.5) * nextHeight;
+  clamp2dView();
+  render2d();
+}
+
+function handle2dPointerDown(event) {
+  if (state.mode !== "2D" || event.button !== 0) {
+    return;
+  }
+  const viewBox = compute2dViewBox();
+  active2dDrag = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    centerX: state.view2d.centerX,
+    centerY: state.view2d.centerY,
+    width: viewBox.width,
+    height: viewBox.height,
+  };
+  view2d.classList.add("is-panning");
+  view2d.setPointerCapture(event.pointerId);
+}
+
+function handle2dPointerMove(event) {
+  if (!active2dDrag || active2dDrag.pointerId !== event.pointerId) {
+    return;
+  }
+  const rect = view2d.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return;
+  }
+  const deltaX = ((event.clientX - active2dDrag.startX) / rect.width) * active2dDrag.width;
+  const deltaY = ((event.clientY - active2dDrag.startY) / rect.height) * active2dDrag.height;
+  state.view2d.centerX = active2dDrag.centerX - deltaX;
+  state.view2d.centerY = active2dDrag.centerY - deltaY;
+  clamp2dView();
+  render2d();
+}
+
+function handle2dPointerUp(event) {
+  if (!active2dDrag || active2dDrag.pointerId !== event.pointerId) {
+    return;
+  }
+  active2dDrag = null;
+  view2d.classList.remove("is-panning");
+  if (view2d.hasPointerCapture(event.pointerId)) {
+    view2d.releasePointerCapture(event.pointerId);
+  }
 }
 
 function renderProbe() {
@@ -822,6 +933,21 @@ document
 button2d.addEventListener("click", () => setMode("2D"));
 button3d.addEventListener("click", () => setMode("3D"));
 qualitySelect.addEventListener("change", () => setQuality(qualitySelect.value));
+view2d.addEventListener(
+  "wheel",
+  (event) => {
+    if (state.mode !== "2D") {
+      return;
+    }
+    event.preventDefault();
+    zoom2dAt(event.clientX, event.clientY, event.deltaY);
+  },
+  { passive: false },
+);
+view2d.addEventListener("pointerdown", handle2dPointerDown);
+view2d.addEventListener("pointermove", handle2dPointerMove);
+view2d.addEventListener("pointerup", handle2dPointerUp);
+view2d.addEventListener("pointercancel", handle2dPointerUp);
 document.querySelector("#toggle-heatmap").addEventListener("click", () => {
   const button = document.querySelector("#toggle-heatmap");
   toggleHeatmap();

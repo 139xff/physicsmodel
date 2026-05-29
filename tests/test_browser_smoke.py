@@ -89,6 +89,12 @@ def _assert_inside_svg_viewbox(page: Page, test_id: str, x: float, y: float) -> 
     assert min_y <= y <= min_y + height
 
 
+def _svg_viewbox(page: Page) -> tuple[float, float, float, float]:
+    value = page.get_by_test_id("view-2d").locator("svg").get_attribute("viewBox")
+    assert value is not None
+    return tuple(float(part) for part in value.split())
+
+
 def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -> None:
     expect(page.get_by_role("heading", name="电磁工作台")).to_be_visible()
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
@@ -197,6 +203,42 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-size-meters", "20")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-cell-size-meters", "0.01")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-grid-divisions", "2000")
+
+
+def test_browser_2d_view_supports_zoom_and_pan(page: Page) -> None:
+    initial_min_x, initial_min_y, initial_width, initial_height = _svg_viewbox(page)
+    assert (initial_min_x, initial_min_y, initial_width, initial_height) == (
+        -1000,
+        -1000,
+        2000,
+        2000,
+    )
+
+    surface = page.get_by_test_id("view-2d")
+    box = surface.bounding_box()
+    assert box is not None
+    center_x = box["x"] + box["width"] / 2
+    center_y = box["y"] + box["height"] / 2
+
+    page.mouse.move(center_x, center_y)
+    page.mouse.wheel(0, -700)
+    zoomed_min_x, zoomed_min_y, zoomed_width, zoomed_height = _svg_viewbox(page)
+    zoom_attr = surface.locator("svg").get_attribute("data-zoom")
+    assert zoom_attr is not None
+    assert float(zoom_attr) > 1
+    assert zoomed_width < initial_width
+    assert zoomed_height < initial_height
+    assert zoomed_min_x > initial_min_x
+    assert zoomed_min_y > initial_min_y
+
+    page.mouse.down()
+    page.mouse.move(center_x - 120, center_y - 80)
+    page.mouse.up()
+    panned_min_x, panned_min_y, panned_width, panned_height = _svg_viewbox(page)
+    assert panned_width == zoomed_width
+    assert panned_height == zoomed_height
+    assert panned_min_x > zoomed_min_x
+    assert panned_min_y > zoomed_min_y
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:

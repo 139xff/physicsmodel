@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 23 - 扩大 3D 缩小可见范围</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>扩大 3D 缩小可见范围</h1>
+    <p>本次变更修复 3D 视图缩小到一定倍率后内容消失的问题。</p>
+
+    <section>
+      <h2>原因</h2>
+      <p>3D 相机远裁剪面原来为 <code>100m</code>，用户继续缩小/拉远后，网格和坐标轴会被相机裁剪掉。</p>
+    </section>
+
+    <section>
+      <h2>修复内容</h2>
+      <ul>
+        <li>将 3D 相机远裁剪面扩大到 <code>10000m</code>。</li>
+        <li>将 OrbitControls 最大拉远距离设置为 <code>5000m</code>。</li>
+        <li>保留默认 100 倍进入视图的行为。</li>
+      </ul>
+    </section>
+  </body>
+</html>

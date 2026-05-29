@@ -206,6 +206,11 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-axis-min-meters", "-10")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-axis-max-meters", "10")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-camera-zoom", "100")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-camera-far-meters", "10000")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute(
+        "data-controls-max-distance-meters",
+        "5000",
+    )
 
 
 def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:

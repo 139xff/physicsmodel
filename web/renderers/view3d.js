@@ -16,6 +16,9 @@ const GRID_SIZE_M = GRID_AXIS_LIMIT_M * 2;
 const GRID_CELL_SIZE_M = 0.01;
 const GRID_DIVISIONS = GRID_SIZE_M / GRID_CELL_SIZE_M;
 const DEFAULT_CAMERA_ZOOM = 100;
+const CAMERA_NEAR_M = 0.001;
+const CAMERA_FAR_M = 10000;
+const CAMERA_MAX_DISTANCE_M = 5000;
 const MIN_DISPLAY_MARKER_RADIUS = 0.005;
 const AXIS_COLORS = {
   x: 0xff4d4f,
@@ -108,12 +111,13 @@ function ensure3d(view3d) {
 
   threeScene = new THREE.Scene();
   threeScene.background = new THREE.Color(0xf7f9fc);
-  camera = new THREE.PerspectiveCamera(48, width / height, 0.01, 100);
+  camera = new THREE.PerspectiveCamera(48, width / height, CAMERA_NEAR_M, CAMERA_FAR_M);
   camera.position.set(12, 10, 12);
   camera.zoom = DEFAULT_CAMERA_ZOOM;
   camera.updateProjectionMatrix();
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.maxDistance = CAMERA_MAX_DISTANCE_M;
   controls.target.set(0, 0, 0);
   controls.addEventListener("change", () => {
     renderer.render(threeScene, camera);
@@ -129,8 +133,8 @@ function ensure3d(view3d) {
 }
 
 function update3dFrame(view3d) {
-  camera.near = 0.01;
-  camera.far = 100;
+  camera.near = CAMERA_NEAR_M;
+  camera.far = CAMERA_FAR_M;
   camera.zoom = DEFAULT_CAMERA_ZOOM;
   camera.updateProjectionMatrix();
   camera.position.set(12, 10, 12);
@@ -145,6 +149,8 @@ function update3dFrame(view3d) {
   view3d.dataset.axisMinMeters = (-GRID_AXIS_LIMIT_M).toString();
   view3d.dataset.axisMaxMeters = GRID_AXIS_LIMIT_M.toString();
   view3d.dataset.cameraZoom = camera.zoom.toString();
+  view3d.dataset.cameraFarMeters = camera.far.toString();
+  view3d.dataset.controlsMaxDistanceMeters = controls.maxDistance.toString();
 }
 
 function startAnimLoop() {

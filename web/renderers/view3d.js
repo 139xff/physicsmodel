@@ -224,6 +224,8 @@ function update3dFrame(view3d, options = {}) {
   view3d.dataset.cameraTarget = `${controls.target.x.toFixed(4)},${controls.target.y.toFixed(4)},${controls.target.z.toFixed(4)}`;
   view3d.dataset.cameraFarMeters = camera.far.toString();
   view3d.dataset.controlsMaxDistanceMeters = controls.maxDistance.toString();
+  view3d.dataset.pointMarkerRadiusMeters = MIN_DISPLAY_MARKER_RADIUS.toString();
+  view3d.dataset.probeMarkerRadiusMeters = MIN_DISPLAY_MARKER_RADIUS.toString();
   view3d.dataset.panMode = controls.mouseButtons.LEFT === THREE.MOUSE.PAN ? "true" : "false";
   view3d.dataset.panSpeed = controls.panSpeed.toString();
 }

@@ -36,6 +36,7 @@ const VIEWPORT_MIN_UNITS = -VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS;
 const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2;
 const VIEWPORT_MIN_ZOOM = 1;
 const DEFAULT_VIEW_ZOOM = 100;
+const POINT_MARKER_RADIUS_UNITS = 1.5;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
 
@@ -549,7 +550,7 @@ function renderSource2d(source) {
         data-testid="source-point-2d-${source.id}"
         cx="${point.x}"
         cy="${point.y}"
-        r="1.5"
+        r="${POINT_MARKER_RADIUS_UNITS}"
       ></circle>
       <text x="${point.x + 9}" y="${point.y - 9}">${label}</text>
     </g>
@@ -595,6 +596,7 @@ function renderOverlay2d() {
 function render2d() {
   const sourceMarkup = state.scene.sources.map((source) => renderSource2d(source)).join("");
   const probe = mapToViewport(state.probe.x, state.probe.y);
+  const probeRadius = POINT_MARKER_RADIUS_UNITS;
   const viewBox = compute2dViewBox();
   const axisOrigin = mapToViewport(0, 0);
   const labelPadding = Math.min(viewBox.width, viewBox.height) * 0.05;
@@ -697,9 +699,10 @@ function render2d() {
           data-testid="probe-marker-2d"
           data-view-x="${probe.x}"
           data-view-y="${probe.y}"
-          d="M ${probe.x - 4} ${probe.y} L ${probe.x + 4} ${probe.y} M ${probe.x} ${probe.y - 4} L ${probe.x} ${probe.y + 4}"
+          data-marker-radius="${probeRadius}"
+          d="M ${probe.x - probeRadius} ${probe.y} L ${probe.x + probeRadius} ${probe.y} M ${probe.x} ${probe.y - probeRadius} L ${probe.x} ${probe.y + probeRadius}"
         ></path>
-        <text x="${probe.x + 6}" y="${probe.y + 6}">Probe</text>
+        <text x="${probe.x + probeRadius + 2}" y="${probe.y + probeRadius + 2}">Probe</text>
       </g>
     </svg>
   `;

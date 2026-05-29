@@ -604,7 +604,7 @@ summary:focus-visible {
 .probe-marker {
   stroke: #111827;
   stroke-linecap: round;
-  stroke-width: 1.08;
+  stroke-width: 0.8;
 }
 
 .analysis {

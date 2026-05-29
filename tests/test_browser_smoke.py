@@ -125,10 +125,12 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
 
     probe_x = _number_attr(page, "probe-marker-2d", "data-view-x")
     probe_y = _number_attr(page, "probe-marker-2d", "data-view-y")
-    _assert_inside_viewbox(probe_x - 4)
-    _assert_inside_viewbox(probe_x + 4)
-    _assert_inside_viewbox(probe_y - 4)
-    _assert_inside_viewbox(probe_y + 4)
+    probe_radius = _number_attr(page, "probe-marker-2d", "data-marker-radius")
+    assert probe_radius == point_radius
+    _assert_inside_viewbox(probe_x - probe_radius)
+    _assert_inside_viewbox(probe_x + probe_radius)
+    _assert_inside_viewbox(probe_y - probe_radius)
+    _assert_inside_viewbox(probe_y + probe_radius)
 
     page.locator("#probe-x").fill("0.22")
     page.locator("#probe-y").fill("0.03")
@@ -194,12 +196,14 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
 
     probe_x = _number_attr(page, "probe-marker-2d", "data-view-x")
     probe_y = _number_attr(page, "probe-marker-2d", "data-view-y")
+    probe_radius = _number_attr(page, "probe-marker-2d", "data-marker-radius")
     assert probe_x == -5
     assert probe_y == -4.5
-    _assert_inside_svg_viewbox(page, "view-2d", probe_x - 4, probe_y)
-    _assert_inside_svg_viewbox(page, "view-2d", probe_x + 4, probe_y)
-    _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y - 4)
-    _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y + 4)
+    assert probe_radius == point_radius
+    _assert_inside_svg_viewbox(page, "view-2d", probe_x - probe_radius, probe_y)
+    _assert_inside_svg_viewbox(page, "view-2d", probe_x + probe_radius, probe_y)
+    _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y - probe_radius)
+    _assert_inside_svg_viewbox(page, "view-2d", probe_x, probe_y + probe_radius)
 
     page.get_by_role("button", name="3D").click()
     expect(page.get_by_test_id("view-3d")).to_be_visible()
@@ -211,6 +215,14 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-axis-labels", "+X,+Y,+Z")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-camera-zoom", "100")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-camera-far-meters", "10000")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute(
+        "data-point-marker-radius-meters",
+        "0.005",
+    )
+    expect(page.get_by_test_id("view-3d")).to_have_attribute(
+        "data-probe-marker-radius-meters",
+        "0.005",
+    )
     expect(page.get_by_test_id("view-3d")).to_have_attribute(
         "data-controls-max-distance-meters",
         "5000",

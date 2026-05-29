@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 19 - 补齐 3D 负 Z 轴区域</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>补齐 3D 负 Z 轴区域</h1>
+    <p>本次变更修复 3D 视图中坐标轴只显示正方向的问题。</p>
+
+    <section>
+      <h2>问题确认</h2>
+      <p>原实现使用 Three.js 自带 <code>AxesHelper</code>，该组件只从原点绘制到正方向，因此负方向轴线没有显示。</p>
+    </section>
+
+    <section>
+      <h2>实现内容</h2>
+      <ul>
+        <li>替换为自定义完整坐标轴。</li>
+        <li>X/Y/Z 三个轴都从 <code>-10m</code> 绘制到 <code>+10m</code>。</li>
+        <li>补齐物理 Z 轴的负方向，即 <code>z &lt; 0</code> 区域。</li>
+        <li>保留 20m 固定网格和 1cm 网格单位设置。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证</h2>
+      <ul>
+        <li>浏览器测试确认 3D 视图公开的轴范围为 <code>-10</code> 到 <code>10</code>。</li>
+      </ul>
+    </section>
+  </body>
+</html>

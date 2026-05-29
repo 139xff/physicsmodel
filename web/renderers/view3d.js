@@ -16,6 +16,11 @@ const GRID_SIZE_M = GRID_AXIS_LIMIT_M * 2;
 const GRID_CELL_SIZE_M = 0.01;
 const GRID_DIVISIONS = GRID_SIZE_M / GRID_CELL_SIZE_M;
 const MIN_DISPLAY_MARKER_RADIUS = 0.005;
+const AXIS_COLORS = {
+  x: 0xff4d4f,
+  y: 0x2563eb,
+  z: 0x22c55e,
+};
 
 function threeVectorFromComponents(components) {
   return new THREE.Vector3(components.x, components.y, components.z);
@@ -23,6 +28,62 @@ function threeVectorFromComponents(components) {
 
 function threePointFromPosition(position) {
   return new THREE.Vector3(position.x, position.z, position.y);
+}
+
+function createFullAxesHelper(size) {
+  const vertices = new Float32Array([
+    -size,
+    0,
+    0,
+    size,
+    0,
+    0,
+    0,
+    0,
+    -size,
+    0,
+    0,
+    size,
+    0,
+    -size,
+    0,
+    0,
+    size,
+    0,
+  ]);
+  const xColor = new THREE.Color(AXIS_COLORS.x);
+  const yColor = new THREE.Color(AXIS_COLORS.y);
+  const zColor = new THREE.Color(AXIS_COLORS.z);
+  const colors = new Float32Array([
+    xColor.r,
+    xColor.g,
+    xColor.b,
+    xColor.r,
+    xColor.g,
+    xColor.b,
+    yColor.r,
+    yColor.g,
+    yColor.b,
+    yColor.r,
+    yColor.g,
+    yColor.b,
+    zColor.r,
+    zColor.g,
+    zColor.b,
+    zColor.r,
+    zColor.g,
+    zColor.b,
+  ]);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const material = new THREE.LineBasicMaterial({
+    linewidth: 2,
+    vertexColors: true,
+  });
+  const helper = new THREE.LineSegments(geometry, material);
+  helper.name = "full-coordinate-axes";
+  return helper;
 }
 
 function surfaceSize(container) {
@@ -56,7 +117,7 @@ function ensure3d(view3d) {
   });
 
   gridHelper = new THREE.GridHelper(GRID_SIZE_M, GRID_DIVISIONS, 0x8ea3b7, 0xd3dce6);
-  axesHelper = new THREE.AxesHelper(GRID_AXIS_LIMIT_M);
+  axesHelper = createFullAxesHelper(GRID_AXIS_LIMIT_M);
   threeScene.add(gridHelper);
   threeScene.add(axesHelper);
   threeScene.add(new THREE.AmbientLight(0xffffff, 0.85));
@@ -75,6 +136,9 @@ function update3dFrame(view3d) {
   view3d.dataset.gridSizeMeters = GRID_SIZE_M.toString();
   view3d.dataset.gridCellSizeMeters = GRID_CELL_SIZE_M.toString();
   view3d.dataset.gridDivisions = GRID_DIVISIONS.toString();
+  view3d.dataset.axisLimitMeters = GRID_AXIS_LIMIT_M.toString();
+  view3d.dataset.axisMinMeters = (-GRID_AXIS_LIMIT_M).toString();
+  view3d.dataset.axisMaxMeters = GRID_AXIS_LIMIT_M.toString();
 }
 
 function startAnimLoop() {

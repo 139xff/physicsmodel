@@ -263,6 +263,45 @@ def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     assert deep_zoom_min_y == -deep_zoom_height / 2
 
 
+def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
+    pan_tool = page.get_by_test_id("pan-tool")
+    expect(pan_tool).to_be_visible()
+    expect(pan_tool).to_have_attribute("aria-pressed", "false")
+
+    initial_min_x, initial_min_y, initial_width, initial_height = _svg_viewbox(page)
+    pan_tool.click()
+    expect(pan_tool).to_have_attribute("aria-pressed", "true")
+
+    surface = page.get_by_test_id("view-2d")
+    box = surface.bounding_box()
+    assert box is not None
+    center_x = box["x"] + box["width"] / 2
+    center_y = box["y"] + box["height"] / 2
+
+    page.mouse.move(center_x, center_y)
+    page.mouse.down()
+    page.mouse.move(center_x - 140, center_y - 90)
+    page.mouse.up()
+
+    panned_min_x, panned_min_y, panned_width, panned_height = _svg_viewbox(page)
+    assert panned_width == initial_width
+    assert panned_height == initial_height
+    assert panned_min_x > initial_min_x
+    assert panned_min_y > initial_min_y
+
+    grid = page.locator("#grid")
+    expect(grid).to_have_attribute("width", "1")
+    expect(grid).to_have_attribute("height", "1")
+
+    page.get_by_role("button", name="3D").click()
+    expect(page.get_by_test_id("view-3d")).to_be_visible()
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-pan-mode", "true")
+
+    pan_tool.click()
+    expect(pan_tool).to_have_attribute("aria-pressed", "false")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-pan-mode", "false")
+
+
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     for button_selector, test_id in [
         ("#add-point", "source-card-point-1"),

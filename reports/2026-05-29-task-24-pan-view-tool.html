@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 24 - 手掌视角平移工具</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>手掌视角平移工具</h1>
+    <p>本次变更在空间视窗中新增手掌按钮，用于切换 2D/3D 的视角平移模式。</p>
+
+    <section>
+      <h2>实现内容</h2>
+      <ul>
+        <li>新增空间视窗工具区和手掌图标按钮。</li>
+        <li>2D 手掌模式下，拖动只移动用户看到的 <code>viewBox</code>，不移动坐标轴或源数据。</li>
+        <li>3D 手掌模式下，左键拖动切换为 OrbitControls 平移视角。</li>
+        <li>关闭手掌模式后，3D 左键恢复旋转，2D 保留滚轮缩放。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证</h2>
+      <ul>
+        <li>浏览器测试验证手掌按钮可切换状态。</li>
+        <li>浏览器测试验证 2D 平移会移动可视窗口但网格规则保持 1cm。</li>
+        <li>浏览器测试验证 3D 手掌模式会切换为 pan 状态。</li>
+      </ul>
+    </section>
+  </body>
+</html>

@@ -1,5 +1,5 @@
 import { evaluateField, getConfig, getPreset, listPresets } from "./api-client.js";
-import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-default-zoom";
+import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-pan-tool";
 
 const runtimeStatus = document.querySelector("#runtime-status");
 const sourceList = document.querySelector("#source-list");
@@ -9,6 +9,7 @@ const view2d = document.querySelector("#view-2d");
 const view3d = document.querySelector("#view-3d");
 const button2d = document.querySelector("#view-2d-button");
 const button3d = document.querySelector("#view-3d-button");
+const panToolButton = document.querySelector("#pan-tool");
 const solverStatus = document.querySelector("[data-testid='solver-status']");
 const overlayStatus = document.querySelector("[data-testid='overlay-status']");
 const overlaySummary = document.querySelector("[data-testid='overlay-summary']");
@@ -57,6 +58,7 @@ const state = {
   },
   probe: { x: 0.2, y: 0.03, z: 0.05 },
   view2d: { centerX: 0, centerY: 0, zoom: DEFAULT_VIEW_ZOOM },
+  panMode: false,
   showHeatmap: false,
   lastResult: null,
   overlayResult: null,
@@ -75,6 +77,7 @@ const KIND_LABELS = {
 let latestProbeRequestId = "";
 let latestOverlayRequestId = "";
 let requestSerial = 0;
+let active2dPan = null;
 function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) {
     return "n/a";
@@ -212,10 +215,25 @@ function setMode(mode) {
   view3d.classList.toggle("hidden", mode !== "3D");
   if (mode === "2D") {
     state.view2d.zoom = DEFAULT_VIEW_ZOOM;
+    state.view2d.centerX = 0;
+    state.view2d.centerY = 0;
   }
   if (mode !== "3D") {
     stopAnimLoop();
   }
+  renderAll();
+}
+
+function renderPanTool() {
+  panToolButton.classList.toggle("selected", state.panMode);
+  panToolButton.setAttribute("aria-pressed", state.panMode ? "true" : "false");
+  view2d.classList.toggle("pan-mode", state.panMode);
+  view3d.classList.toggle("pan-mode", state.panMode);
+}
+
+function togglePanMode() {
+  state.panMode = !state.panMode;
+  renderPanTool();
   renderAll();
 }
 
@@ -430,8 +448,16 @@ function clamp2dView() {
     state.view2d.zoom = VIEWPORT_MIN_ZOOM;
   }
   state.view2d.zoom = Math.max(VIEWPORT_MIN_ZOOM, state.view2d.zoom);
-  state.view2d.centerX = 0;
-  state.view2d.centerY = 0;
+  const halfWidth = VIEWPORT_SIZE_UNITS / (2 * state.view2d.zoom);
+  const halfHeight = VIEWPORT_SIZE_UNITS / (2 * state.view2d.zoom);
+  state.view2d.centerX = Math.min(
+    VIEWPORT_MIN_UNITS + VIEWPORT_SIZE_UNITS - halfWidth,
+    Math.max(VIEWPORT_MIN_UNITS + halfWidth, state.view2d.centerX),
+  );
+  state.view2d.centerY = Math.min(
+    VIEWPORT_MIN_UNITS + VIEWPORT_SIZE_UNITS - halfHeight,
+    Math.max(VIEWPORT_MIN_UNITS + halfHeight, state.view2d.centerY),
+  );
 }
 
 function compute2dViewBox() {
@@ -628,6 +654,51 @@ function zoom2d(deltaY) {
   render2d();
 }
 
+function start2dPan(event) {
+  if (!state.panMode || state.mode !== "2D" || event.button !== 0) {
+    return;
+  }
+  const viewBox = compute2dViewBox();
+  active2dPan = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    centerX: state.view2d.centerX,
+    centerY: state.view2d.centerY,
+    width: viewBox.width,
+    height: viewBox.height,
+  };
+  view2d.classList.add("is-panning");
+  view2d.setPointerCapture(event.pointerId);
+}
+
+function move2dPan(event) {
+  if (!active2dPan || active2dPan.pointerId !== event.pointerId) {
+    return;
+  }
+  const rect = view2d.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return;
+  }
+  const deltaX = ((event.clientX - active2dPan.startX) / rect.width) * active2dPan.width;
+  const deltaY = ((event.clientY - active2dPan.startY) / rect.height) * active2dPan.height;
+  state.view2d.centerX = active2dPan.centerX - deltaX;
+  state.view2d.centerY = active2dPan.centerY - deltaY;
+  clamp2dView();
+  render2d();
+}
+
+function end2dPan(event) {
+  if (!active2dPan || active2dPan.pointerId !== event.pointerId) {
+    return;
+  }
+  active2dPan = null;
+  view2d.classList.remove("is-panning");
+  if (view2d.hasPointerCapture(event.pointerId)) {
+    view2d.releasePointerCapture(event.pointerId);
+  }
+}
+
 function renderProbe() {
   probePosition.textContent =
     `探针位置 (${formatFixed(state.probe.x)}, ${formatFixed(state.probe.y)}, ` +
@@ -684,7 +755,7 @@ function renderAll() {
   render2d();
   renderProbe();
   if (state.mode === "3D") {
-    render3d(view3d, state);
+    render3d(view3d, state, { panMode: state.panMode });
   }
   renderResult();
   renderOverlaySummary();
@@ -847,6 +918,7 @@ document
   .addEventListener("click", () => addSource("spherical_shell"));
 button2d.addEventListener("click", () => setMode("2D"));
 button3d.addEventListener("click", () => setMode("3D"));
+panToolButton.addEventListener("click", togglePanMode);
 qualitySelect.addEventListener("change", () => setQuality(qualitySelect.value));
 view2d.addEventListener(
   "wheel",
@@ -859,6 +931,10 @@ view2d.addEventListener(
   },
   { passive: false },
 );
+view2d.addEventListener("pointerdown", start2dPan);
+view2d.addEventListener("pointermove", move2dPan);
+view2d.addEventListener("pointerup", end2dPan);
+view2d.addEventListener("pointercancel", end2dPan);
 document.querySelector("#toggle-heatmap").addEventListener("click", () => {
   const button = document.querySelector("#toggle-heatmap");
   toggleHeatmap();
@@ -895,6 +971,7 @@ window.addEventListener("resize", () => {
 });
 
 renderAll();
+renderPanTool();
 initialiseShell().catch(() => {
   runtimeStatus.textContent =
     "本地运行配置暂不可用；当前界面状态仍可继续保留。";

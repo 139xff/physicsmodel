@@ -25,6 +25,16 @@ const AXIS_COLORS = {
   y: 0x2563eb,
   z: 0x22c55e,
 };
+const DEFAULT_MOUSE_BUTTONS = {
+  LEFT: THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.DOLLY,
+  RIGHT: THREE.MOUSE.PAN,
+};
+const PAN_MOUSE_BUTTONS = {
+  LEFT: THREE.MOUSE.PAN,
+  MIDDLE: THREE.MOUSE.DOLLY,
+  RIGHT: THREE.MOUSE.ROTATE,
+};
 
 function threeVectorFromComponents(components) {
   return new THREE.Vector3(components.x, components.y, components.z);
@@ -117,7 +127,9 @@ function ensure3d(view3d) {
   camera.updateProjectionMatrix();
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.enablePan = true;
   controls.maxDistance = CAMERA_MAX_DISTANCE_M;
+  controls.mouseButtons = { ...DEFAULT_MOUSE_BUTTONS };
   controls.target.set(0, 0, 0);
   controls.addEventListener("change", () => {
     renderer.render(threeScene, camera);
@@ -151,6 +163,14 @@ function update3dFrame(view3d) {
   view3d.dataset.cameraZoom = camera.zoom.toString();
   view3d.dataset.cameraFarMeters = camera.far.toString();
   view3d.dataset.controlsMaxDistanceMeters = controls.maxDistance.toString();
+  view3d.dataset.panMode = controls.mouseButtons.LEFT === THREE.MOUSE.PAN ? "true" : "false";
+}
+
+function set3dPanMode(enabled) {
+  if (!controls) {
+    return;
+  }
+  controls.mouseButtons = enabled ? { ...PAN_MOUSE_BUTTONS } : { ...DEFAULT_MOUSE_BUTTONS };
 }
 
 function startAnimLoop() {
@@ -265,7 +285,7 @@ function _addFieldArrows(parent, state) {
   }
 }
 
-export function render3d(view3d, state) {
+export function render3d(view3d, state, options = {}) {
   view3d.removeAttribute("data-ring-normal-three");
   const firstRing = state.scene.sources.find((source) => source.kind === "ring");
   if (firstRing) {
@@ -275,6 +295,7 @@ export function render3d(view3d, state) {
   }
 
   ensure3d(view3d);
+  set3dPanMode(Boolean(options.panMode));
 
   const { width, height } = surfaceSize(view3d);
   const canvas = renderer.domElement;

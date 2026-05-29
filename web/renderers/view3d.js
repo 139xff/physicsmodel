@@ -131,7 +131,9 @@ function ensure3d(view3d) {
 function update3dFrame(view3d) {
   camera.near = 0.01;
   camera.far = 100;
+  camera.zoom = DEFAULT_CAMERA_ZOOM;
   camera.updateProjectionMatrix();
+  camera.position.set(12, 10, 12);
   controls.target.set(0, 0, 0);
   controls.update();
   gridHelper.position.set(0, 0, 0);
@@ -142,16 +144,6 @@ function update3dFrame(view3d) {
   view3d.dataset.axisLimitMeters = GRID_AXIS_LIMIT_M.toString();
   view3d.dataset.axisMinMeters = (-GRID_AXIS_LIMIT_M).toString();
   view3d.dataset.axisMaxMeters = GRID_AXIS_LIMIT_M.toString();
-  view3d.dataset.cameraZoom = camera.zoom.toString();
-}
-
-export function reset3dView(view3d) {
-  ensure3d(view3d);
-  camera.position.set(12, 10, 12);
-  camera.zoom = DEFAULT_CAMERA_ZOOM;
-  camera.updateProjectionMatrix();
-  controls.target.set(0, 0, 0);
-  controls.update();
   view3d.dataset.cameraZoom = camera.zoom.toString();
 }
 

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 22 - 修复视图空白和切换失效</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>修复视图空白和切换失效</h1>
+    <p>本次变更修复页面打开后 2D/3D 无法切换、空间视图空白的问题。</p>
+
+    <section>
+      <h2>问题原因</h2>
+      <p>
+        <code>app.js</code> 新增引用了 <code>reset3dView</code>，但浏览器可能仍缓存旧版
+        <code>view3d.js</code>，旧模块没有该导出，导致前端脚本启动失败。
+      </p>
+    </section>
+
+    <section>
+      <h2>修复内容</h2>
+      <ul>
+        <li>移除新增的 <code>reset3dView</code> 命名导入，保持模块接口兼容。</li>
+        <li>将 3D 默认倍率重置放回 <code>render3d</code> 内部。</li>
+        <li>给 <code>view3d.js</code> 导入路径增加版本参数，强制浏览器拉取新模块。</li>
+      </ul>
+    </section>
+  </body>
+</html>

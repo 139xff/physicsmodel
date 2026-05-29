@@ -1,5 +1,5 @@
 import { evaluateField, getConfig, getPreset, listPresets } from "./api-client.js";
-import { render3d, reset3dView, resize3d, stopAnimLoop } from "./renderers/view3d.js";
+import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-default-zoom";
 
 const runtimeStatus = document.querySelector("#runtime-status");
 const sourceList = document.querySelector("#source-list");
@@ -213,9 +213,7 @@ function setMode(mode) {
   if (mode === "2D") {
     state.view2d.zoom = DEFAULT_VIEW_ZOOM;
   }
-  if (mode === "3D") {
-    reset3dView(view3d);
-  } else {
+  if (mode !== "3D") {
     stopAnimLoop();
   }
   renderAll();

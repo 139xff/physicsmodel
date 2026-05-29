@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 25 - 降低 3D 手掌平移灵敏度</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>降低 3D 手掌平移灵敏度</h1>
+    <p>本次变更让 3D 手掌模式下的拖动平移更接近 2D 视图的操作手感。</p>
+
+    <section>
+      <h2>实现内容</h2>
+      <ul>
+        <li>3D 手掌模式开启时，将 OrbitControls <code>panSpeed</code> 设置为 <code>0.04</code>。</li>
+        <li>关闭手掌模式后，恢复默认 <code>panSpeed = 1</code>。</li>
+        <li>2D 平移逻辑保持不变。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证</h2>
+      <ul>
+        <li>浏览器测试验证手掌模式下 <code>data-pan-speed="0.04"</code>。</li>
+        <li>浏览器测试验证关闭手掌模式后恢复 <code>data-pan-speed="1"</code>。</li>
+      </ul>
+    </section>
+  </body>
+</html>

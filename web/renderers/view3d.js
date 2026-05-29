@@ -19,6 +19,8 @@ const DEFAULT_CAMERA_ZOOM = 100;
 const CAMERA_NEAR_M = 0.001;
 const CAMERA_FAR_M = 10000;
 const CAMERA_MAX_DISTANCE_M = 5000;
+const DEFAULT_PAN_SPEED = 1;
+const HAND_PAN_SPEED = 0.04;
 const MIN_DISPLAY_MARKER_RADIUS = 0.005;
 const AXIS_COLORS = {
   x: 0xff4d4f,
@@ -128,6 +130,7 @@ function ensure3d(view3d) {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.enablePan = true;
+  controls.panSpeed = DEFAULT_PAN_SPEED;
   controls.maxDistance = CAMERA_MAX_DISTANCE_M;
   controls.mouseButtons = { ...DEFAULT_MOUSE_BUTTONS };
   controls.target.set(0, 0, 0);
@@ -164,6 +167,7 @@ function update3dFrame(view3d) {
   view3d.dataset.cameraFarMeters = camera.far.toString();
   view3d.dataset.controlsMaxDistanceMeters = controls.maxDistance.toString();
   view3d.dataset.panMode = controls.mouseButtons.LEFT === THREE.MOUSE.PAN ? "true" : "false";
+  view3d.dataset.panSpeed = controls.panSpeed.toString();
 }
 
 function set3dPanMode(enabled) {
@@ -171,6 +175,7 @@ function set3dPanMode(enabled) {
     return;
   }
   controls.mouseButtons = enabled ? { ...PAN_MOUSE_BUTTONS } : { ...DEFAULT_MOUSE_BUTTONS };
+  controls.panSpeed = enabled ? HAND_PAN_SPEED : DEFAULT_PAN_SPEED;
 }
 
 function startAnimLoop() {

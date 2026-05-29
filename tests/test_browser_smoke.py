@@ -296,10 +296,12 @@ def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
     page.get_by_role("button", name="3D").click()
     expect(page.get_by_test_id("view-3d")).to_be_visible()
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-pan-mode", "true")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-pan-speed", "0.04")
 
     pan_tool.click()
     expect(pan_tool).to_have_attribute("aria-pressed", "false")
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-pan-mode", "false")
+    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-pan-speed", "1")
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:

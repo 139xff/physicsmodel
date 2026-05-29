@@ -34,7 +34,6 @@ const VIEWPORT_GRID_STEP_UNITS = 1;
 const VIEWPORT_MIN_UNITS = -VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS;
 const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2;
 const VIEWPORT_MIN_ZOOM = 1;
-const VIEWPORT_MAX_ZOOM = 80;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
 
@@ -422,12 +421,11 @@ function radiusToViewport(radius, minimum = 0) {
   return Math.max(minimum, radius * VIEWPORT_METERS_TO_UNITS);
 }
 
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
 function clamp2dView() {
-  state.view2d.zoom = clamp(state.view2d.zoom, VIEWPORT_MIN_ZOOM, VIEWPORT_MAX_ZOOM);
+  if (!Number.isFinite(state.view2d.zoom)) {
+    state.view2d.zoom = VIEWPORT_MIN_ZOOM;
+  }
+  state.view2d.zoom = Math.max(VIEWPORT_MIN_ZOOM, state.view2d.zoom);
   state.view2d.centerX = 0;
   state.view2d.centerY = 0;
 }
@@ -620,11 +618,7 @@ function render2d() {
 }
 
 function zoom2d(deltaY) {
-  const nextZoom = clamp(
-    state.view2d.zoom * Math.exp(-deltaY * 0.0012),
-    VIEWPORT_MIN_ZOOM,
-    VIEWPORT_MAX_ZOOM,
-  );
+  const nextZoom = state.view2d.zoom * Math.exp(-deltaY * 0.0012);
   state.view2d.zoom = nextZoom;
   clamp2dView();
   render2d();

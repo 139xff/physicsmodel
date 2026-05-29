@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 20 - 移除 2D 放大倍率上限</title>
+    <style>
+      body {
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+        line-height: 1.65;
+        margin: 32px;
+        color: #1f2937;
+      }
+      section {
+        margin-top: 24px;
+      }
+      code {
+        background: #f3f4f6;
+        border-radius: 4px;
+        padding: 2px 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>移除 2D 放大倍率上限</h1>
+    <p>本次变更解决 2D 视图放大倍率被限制的问题。</p>
+
+    <section>
+      <h2>实现内容</h2>
+      <ul>
+        <li>移除原来的 <code>VIEWPORT_MAX_ZOOM = 80</code> 人为上限。</li>
+        <li>保留最小倍率限制，避免缩小到固定 20m 网格范围之外。</li>
+        <li>继续保持 2D 原点固定在视图中心。</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>验证</h2>
+      <ul>
+        <li>浏览器测试验证放大倍率可以超过原来的 <code>80</code>。</li>
+        <li>浏览器测试验证深度放大后 <code>viewBox</code> 仍关于原点对称。</li>
+      </ul>
+    </section>
+  </body>
+</html>

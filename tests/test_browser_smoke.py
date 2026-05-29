@@ -243,6 +243,17 @@ def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     assert second_min_x == -second_width / 2
     assert second_min_y == -second_height / 2
 
+    for _ in range(8):
+        page.mouse.wheel(0, -700)
+    deep_zoom_min_x, deep_zoom_min_y, deep_zoom_width, deep_zoom_height = _svg_viewbox(page)
+    deep_zoom_attr = surface.locator("svg").get_attribute("data-zoom")
+    assert deep_zoom_attr is not None
+    assert float(deep_zoom_attr) > 80
+    assert deep_zoom_width < second_width
+    assert deep_zoom_height < second_height
+    assert deep_zoom_min_x == -deep_zoom_width / 2
+    assert deep_zoom_min_y == -deep_zoom_height / 2
+
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     for button_selector, test_id in [

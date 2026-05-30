@@ -10,6 +10,7 @@ const view3d = document.querySelector("#view-3d");
 const button2d = document.querySelector("#view-2d-button");
 const button3d = document.querySelector("#view-3d-button");
 const panToolButton = document.querySelector("#pan-tool");
+const toggleFieldLinesButton = document.querySelector("#toggle-field-lines");
 const addInfinitePlaneButton = document.querySelector("#add-infinite-plane");
 const addSphericalShellButton = document.querySelector("#add-spherical-shell");
 const solverStatus = document.querySelector("[data-testid='solver-status']");
@@ -39,7 +40,7 @@ const VIEWPORT_MIN_UNITS = -VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS;
 const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2;
 const VIEWPORT_MIN_ZOOM = 1;
 const DEFAULT_VIEW_ZOOM = 100;
-const POINT_MARKER_RADIUS_UNITS = 0.2;
+const POINT_VISUAL_RADIUS_CM = 0.5;
 const RING_DISPLAY_RADIUS_UNITS = 0.2;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const MAX_AXIS_TICKS = 36;
@@ -54,9 +55,18 @@ const AXIS_LABEL_X_SPACING_FACTOR = 1.2;
 const AXIS_LABEL_Y_SPACING_FACTOR = 0.77;
 const AXIS_X_COLOR = "#d92d20";
 const AXIS_Y_COLOR = "#175cd3";
-const POSITIVE_SOURCE_COLOR = "#0071e3";
-const NEGATIVE_SOURCE_COLOR = "#d92d20";
+const POSITIVE_SOURCE_COLOR = "#d92d20";
+const NEGATIVE_SOURCE_COLOR = "#175cd3";
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
+const FIELD_LINE_TOTAL_COUNT = 36;
+const FIELD_LINE_START_RADIUS_M = POINT_VISUAL_RADIUS_CM / 100;
+const FIELD_LINE_STOP_RADIUS_M = 0.014;
+const FIELD_LINE_STEP_M = 0.065;
+const FIELD_LINE_MAX_STEPS = 420;
+const FIELD_LINE_MIN_FIELD = 1e-18;
+const FIELD_LINE_SOFTENING_M = 0.006;
+const FIELD_LINE_ARROW_DISTANCE_M = 0.05;
+const FIELD_LINE_ARROW_STEM_M = 0.012;
 
 const state = {
   mode: "2D",
@@ -79,6 +89,7 @@ const state = {
   view2d: { centerX: 0, centerY: 0, zoom: DEFAULT_VIEW_ZOOM },
   panMode: false,
   showHeatmap: false,
+  showFieldLines: false,
   lastResult: null,
   overlayResult: null,
   overlaySamples: [],
@@ -92,6 +103,7 @@ const modeStates = {
     lastResult: state.lastResult,
     overlayResult: state.overlayResult,
     overlaySamples: state.overlaySamples,
+    showFieldLines: state.showFieldLines,
   },
   "3D": {
     sourceIndex: {
@@ -112,6 +124,7 @@ const modeStates = {
     lastResult: null,
     overlayResult: null,
     overlaySamples: [],
+    showFieldLines: false,
   },
 };
 
@@ -137,6 +150,7 @@ function saveModeState(mode = state.mode) {
     lastResult: state.lastResult,
     overlayResult: state.overlayResult,
     overlaySamples: state.overlaySamples,
+    showFieldLines: state.showFieldLines,
   };
 }
 
@@ -148,6 +162,7 @@ function loadModeState(mode) {
   state.lastResult = modeState.lastResult;
   state.overlayResult = modeState.overlayResult;
   state.overlaySamples = modeState.overlaySamples;
+  state.showFieldLines = Boolean(modeState.showFieldLines);
 }
 function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) {
@@ -158,6 +173,18 @@ function formatNumber(value, digits = 3) {
 
 function formatFixed(value) {
   return Number(value).toFixed(3);
+}
+
+function metersToCentimeters(value) {
+  return Number(value) * 100;
+}
+
+function centimetersToMeters(value) {
+  return Number(value) / 100;
+}
+
+function formatCentimeters(value) {
+  return metersToCentimeters(value).toFixed(2).replace(/\.?0+$/, "");
 }
 
 function escapeHtml(value) {
@@ -336,23 +363,25 @@ function renderProbeForm() {
   }
   const zControl = state.mode === "2D"
     ? ""
-    : `<label>探针 z <input id="probe-z" type="number" step="0.01" value="${formatFixed(state.probe.z)}"></label>`;
+    : `<label>探针 z / cm <input id="probe-z" type="number" step="0.1" value="${formatCentimeters(state.probe.z)}"></label>`;
   probeForm.innerHTML = `
-    <label>探针 x <input id="probe-x" type="number" step="0.01" value="${formatFixed(state.probe.x)}"></label>
-    <label>探针 y <input id="probe-y" type="number" step="0.01" value="${formatFixed(state.probe.y)}"></label>
+    <label>探针 x / cm <input id="probe-x" type="number" step="0.1" value="${formatCentimeters(state.probe.x)}"></label>
+    <label>探针 y / cm <input id="probe-y" type="number" step="0.1" value="${formatCentimeters(state.probe.y)}"></label>
     ${zControl}
+    <button id="probe-submit" class="probe-submit" type="submit">确定</button>
   `;
   refreshProbeInputRefs();
 }
 
 function setProbeFromInputs() {
   state.probe = {
-    x: Number(probeInputs.x?.value ?? state.probe.x),
-    y: Number(probeInputs.y?.value ?? state.probe.y),
-    z: Number(probeInputs.z?.value ?? state.probe.z),
+    x: centimetersToMeters(probeInputs.x?.value ?? metersToCentimeters(state.probe.x)),
+    y: centimetersToMeters(probeInputs.y?.value ?? metersToCentimeters(state.probe.y)),
+    z: probeInputs.z
+      ? centimetersToMeters(probeInputs.z.value)
+      : state.probe.z,
   };
   renderAll();
-  scheduleEvaluation();
 }
 
 function setQuality(value) {
@@ -365,6 +394,12 @@ function setQuality(value) {
 function toggleHeatmap() {
   state.showHeatmap = !state.showHeatmap;
   render2d();
+}
+
+function toggleFieldLines() {
+  state.showFieldLines = !state.showFieldLines;
+  render2d();
+  renderOverlaySummary();
 }
 
 function potentialColor(potential, maxAbs) {
@@ -664,7 +699,7 @@ function renderSource2d(source, scale) {
   }
   const point = mapToViewport(source.position.x, source.position.y);
   const label = escapeHtml(source.label);
-  const markerRadius = (scale.fontPx * Math.min(scale.xUnitsPerPx, scale.yUnitsPerPx)) / 2;
+  const markerRadius = POINT_VISUAL_RADIUS_CM;
   const markerStrokeWidth = scale.fontPx * ((scale.xUnitsPerPx + scale.yUnitsPerPx) / 2);
   const chargeColor = sourceChargeColor(source);
   const chargeSign = sourceChargeSign(source);
@@ -760,8 +795,10 @@ function renderSource2d(source, scale) {
       <circle
         class="source-point"
         data-testid="source-point-2d-${source.id}"
-        data-display-radius-cm="${POINT_MARKER_RADIUS_UNITS}"
-        data-visual-size-px="${scale.fontPx.toFixed(2)}"
+        data-display-radius-cm="${POINT_VISUAL_RADIUS_CM}"
+        data-visual-radius-cm="${POINT_VISUAL_RADIUS_CM}"
+        data-physics-model="ideal-point"
+        data-physics-center="position"
         data-charge-color="${chargeColor}"
         data-charge-sign="${chargeSign}"
         cx="${point.x}"
@@ -782,39 +819,310 @@ function renderSource2d(source, scale) {
   `;
 }
 
-function renderOverlay2d() {
-  if (!state.overlayResult || state.overlaySamples.length === 0) {
-    return '<g data-testid="overlay-vector-layer" data-vector-count="0"></g>';
+function sourceChargeSamples2d(source) {
+  const charge = sourceChargeValue(source);
+  if (!Number.isFinite(charge) || Math.abs(charge) < 1e-30 || !source.position) {
+    return [];
   }
-  const magnitudes = state.overlayResult.samples.map((sample) => sample.field_magnitude_v_per_m);
-  const maxMagnitude = Math.max(...magnitudes, 1);
-  const vectors = state.overlayResult.samples
-    .map((sample, index) => {
-      const point = mapToViewport(state.overlaySamples[index].x, state.overlaySamples[index].y);
-      const field = sample.field_v_per_m;
-      const xyMagnitude = Math.hypot(field.x, field.y);
-      const scale = xyMagnitude > 0 ? Math.min(5.5, 1.5 + 4 * (xyMagnitude / maxMagnitude)) : 0;
-      const dx = xyMagnitude > 0 ? (field.x / xyMagnitude) * scale : 0;
-      const dy = xyMagnitude > 0 ? -(field.y / xyMagnitude) * scale : 0;
-      return `
-        <line
-          class="field-vector"
-          x1="${point.x}"
-          y1="${point.y}"
-          x2="${point.x + dx}"
-          y2="${point.y + dy}"
-        ></line>
-      `;
+
+  if (source.kind === "line_segment") {
+    const segmentCount = 16;
+    const directionMagnitude = Math.hypot(source.orientation.x, source.orientation.y);
+    const directionX = directionMagnitude > 1e-12 ? source.orientation.x / directionMagnitude : 1;
+    const directionY = directionMagnitude > 1e-12 ? source.orientation.y / directionMagnitude : 0;
+    return Array.from({ length: segmentCount }, (_, index) => {
+      const t = (index + 0.5) / segmentCount;
+      return {
+        x: source.position.x + directionX * source.length_m * t,
+        y: source.position.y + directionY * source.length_m * t,
+        charge: charge / segmentCount,
+      };
+    });
+  }
+
+  if (source.kind === "ring") {
+    const sampleCount = 24;
+    return Array.from({ length: sampleCount }, (_, index) => {
+      const angle = (Math.PI * 2 * index) / sampleCount;
+      return {
+        x: source.position.x + Math.cos(angle) * source.radius_m,
+        y: source.position.y + Math.sin(angle) * source.radius_m,
+        charge: charge / sampleCount,
+      };
+    });
+  }
+
+  if (source.kind === "disk") {
+    const ringCount = 3;
+    const samples = [{ x: source.position.x, y: source.position.y, weight: 1 }];
+    for (let ringIndex = 1; ringIndex <= ringCount; ringIndex += 1) {
+      const radius = source.radius_m * (ringIndex / ringCount);
+      const sampleCount = ringIndex * 12;
+      for (let index = 0; index < sampleCount; index += 1) {
+        const angle = (Math.PI * 2 * index) / sampleCount;
+        samples.push({
+          x: source.position.x + Math.cos(angle) * radius,
+          y: source.position.y + Math.sin(angle) * radius,
+          weight: ringIndex,
+        });
+      }
+    }
+    const totalWeight = samples.reduce((sum, sample) => sum + sample.weight, 0);
+    return samples.map((sample) => ({
+      x: sample.x,
+      y: sample.y,
+      charge: (charge * sample.weight) / totalWeight,
+    }));
+  }
+
+  if (source.kind === "infinite_plane" || source.kind === "spherical_shell") {
+    return [];
+  }
+
+  return [{ x: source.position.x, y: source.position.y, charge }];
+}
+
+function electricField2dAt(x, y, fieldSamples) {
+  return fieldSamples.reduce(
+    (field, sample) => {
+      const dx = x - sample.x;
+      const dy = y - sample.y;
+      const distanceSq = dx * dx + dy * dy + FIELD_LINE_SOFTENING_M * FIELD_LINE_SOFTENING_M;
+      const invDistanceCubed = 1 / (distanceSq * Math.sqrt(distanceSq));
+      return {
+        x: field.x + sample.charge * dx * invDistanceCubed,
+        y: field.y + sample.charge * dy * invDistanceCubed,
+      };
+    },
+    { x: 0, y: 0 },
+  );
+}
+
+function fieldLineSeedSources2d() {
+  const chargedSources = state.scene.sources.filter((source) => Math.abs(sourceChargeValue(source)) > 1e-30);
+  const pointSources = chargedSources.filter((source) => source.kind === "point");
+  const positivePointSources = pointSources.filter((source) => sourceChargeValue(source) > 0);
+  if (positivePointSources.length > 0) {
+    return positivePointSources;
+  }
+  if (pointSources.length > 0) {
+    return pointSources;
+  }
+  const positiveSources = chargedSources.filter((source) => sourceChargeValue(source) > 0 && source.position);
+  return positiveSources.length > 0 ? positiveSources : chargedSources.filter((source) => source.position);
+}
+
+function fieldLineStartRadiusMeters(source) {
+  if (source.kind === "point") {
+    return FIELD_LINE_START_RADIUS_M;
+  }
+  return Math.max(FIELD_LINE_START_RADIUS_M, sourceWorldRadius(source) + 0.008);
+}
+
+function fieldLineTerminalRadiusMeters(source) {
+  if (source.kind === "point") {
+    return Math.max(FIELD_LINE_STOP_RADIUS_M, POINT_VISUAL_RADIUS_CM / 100 + 0.009);
+  }
+  return Math.max(FIELD_LINE_STOP_RADIUS_M, sourceWorldRadius(source) + 0.01);
+}
+
+function isInsideFieldLineBounds(x, y, bounds) {
+  const margin = FIELD_LINE_STEP_M * 2;
+  return (
+    x >= bounds.minX - margin &&
+    x <= bounds.maxX + margin &&
+    y >= bounds.minY - margin &&
+    y <= bounds.maxY + margin
+  );
+}
+
+function isNearNegativeTerminal(x, y, seedSource) {
+  return state.scene.sources.some((source) => {
+    if (source.id === seedSource.id || sourceChargeValue(source) >= 0 || !source.position) {
+      return false;
+    }
+    const radius = fieldLineTerminalRadiusMeters(source);
+    return Math.hypot(x - source.position.x, y - source.position.y) <= radius;
+  });
+}
+
+function traceFieldLine(seed, seedSource, traceDirection, fieldSamples, bounds) {
+  const points = [seed];
+  let x = seed.x;
+  let y = seed.y;
+
+  for (let step = 0; step < FIELD_LINE_MAX_STEPS; step += 1) {
+    const field = electricField2dAt(x, y, fieldSamples);
+    const magnitude = Math.hypot(field.x, field.y);
+    if (magnitude < FIELD_LINE_MIN_FIELD) {
+      break;
+    }
+
+    x += (field.x / magnitude) * FIELD_LINE_STEP_M * traceDirection;
+    y += (field.y / magnitude) * FIELD_LINE_STEP_M * traceDirection;
+    points.push({ x, y });
+
+    if (!isInsideFieldLineBounds(x, y, bounds)) {
+      break;
+    }
+    if (traceDirection > 0 && isNearNegativeTerminal(x, y, seedSource)) {
+      break;
+    }
+  }
+
+  return points;
+}
+
+function fieldLinePath(points) {
+  return points
+    .map((point, index) => {
+      const viewportPoint = mapToViewport(point.x, point.y);
+      return `${index === 0 ? "M" : "L"} ${viewportPoint.x.toFixed(3)} ${viewportPoint.y.toFixed(3)}`;
     })
-    .join("");
+    .join(" ");
+}
+
+function fieldLineArrowPoint(points, source) {
+  const sourceX = source.position.x;
+  const sourceY = source.position.y;
+  let fallback = null;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const previousDistance = Math.hypot(previous.x - sourceX, previous.y - sourceY);
+    const currentDistance = Math.hypot(current.x - sourceX, current.y - sourceY);
+    const crossesTarget =
+      (FIELD_LINE_ARROW_DISTANCE_M - previousDistance) *
+      (FIELD_LINE_ARROW_DISTANCE_M - currentDistance) <= 0;
+    const directionX = current.x - previous.x;
+    const directionY = current.y - previous.y;
+    const directionMagnitude = Math.hypot(directionX, directionY);
+    if (directionMagnitude <= 1e-12) {
+      continue;
+    }
+
+    const closestDistance = Math.min(
+      Math.abs(previousDistance - FIELD_LINE_ARROW_DISTANCE_M),
+      Math.abs(currentDistance - FIELD_LINE_ARROW_DISTANCE_M),
+    );
+    if (!fallback || closestDistance < fallback.closestDistance) {
+      fallback = {
+        point: current,
+        directionX: directionX / directionMagnitude,
+        directionY: directionY / directionMagnitude,
+        closestDistance,
+      };
+    }
+
+    if (!crossesTarget) {
+      continue;
+    }
+
+    const span = currentDistance - previousDistance;
+    const t = Math.abs(span) > 1e-12
+      ? (FIELD_LINE_ARROW_DISTANCE_M - previousDistance) / span
+      : 0;
+    return {
+      point: {
+        x: previous.x + directionX * Math.max(0, Math.min(1, t)),
+        y: previous.y + directionY * Math.max(0, Math.min(1, t)),
+      },
+      directionX: directionX / directionMagnitude,
+      directionY: directionY / directionMagnitude,
+    };
+  }
+
+  return fallback;
+}
+
+function fieldLineArrowMarkup(points, source) {
+  const arrow = fieldLineArrowPoint(points, source);
+  if (!arrow) {
+    return "";
+  }
+  const start = {
+    x: arrow.point.x - arrow.directionX * FIELD_LINE_ARROW_STEM_M,
+    y: arrow.point.y - arrow.directionY * FIELD_LINE_ARROW_STEM_M,
+  };
+  const startViewport = mapToViewport(start.x, start.y);
+  const endViewport = mapToViewport(arrow.point.x, arrow.point.y);
+  return `
+    <line
+      class="field-line-arrow-stem"
+      data-testid="field-line-arrow-2d"
+      data-arrow-distance-cm="${FIELD_LINE_ARROW_DISTANCE_M * 100}"
+      x1="${startViewport.x.toFixed(3)}"
+      y1="${startViewport.y.toFixed(3)}"
+      x2="${endViewport.x.toFixed(3)}"
+      y2="${endViewport.y.toFixed(3)}"
+      marker-end="url(#field-line-arrow)"
+    ></line>
+  `;
+}
+
+function renderFieldLines2d() {
+  if (!state.showFieldLines) {
+    return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="false"></g>';
+  }
+
+  const fieldSamples = state.scene.sources.flatMap((source) => sourceChargeSamples2d(source));
+  const seedSources = fieldLineSeedSources2d();
+  if (fieldSamples.length === 0 || seedSources.length === 0) {
+    return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="true"></g>';
+  }
+
+  const bounds = compute2dWorldBounds();
+  const paths = [];
+  const arrows = [];
+  const baseLineCount = Math.floor(FIELD_LINE_TOTAL_COUNT / seedSources.length);
+  const remainder = FIELD_LINE_TOTAL_COUNT % seedSources.length;
+  for (const [sourceIndex, source] of seedSources.entries()) {
+    const charge = sourceChargeValue(source);
+    const startRadius = fieldLineStartRadiusMeters(source);
+    const traceDirection = charge >= 0 ? 1 : -1;
+    const lineCount = baseLineCount + (sourceIndex < remainder ? 1 : 0);
+    for (let index = 0; index < lineCount; index += 1) {
+      const angle = (Math.PI * 2 * index) / lineCount;
+      const seed = {
+        x: source.position.x + Math.cos(angle) * startRadius,
+        y: source.position.y + Math.sin(angle) * startRadius,
+      };
+      const tracedPoints = traceFieldLine(seed, source, traceDirection, fieldSamples, bounds);
+      const renderPoints = charge >= 0 ? tracedPoints : [...tracedPoints].reverse();
+      if (renderPoints.length < 2) {
+        continue;
+      }
+      paths.push(`
+        <path
+          class="field-line"
+          data-testid="field-line-2d"
+          d="${fieldLinePath(renderPoints)}"
+        ></path>
+      `);
+      arrows.push(fieldLineArrowMarkup(renderPoints, source));
+    }
+  }
+
   return `
     <g
-      class="overlay-vector-layer"
-      data-testid="overlay-vector-layer"
-      data-vector-count="${state.overlayResult.samples.length}"
+      class="field-line-layer"
+      data-testid="field-line-layer"
+      data-field-line-count="${paths.length}"
+      data-target-line-count="${FIELD_LINE_TOTAL_COUNT}"
+      data-arrow-distance-cm="${FIELD_LINE_ARROW_DISTANCE_M * 100}"
+      data-enabled="true"
     >
-      ${vectors}
+      ${paths.join("")}
+      ${arrows.join("")}
     </g>
+  `;
+}
+
+function renderOverlay2d() {
+  return `
+    <g data-testid="overlay-vector-layer" data-vector-count="0"></g>
+    ${renderFieldLines2d()}
   `;
 }
 
@@ -848,17 +1156,34 @@ function niceAxisStep(spanCm, maxTicks) {
   return 10 * base;
 }
 
-function formatAxisTick(value) {
+function decimalPlacesForStep(step) {
+  for (let precision = 0; precision <= 6; precision += 1) {
+    const scale = 10 ** precision;
+    if (Math.abs(Math.round(step * scale) - step * scale) < 1e-8) {
+      return precision;
+    }
+  }
+  return 6;
+}
+
+function formatAxisTick(value, precision = 0) {
   if (Math.abs(value) < 1e-10) {
     return "0";
   }
-  if (Math.abs(value) >= 10) {
+  if (precision === 0) {
     return value.toFixed(0);
   }
-  if (Math.abs(value) >= 1) {
-    return value.toFixed(1).replace(/\.0$/, "");
+  return value.toFixed(precision).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function axisTickLabelPrecision(ticks, step) {
+  for (let precision = decimalPlacesForStep(step); precision <= 6; precision += 1) {
+    const labels = ticks.map((tick) => formatAxisTick(tick, precision));
+    if (new Set(labels).size === labels.length) {
+      return precision;
+    }
   }
-  return value.toFixed(2).replace(/0$/, "").replace(/\.0$/, "");
+  return 6;
 }
 
 function maxAxisTicksForScreen(spanPx, fontPx, spacingFactor) {
@@ -936,6 +1261,8 @@ function render2dAxes(viewBox, axisOrigin, scale) {
   const chosenTickData = chooseAxisTickData(minXCm, maxXCm, minYCm, maxYCm, scale);
   const xTickData = chosenTickData.xData;
   const yTickData = chosenTickData.yData;
+  const xTickLabelPrecision = axisTickLabelPrecision(xTickData.ticks, xTickData.step);
+  const yTickLabelPrecision = axisTickLabelPrecision(yTickData.ticks, yTickData.step);
   const xTicks = xTickData.ticks
     .map((tick) => {
       const x = tick;
@@ -945,7 +1272,7 @@ function render2dAxes(viewBox, axisOrigin, scale) {
       return `
         <g class="axis-tick axis-tick-x" data-testid="axis-tick-2d-x">
           ${line}
-          <text x="${x}" y="${axisOrigin.y + tickHalfY + labelGapY}" style="font-size: ${fontSize}px; stroke-width: ${textStrokeWidth}px;" text-anchor="middle">${formatAxisTick(tick)}</text>
+          <text x="${x}" y="${axisOrigin.y + tickHalfY + labelGapY}" style="font-size: ${fontSize}px; stroke-width: ${textStrokeWidth}px;" text-anchor="middle">${formatAxisTick(tick, xTickLabelPrecision)}</text>
         </g>
       `;
     })
@@ -953,7 +1280,7 @@ function render2dAxes(viewBox, axisOrigin, scale) {
   const yTicks = yTickData.ticks
     .map((tick) => {
       const y = -tick;
-      const label = Math.abs(tick) < 1e-10 ? "" : formatAxisTick(tick);
+      const label = Math.abs(tick) < 1e-10 ? "" : formatAxisTick(tick, yTickLabelPrecision);
       const line = label
         ? `<line stroke="${AXIS_Y_COLOR}" x1="${axisOrigin.x - tickHalfX}" y1="${y}" x2="${axisOrigin.x + tickHalfX}" y2="${y}"></line>`
         : "";
@@ -977,6 +1304,8 @@ function render2dAxes(viewBox, axisOrigin, scale) {
       data-visible-y-label-count="${yTickData.ticks.filter((tick) => Math.abs(tick) >= 1e-10).length}"
       data-x-tick-limit="${chosenTickData.xLimit}"
       data-y-tick-limit="${chosenTickData.yLimit}"
+      data-x-tick-label-precision="${xTickLabelPrecision}"
+      data-y-tick-label-precision="${yTickLabelPrecision}"
       data-viewport-ratio="${(scale.widthPx / scale.heightPx).toFixed(3)}"
       data-axis-unit="cm"
       data-tick-length-px="${AXIS_TICK_LENGTH_PX}"
@@ -1031,16 +1360,19 @@ function render2d() {
       <defs>
         <radialGradient id="source-point-positive-gradient" cx="32%" cy="28%" r="78%">
           <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
-          <stop offset="24%" stop-color="#8ec5ff" stop-opacity="0.98"></stop>
+          <stop offset="24%" stop-color="#fda29b" stop-opacity="0.98"></stop>
           <stop offset="62%" stop-color="${POSITIVE_SOURCE_COLOR}" stop-opacity="1"></stop>
-          <stop offset="100%" stop-color="#003f8c" stop-opacity="1"></stop>
+          <stop offset="100%" stop-color="#7a170f" stop-opacity="1"></stop>
         </radialGradient>
         <radialGradient id="source-point-negative-gradient" cx="32%" cy="28%" r="78%">
           <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
-          <stop offset="24%" stop-color="#fda29b" stop-opacity="0.98"></stop>
+          <stop offset="24%" stop-color="#8ec5ff" stop-opacity="0.98"></stop>
           <stop offset="62%" stop-color="${NEGATIVE_SOURCE_COLOR}" stop-opacity="1"></stop>
-          <stop offset="100%" stop-color="#7a170f" stop-opacity="1"></stop>
+          <stop offset="100%" stop-color="#003f8c" stop-opacity="1"></stop>
         </radialGradient>
+        <marker id="field-line-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M 0 0 L 7 3 L 0 6 Z" class="field-line-arrow"></path>
+        </marker>
         <pattern id="grid" width="${VIEWPORT_GRID_STEP_UNITS}" height="${VIEWPORT_GRID_STEP_UNITS}" patternUnits="userSpaceOnUse">
           <path d="M ${VIEWPORT_GRID_STEP_UNITS} 0 L 0 0 0 ${VIEWPORT_GRID_STEP_UNITS}" fill="none"></path>
         </pattern>
@@ -1115,16 +1447,18 @@ function end2dPan(event) {
 function renderProbe() {
   renderProbeForm();
   probePosition.textContent = state.mode === "2D"
-    ? `探针位置 (${formatFixed(state.probe.x)}, ${formatFixed(state.probe.y)}) m`
-    : `探针位置 (${formatFixed(state.probe.x)}, ${formatFixed(state.probe.y)}, ` +
-      `${formatFixed(state.probe.z)}) m`;
+    ? `探针位置 (${formatCentimeters(state.probe.x)}, ${formatCentimeters(state.probe.y)}) cm`
+    : `探针位置 (${formatCentimeters(state.probe.x)}, ${formatCentimeters(state.probe.y)}, ` +
+      `${formatCentimeters(state.probe.z)}) cm`;
 }
 
 function renderResult() {
   qualityValue.textContent = state.quality;
   if (!state.lastResult) {
     solverStatus.textContent = state.scene.sources.length === 0 ? "等待源" : solverStatus.textContent;
-    potentialValue.textContent = "暂无";
+    if (potentialValue) {
+      potentialValue.textContent = "暂无";
+    }
     fieldVectorValue.textContent = "暂无";
     fieldMagnitudeValue.textContent = "暂无";
     contributionList.innerHTML = "<li>还没有源贡献。</li>";
@@ -1134,7 +1468,9 @@ function renderResult() {
 
   const sample = state.lastResult.samples[0];
   solverStatus.textContent = `已完成 (${state.lastResult.request_id})`;
-  potentialValue.textContent = `${formatNumber(sample.potential_v, 5)} V`;
+  if (potentialValue) {
+    potentialValue.textContent = `${formatNumber(sample.potential_v, 5)} V`;
+  }
   fieldVectorValue.textContent =
     `(${formatNumber(sample.field_v_per_m.x, 4)}, ` +
     `${formatNumber(sample.field_v_per_m.y, 4)}, ${formatNumber(sample.field_v_per_m.z, 4)}) V/m`;
@@ -1158,9 +1494,17 @@ function renderResult() {
 }
 
 function renderOverlaySummary() {
+  if (state.showFieldLines) {
+    const lineCount = view2d.querySelectorAll("[data-testid='field-line-2d']").length;
+    overlayStatus.textContent = state.scene.sources.length === 0 ? "等待源" : `电场线 ${lineCount} 条`;
+    overlaySummary.textContent = lineCount > 0
+      ? "二维视图已显示电场线；方向按合电场追踪，箭头表示电场方向。"
+      : "当前二维源不足以生成电场线。";
+    return;
+  }
   if (!state.overlayResult) {
     overlayStatus.textContent = state.scene.sources.length === 0 ? "等待源" : overlayStatus.textContent;
-    overlaySummary.textContent = "加入源后，二维视图会显示采样电场箭头。";
+    overlaySummary.textContent = "点击“显示电场”后，二维视图会显示电场线。";
     return;
   }
   const magnitudes = state.overlayResult.samples.map((sample) => sample.field_magnitude_v_per_m);
@@ -1168,9 +1512,8 @@ function renderOverlaySummary() {
   const maxMagnitude = Math.max(...magnitudes);
   overlayStatus.textContent = `已完成 (${state.overlayResult.request_id})`;
   overlaySummary.textContent =
-    `二维箭头层采样 ${state.overlayResult.sample_count} 个点；` +
-    `采样 |E| 范围 ${formatNumber(minMagnitude, 3)} 到 ${formatNumber(maxMagnitude, 3)} V/m。` +
-    "这是离散采样摘要，不是场线或等势线提取。";
+    `已完成 ${state.overlayResult.sample_count} 个采样点；` +
+    `|E| 范围 ${formatNumber(minMagnitude, 3)} 到 ${formatNumber(maxMagnitude, 3)} V/m。`;
 }
 
 function renderAll(options = {}) {
@@ -1192,12 +1535,14 @@ function setEmptyComputationState() {
   state.overlayResult = null;
   solverStatus.textContent = "等待源";
   overlayStatus.textContent = "等待源";
-  potentialValue.textContent = "暂无";
+  if (potentialValue) {
+    potentialValue.textContent = "暂无";
+  }
   fieldVectorValue.textContent = "暂无";
   fieldMagnitudeValue.textContent = "暂无";
   contributionList.innerHTML = "<li>还没有源贡献。</li>";
   warningList.innerHTML = "<li>暂无提示。</li>";
-  overlaySummary.textContent = "加入源后，二维视图会显示采样电场箭头。";
+  overlaySummary.textContent = "点击“显示电场”后，二维视图会显示电场线。";
   render2d();
 }
 
@@ -1223,6 +1568,23 @@ async function evaluateProbe(requestId) {
   }
   state.lastResult = result;
   renderResult();
+}
+
+function measureProbeFromInputs(event) {
+  event.preventDefault();
+  setProbeFromInputs();
+  requestSerial += 1;
+  latestProbeRequestId = `ui-probe-${requestSerial}`;
+  const validationMessage = sceneValidationMessage();
+  if (validationMessage) {
+    solverStatus.textContent = validationMessage;
+    return;
+  }
+  evaluateProbe(latestProbeRequestId).catch((error) => {
+    if (latestProbeRequestId) {
+      solverStatus.textContent = error.message;
+    }
+  });
 }
 
 function overlaySamplePoints() {
@@ -1361,13 +1723,15 @@ view2d.addEventListener("pointerdown", start2dPan);
 view2d.addEventListener("pointermove", move2dPan);
 view2d.addEventListener("pointerup", end2dPan);
 view2d.addEventListener("pointercancel", end2dPan);
-document.querySelector("#toggle-heatmap").addEventListener("click", () => {
-  const button = document.querySelector("#toggle-heatmap");
-  toggleHeatmap();
-  button.classList.toggle("active", state.showHeatmap);
-  button.textContent = state.showHeatmap ? "隐藏电势热力图" : "显示电势热力图";
+toggleFieldLinesButton.addEventListener("click", () => {
+  toggleFieldLines();
+  toggleFieldLinesButton.classList.toggle("active", state.showFieldLines);
+  toggleFieldLinesButton.textContent = state.showFieldLines ? "隐藏电场" : "显示电场";
 });
-document.querySelector("#probe-form").addEventListener("change", setProbeFromInputs);
+probeForm.addEventListener("submit", measureProbeFromInputs);
+probeForm.addEventListener("input", () => {
+  solverStatus.textContent = state.scene.sources.length === 0 ? "等待源" : "等待确定";
+});
 presetForm.addEventListener("submit", (event) => {
   event.preventDefault();
   loadSelectedPreset().catch((error) => {

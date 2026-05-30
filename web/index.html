@@ -13,7 +13,7 @@
       }
     }
   </script>
-  <script type="module" src="./app.js?v=20260530-independent-2d-3d"></script>
+  <script type="module" src="./app.js?v=20260531-field-lines-measure-cm"></script>
 </head>
 <body>
   <div class="workbench">
@@ -114,38 +114,34 @@
         </div>
 
         <section class="status-block">
-          <h3>探针</h3>
+          <h3>探针测量</h3>
           <form id="probe-form" class="probe-form">
-            <label>探针 x <input id="probe-x" type="number" step="0.01" value="0.20"></label>
-            <label>探针 y <input id="probe-y" type="number" step="0.01" value="0.03"></label>
-            <label>探针 z <input id="probe-z" type="number" step="0.01" value="0.05"></label>
+            <label>探针 x / cm <input id="probe-x" type="number" step="0.1" value="20"></label>
+            <label>探针 y / cm <input id="probe-y" type="number" step="0.1" value="3"></label>
+            <label>探针 z / cm <input id="probe-z" type="number" step="0.1" value="5"></label>
+            <button id="probe-submit" class="probe-submit" type="submit">确定</button>
           </form>
-          <p class="probe-position" data-testid="probe-position">探针位置 (0.200, 0.030, 0.050) m</p>
+          <p class="probe-position" data-testid="probe-position">探针位置 (20, 3, 5) cm</p>
+          <p class="status-value" data-testid="solver-status">等待源</p>
+          <dl class="measurement-results">
+            <div><dt>电场 E</dt><dd id="field-vector-value">暂无</dd></div>
+            <div><dt>电场强度 |E|</dt><dd data-testid="field-magnitude-value">暂无</dd></div>
+          </dl>
         </section>
 
         <section class="status-block">
-          <h3>分析覆盖层</h3>
+          <h3>场显示</h3>
           <label class="quality-control">计算质量
             <select id="quality-select" name="quality">
               <option value="preview" selected>快速预览</option>
               <option value="refined">精细计算</option>
             </select>
           </label>
-          <button id="toggle-heatmap" class="heatmap-toggle" type="button">显示电势热力图</button>
+          <button id="toggle-field-lines" class="field-lines-toggle" type="button">显示电场</button>
           <p class="status-value" data-testid="overlay-status">等待源</p>
           <p class="overlay-summary" data-testid="overlay-summary">
-            加入源后，二维视图会显示采样电场箭头。
+            点击“显示电场”后，二维视图会显示电场线。
           </p>
-        </section>
-
-        <section class="status-block">
-          <h3>计算状态</h3>
-          <p class="status-value" data-testid="solver-status">等待源</p>
-          <dl>
-            <div><dt>电势 V</dt><dd data-testid="potential-value">暂无</dd></div>
-            <div><dt>电场 E</dt><dd id="field-vector-value">暂无</dd></div>
-            <div><dt>电场强度 |E|</dt><dd data-testid="field-magnitude-value">暂无</dd></div>
-          </dl>
         </section>
 
         <section class="status-block">

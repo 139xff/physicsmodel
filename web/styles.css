@@ -293,7 +293,8 @@ summary:focus-visible {
   transform: translateY(-1px);
 }
 
-.heatmap-toggle {
+.heatmap-toggle,
+.field-lines-toggle {
   background: var(--panel-strong);
   border: 1px solid var(--line);
   border-radius: var(--radius-small);
@@ -307,12 +308,14 @@ summary:focus-visible {
   transition: background 160ms ease, border-color 160ms ease;
 }
 
-.heatmap-toggle:hover {
+.heatmap-toggle:hover,
+.field-lines-toggle:hover {
   border-color: rgba(0, 113, 227, 0.38);
 }
 
-.heatmap-toggle.active {
-  background: linear-gradient(180deg, #0a84ff, #0071e3);
+.heatmap-toggle.active,
+.field-lines-toggle.active {
+  background: linear-gradient(180deg, #d92d20, #b42318);
   color: #fff;
 }
 
@@ -447,10 +450,20 @@ summary:focus-visible {
   grid-template-columns: 1fr;
 }
 
+.probe-form button,
 .preset-form button {
   background: linear-gradient(180deg, #0a84ff, #0071e3);
+  border: 0;
+  border-radius: 11px;
   color: #fff;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 9px 10px;
   text-align: center;
+}
+
+.probe-submit {
+  grid-column: 1 / -1;
 }
 
 .preset-status,
@@ -612,6 +625,32 @@ summary:focus-visible {
 
 .overlay-vector-layer {
   opacity: 0.82;
+}
+
+.field-line-layer {
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+.field-line {
+  fill: none;
+  stroke: #14532d;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+}
+
+.field-line-arrow-stem {
+  stroke: #14532d;
+  stroke-linecap: round;
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+}
+
+.field-line-arrow {
+  fill: #14532d;
+  stroke: none;
 }
 
 .field-vector {

@@ -124,9 +124,6 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
     point_radius = _number_attr(page, "source-point-2d-point-1", "r")
-    point_size = page.get_by_test_id("source-point-2d-point-1").evaluate(
-        "element => element.getBoundingClientRect().width"
-    )
     axis_label_size = float(
         page.get_by_test_id("axis-layer-2d").get_attribute("data-label-font-px") or "0"
     )
@@ -135,14 +132,26 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     )
     axis_text_height = _axis_tick_text_height(page)
     assert source_label_height == pytest.approx(axis_text_height, abs=1.5)
-    assert point_size == pytest.approx(axis_label_size, abs=1.5)
+    assert point_radius == pytest.approx(0.5)
+    expect(page.get_by_test_id("source-point-2d-point-1")).to_have_attribute(
+        "data-visual-radius-cm",
+        "0.5",
+    )
+    expect(page.get_by_test_id("source-point-2d-point-1")).to_have_attribute(
+        "data-physics-model",
+        "ideal-point",
+    )
+    expect(page.get_by_test_id("source-point-2d-point-1")).to_have_attribute(
+        "data-physics-center",
+        "position",
+    )
     expect(page.get_by_test_id("source-point-2d-point-1")).to_have_attribute(
         "data-charge-sign",
         "positive",
     )
     expect(page.get_by_test_id("source-point-2d-point-1")).to_have_attribute(
         "data-charge-color",
-        "#0071e3",
+        "#d92d20",
     )
     point_fill = page.get_by_test_id("source-point-2d-point-1").evaluate(
         "element => getComputedStyle(element).fill"
@@ -173,7 +182,7 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     ) == pytest.approx(axis_label_size, abs=0.05)
     expect(page.get_by_test_id("source-line-segment-2d-line-segment-1")).to_have_attribute(
         "data-charge-color",
-        "#0071e3",
+        "#d92d20",
     )
 
     ring_x = _number_attr(page, "source-ring-2d-ring-1", "cx")
@@ -185,7 +194,7 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     ) == pytest.approx(axis_label_size, abs=0.05)
     expect(page.get_by_test_id("source-ring-2d-ring-1")).to_have_attribute(
         "data-charge-color",
-        "#0071e3",
+        "#d92d20",
     )
     _assert_inside_viewbox(ring_x - ring_radius)
     _assert_inside_viewbox(ring_x + ring_radius)
@@ -202,15 +211,14 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     )
     expect(page.get_by_test_id("source-line-segment-2d-line-segment-1")).to_have_attribute(
         "data-charge-color",
-        "#d92d20",
+        "#175cd3",
     )
 
-    page.locator("#probe-x").fill("0.22")
-    page.locator("#probe-y").fill("0.03")
-    page.locator("#probe-y").press("Tab")
+    page.locator("#probe-x").fill("22")
+    page.locator("#probe-y").fill("3")
+    page.locator("#probe-submit").click()
 
     expect(page.get_by_test_id("solver-status")).to_contain_text("已完成")
-    expect(page.get_by_test_id("potential-value")).not_to_contain_text("暂无")
     expect(page.get_by_test_id("field-magnitude-value")).not_to_contain_text("暂无")
     expect(page.get_by_test_id("contribution-list")).to_contain_text("point-1")
     expect(page.get_by_test_id("contribution-list")).to_contain_text("ring-1")
@@ -221,12 +229,12 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("view-3d")).to_be_visible()
     expect(page.get_by_test_id("mode-label")).to_contain_text("3D")
     expect(page.get_by_test_id("source-count")).to_contain_text("0 个源")
-    expect(page.get_by_test_id("probe-position")).to_contain_text("0.200")
+    expect(page.get_by_test_id("probe-position")).to_contain_text("20")
 
     page.get_by_role("button", name="2D").click()
     expect(page.get_by_test_id("view-2d")).to_be_visible()
     expect(page.get_by_test_id("source-count")).to_contain_text("3 个源")
-    expect(page.get_by_test_id("probe-position")).to_contain_text("0.220")
+    expect(page.get_by_test_id("probe-position")).to_contain_text("22")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
 
 
@@ -237,9 +245,9 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-0.08")
     page.locator('[data-source-id="point-1"][data-field="position.y"]').press("Tab")
 
-    page.locator("#probe-x").fill("-0.05")
-    page.locator("#probe-y").fill("0.045")
-    page.locator("#probe-y").press("Tab")
+    page.locator("#probe-x").fill("-5")
+    page.locator("#probe-y").fill("4.5")
+    page.locator("#probe-submit").click()
 
     min_x, min_y, width, height = _svg_viewbox(page)
     assert min_x == pytest.approx(-width / 2)
@@ -297,20 +305,25 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
         """
     )
     assert tick_colors == {"x": "#d92d20", "y": "#175cd3"}
-    tick_labels = page.locator(".axis-tick text").evaluate_all(
+    x_tick_labels = page.locator(".axis-tick-x text").evaluate_all(
         "nodes => nodes.map((node) => node.textContent.trim()).filter(Boolean)"
     )
-    assert all(float(label).is_integer() for label in tick_labels)
+    y_tick_labels = page.locator(".axis-tick-y text").evaluate_all(
+        "nodes => nodes.map((node) => node.textContent.trim()).filter(Boolean)"
+    )
+    assert len(x_tick_labels) == len(set(x_tick_labels))
+    assert len(y_tick_labels) == len(set(y_tick_labels))
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
     point_radius = _number_attr(page, "source-point-2d-point-1", "r")
     assert point_x == 8
     assert point_y == 8
-    point_size = page.get_by_test_id("source-point-2d-point-1").evaluate(
-        "element => element.getBoundingClientRect().width"
+    assert point_radius == pytest.approx(0.5)
+    expect(page.get_by_test_id("source-point-2d-point-1")).to_have_attribute(
+        "data-physics-model",
+        "ideal-point",
     )
-    assert point_size == pytest.approx(label_font_px, abs=1.5)
     _assert_inside_svg_viewbox(page, "view-2d", point_x - point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x + point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x, point_y - point_radius)
@@ -427,6 +440,34 @@ def test_browser_2d_axis_label_size_follows_viewport_not_zoom(page: Page) -> Non
     assert larger_text_height > initial_text_height
 
 
+def test_browser_2d_axis_decimal_labels_do_not_collapse_after_ten(page: Page) -> None:
+    surface = page.get_by_test_id("view-2d")
+    box = surface.bounding_box()
+    assert box is not None
+    center_x = box["x"] + box["width"] / 2
+    center_y = box["y"] + box["height"] / 2
+
+    page.mouse.move(center_x, center_y)
+    for _ in range(3):
+        page.mouse.wheel(0, -700)
+
+    pan_tool = page.get_by_test_id("pan-tool")
+    pan_tool.click()
+    for _ in range(8):
+        page.mouse.move(center_x, center_y)
+        page.mouse.down()
+        page.mouse.move(center_x - 600, center_y)
+        page.mouse.up()
+
+    x_tick_labels = page.locator(".axis-tick-x text").evaluate_all(
+        "nodes => nodes.map((node) => node.textContent.trim()).filter(Boolean)"
+    )
+    x_tick_values = [float(label) for label in x_tick_labels]
+
+    assert len(x_tick_labels) == len(set(x_tick_labels))
+    assert any(value > 10 and not value.is_integer() for value in x_tick_values)
+
+
 def test_browser_2d_axis_ticks_reduce_for_small_viewport(page: Page) -> None:
     page.set_viewport_size({"width": 900, "height": 620})
     page.wait_for_timeout(300)
@@ -507,6 +548,18 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
 
     expect(page.get_by_test_id("source-count")).to_contain_text("4 个源")
     expect(page.get_by_test_id("source-card-spherical-shell-1")).to_have_count(0)
+    expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "0")
+    expect(page.get_by_test_id("field-line-layer")).to_have_attribute("data-field-line-count", "0")
+    page.locator("#toggle-field-lines").click()
+    expect(page.get_by_test_id("field-line-layer")).to_have_attribute("data-enabled", "true")
+    field_line_layer = page.get_by_test_id("field-line-layer")
+    field_line_count = int(field_line_layer.get_attribute("data-field-line-count") or "0")
+    assert field_line_count == 36
+    expect(field_line_layer).to_have_attribute("data-target-line-count", "36")
+    expect(field_line_layer).to_have_attribute("data-arrow-distance-cm", "5")
+    expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(36)
+    expect(page.get_by_test_id("overlay-summary")).to_contain_text("电场线")
+    page.locator("#toggle-field-lines").click()
     page.get_by_role("button", name="3D").click()
     expect(page.locator("#add-infinite-plane")).to_be_visible()
     expect(page.locator("#add-spherical-shell")).to_be_visible()
@@ -543,8 +596,8 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.get_by_test_id("solver-status")).to_contain_text("已完成")
 
     expect(page.get_by_test_id("overlay-status")).to_contain_text("已完成")
-    expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "25")
-    expect(page.get_by_test_id("overlay-summary")).to_contain_text("采样 |E|")
+    expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "0")
+    expect(page.get_by_test_id("overlay-summary")).to_contain_text("|E|")
 
     page.get_by_role("button", name="3D").click()
     expect(page.get_by_test_id("view-3d")).to_be_visible()
@@ -566,9 +619,9 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
         })
         """
     )
-    assert disk_style["fill"] == "rgb(0, 113, 227)"
+    assert disk_style["fill"] == "rgb(217, 45, 32)"
     assert disk_style["fillOpacity"] == "1"
-    assert disk_style["stroke"] == "rgb(0, 113, 227)"
+    assert disk_style["stroke"] == "rgb(217, 45, 32)"
 
     page.locator("#preset-select").select_option("electric-dipole")
     page.locator("#preset-form button").click()
@@ -576,4 +629,4 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.get_by_test_id("source-count")).to_contain_text("2 个源")
     expect(page.get_by_test_id("source-card-dipole-positive")).to_contain_text("Positive pole")
     expect(page.get_by_test_id("quality-value")).to_contain_text("refined")
-    expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "25")
+    expect(page.get_by_test_id("overlay-vector-layer")).to_have_attribute("data-vector-count", "0")

@@ -28,6 +28,8 @@ const AXIS_COLORS = {
   y: 0x2563eb,
   z: 0x22c55e,
 };
+const POSITIVE_SOURCE_COLOR = 0x0071e3;
+const NEGATIVE_SOURCE_COLOR = 0xd92d20;
 const DEFAULT_MOUSE_BUTTONS = {
   LEFT: THREE.MOUSE.ROTATE,
   MIDDLE: THREE.MOUSE.DOLLY,
@@ -257,11 +259,25 @@ export function stopAnimLoop() {
   }
 }
 
+function sourceChargeValue(source) {
+  if ("charge_c" in source && source.charge_c !== null) {
+    return Number(source.charge_c);
+  }
+  if ("surface_charge_density_c_per_m2" in source) {
+    return Number(source.surface_charge_density_c_per_m2);
+  }
+  return 0;
+}
+
+function sourceChargeColor(source) {
+  return sourceChargeValue(source) >= 0 ? POSITIVE_SOURCE_COLOR : NEGATIVE_SOURCE_COLOR;
+}
+
 function meshForSource(source) {
   if (source.kind === "ring") {
     const radius = Math.max(source.radius_m, MIN_DISPLAY_MARKER_RADIUS);
     const geometry = new THREE.TorusGeometry(radius, Math.max(radius * 0.05, 0.003), 10, 72);
-    const material = new THREE.MeshBasicMaterial({ color: 0xb7791f });
+    const material = new THREE.MeshBasicMaterial({ color: sourceChargeColor(source) });
     const mesh = new THREE.Mesh(geometry, material);
     const threeNormal = threeVectorFromComponents(physicsNormalToThreeComponents(source.normal));
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), threeNormal);
@@ -271,7 +287,7 @@ function meshForSource(source) {
   if (source.kind === "line_segment") {
     const length = Math.max(source.length_m, MIN_DISPLAY_MARKER_RADIUS * 2);
     const geometry = new THREE.CylinderGeometry(0.004, 0.004, length, 12);
-    const material = new THREE.MeshBasicMaterial({ color: 0x0071e3 });
+    const material = new THREE.MeshBasicMaterial({ color: sourceChargeColor(source) });
     const mesh = new THREE.Mesh(geometry, material);
     const direction = threeVectorFromComponents(physicsNormalToThreeComponents(source.orientation));
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
@@ -285,7 +301,7 @@ function meshForSource(source) {
     );
     const geometry = new THREE.CircleGeometry(radius, 72);
     const material = new THREE.MeshBasicMaterial({
-      color: source.kind === "disk" ? 0x0f766e : 0x6366f1,
+      color: sourceChargeColor(source),
       opacity: 0.45,
       side: THREE.DoubleSide,
       transparent: true,
@@ -304,7 +320,7 @@ function meshForSource(source) {
     12,
   );
   const material = new THREE.MeshBasicMaterial({
-    color: source.charge_c >= 0 ? 0x0071e3 : 0xff5a72,
+    color: sourceChargeColor(source),
     wireframe: source.kind === "spherical_shell",
   });
   return new THREE.Mesh(geometry, material);

@@ -542,10 +542,17 @@ summary:focus-visible {
 }
 
 .axis-tick line {
-  stroke: rgba(17, 24, 39, 0.55);
   stroke-linecap: round;
   stroke-width: 0.9;
   vector-effect: non-scaling-stroke;
+}
+
+.axis-tick-x line {
+  stroke: #d92d20;
+}
+
+.axis-tick-y line {
+  stroke: #175cd3;
 }
 
 .axis-tick text {
@@ -562,9 +569,13 @@ summary:focus-visible {
 
 .source-point {
   fill: var(--accent);
-  filter: drop-shadow(0 2px 4px rgba(0, 113, 227, 0.35));
-  stroke: #fff;
-  stroke-width: 0.8;
+  filter: drop-shadow(0 2px 4px rgba(16, 24, 40, 0.32));
+  stroke: none;
+  stroke-width: 0;
+}
+
+.source-point-highlight {
+  pointer-events: none;
 }
 
 .source-ring {

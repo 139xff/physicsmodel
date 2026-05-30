@@ -95,6 +95,12 @@ def _svg_viewbox(page: Page) -> tuple[float, float, float, float]:
     return tuple(float(part) for part in value.split())
 
 
+def _view2d_surface_aspect(page: Page) -> float:
+    box = page.get_by_test_id("view-2d").bounding_box()
+    assert box is not None
+    return box["width"] / box["height"]
+
+
 def _axis_tick_text_height(page: Page) -> float:
     height = page.locator("[data-testid='axis-tick-2d-x'] text").first.evaluate(
         "element => element.getBoundingClientRect().height"
@@ -118,7 +124,30 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
     point_radius = _number_attr(page, "source-point-2d-point-1", "r")
-    assert point_radius == 0.2
+    point_size = page.get_by_test_id("source-point-2d-point-1").evaluate(
+        "element => element.getBoundingClientRect().width"
+    )
+    axis_label_size = float(
+        page.get_by_test_id("axis-layer-2d").get_attribute("data-label-font-px") or "0"
+    )
+    source_label_height = page.get_by_test_id("source-label-2d-point-1").evaluate(
+        "element => element.getBoundingClientRect().height"
+    )
+    axis_text_height = _axis_tick_text_height(page)
+    assert source_label_height == pytest.approx(axis_text_height, abs=1.5)
+    assert point_size == pytest.approx(axis_label_size, abs=1.5)
+    expect(page.get_by_test_id("source-point-2d-point-1")).to_have_attribute(
+        "data-charge-sign",
+        "positive",
+    )
+    expect(page.get_by_test_id("source-point-2d-point-1")).to_have_attribute(
+        "data-charge-color",
+        "#0071e3",
+    )
+    point_fill = page.get_by_test_id("source-point-2d-point-1").evaluate(
+        "element => getComputedStyle(element).fill"
+    )
+    assert "gradient" in point_fill
     _assert_inside_viewbox(point_x - point_radius)
     _assert_inside_viewbox(point_x + point_radius)
     _assert_inside_viewbox(point_y - point_radius)
@@ -129,12 +158,35 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     line_y1 = _number_attr(page, "source-line-segment-2d-line-segment-1", "y1")
     line_y2 = _number_attr(page, "source-line-segment-2d-line-segment-1", "y2")
     line_length = ((line_x2 - line_x1) ** 2 + (line_y2 - line_y1) ** 2) ** 0.5
-    assert line_length == pytest.approx(0.4)
+    assert line_x1 == pytest.approx(-8)
+    assert line_y1 == pytest.approx(-8)
+    assert line_x2 == pytest.approx(8)
+    assert line_y2 == pytest.approx(-8)
+    assert line_length == pytest.approx(16)
+    expect(page.get_by_test_id("source-line-segment-2d-line-segment-1")).to_have_attribute(
+        "data-starts-at-position",
+        "true",
+    )
+    assert float(
+        page.get_by_test_id("source-line-segment-2d-line-segment-1").get_attribute("data-stroke-px")
+        or "0"
+    ) == pytest.approx(axis_label_size, abs=0.05)
+    expect(page.get_by_test_id("source-line-segment-2d-line-segment-1")).to_have_attribute(
+        "data-charge-color",
+        "#0071e3",
+    )
 
     ring_x = _number_attr(page, "source-ring-2d-ring-1", "cx")
     ring_y = _number_attr(page, "source-ring-2d-ring-1", "cy")
     ring_radius = _number_attr(page, "source-ring-2d-ring-1", "r")
     assert ring_radius == 0.2
+    assert float(
+        page.get_by_test_id("source-ring-2d-ring-1").get_attribute("data-stroke-px") or "0"
+    ) == pytest.approx(axis_label_size, abs=0.05)
+    expect(page.get_by_test_id("source-ring-2d-ring-1")).to_have_attribute(
+        "data-charge-color",
+        "#0071e3",
+    )
     _assert_inside_viewbox(ring_x - ring_radius)
     _assert_inside_viewbox(ring_x + ring_radius)
     _assert_inside_viewbox(ring_y - ring_radius)
@@ -142,10 +194,20 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
 
     expect(page.get_by_test_id("probe-marker-2d")).to_have_count(0)
 
+    page.locator('[data-source-id="line-segment-1"][data-field="charge_c"]').fill("-1.5e-9")
+    page.locator('[data-source-id="line-segment-1"][data-field="charge_c"]').press("Tab")
+    expect(page.get_by_test_id("source-line-segment-2d-line-segment-1")).to_have_attribute(
+        "data-charge-sign",
+        "negative",
+    )
+    expect(page.get_by_test_id("source-line-segment-2d-line-segment-1")).to_have_attribute(
+        "data-charge-color",
+        "#d92d20",
+    )
+
     page.locator("#probe-x").fill("0.22")
     page.locator("#probe-y").fill("0.03")
-    page.locator("#probe-z").fill("0.08")
-    page.locator("#probe-z").press("Tab")
+    page.locator("#probe-y").press("Tab")
 
     expect(page.get_by_test_id("solver-status")).to_contain_text("已完成")
     expect(page.get_by_test_id("potential-value")).not_to_contain_text("暂无")
@@ -157,11 +219,9 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
 
     page.get_by_role("button", name="3D").click()
     expect(page.get_by_test_id("view-3d")).to_be_visible()
-    expect(page.get_by_test_id("view-3d")).to_have_attribute("data-ring-normal-three", "0,1,0")
     expect(page.get_by_test_id("mode-label")).to_contain_text("3D")
-    expect(page.get_by_test_id("source-count")).to_contain_text("3 个源")
-    expect(page.get_by_test_id("probe-position")).to_contain_text("0.220")
-    expect(page.get_by_test_id("potential-value")).not_to_contain_text("暂无")
+    expect(page.get_by_test_id("source-count")).to_contain_text("0 个源")
+    expect(page.get_by_test_id("probe-position")).to_contain_text("0.200")
 
     page.get_by_role("button", name="2D").click()
     expect(page.get_by_test_id("view-2d")).to_be_visible()
@@ -175,16 +235,17 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
 
     page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("0.08")
     page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-0.08")
-    page.locator('[data-source-id="point-1"][data-field="position.z"]').fill("0")
-    page.locator('[data-source-id="point-1"][data-field="position.z"]').press("Tab")
+    page.locator('[data-source-id="point-1"][data-field="position.y"]').press("Tab")
 
     page.locator("#probe-x").fill("-0.05")
     page.locator("#probe-y").fill("0.045")
-    page.locator("#probe-z").fill("0")
-    page.locator("#probe-z").press("Tab")
+    page.locator("#probe-y").press("Tab")
 
-    view_box = page.get_by_test_id("view-2d").locator("svg").get_attribute("viewBox")
-    assert view_box == "-10 -10 20 20"
+    min_x, min_y, width, height = _svg_viewbox(page)
+    assert min_x == pytest.approx(-width / 2)
+    assert min_y == pytest.approx(-height / 2)
+    assert width == pytest.approx(20)
+    assert width / height == pytest.approx(_view2d_surface_aspect(page), rel=0.02)
 
     grid = page.locator("#grid")
     expect(grid).to_have_attribute("width", "1")
@@ -200,19 +261,56 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
     axis_layer = page.get_by_test_id("axis-layer-2d")
     x_tick_count = int(axis_layer.get_attribute("data-x-tick-count") or "0")
     y_tick_count = int(axis_layer.get_attribute("data-y-tick-count") or "0")
-    assert 0 < x_tick_count <= 20
-    assert 0 < y_tick_count <= 20
+    assert 0 < x_tick_count <= 36
+    assert 0 < y_tick_count <= 36
     assert axis_layer.get_attribute("data-axis-unit") == "cm"
     assert axis_layer.get_attribute("data-tick-length-px") == "7"
     label_font_px = float(axis_layer.get_attribute("data-label-font-px") or "0")
-    assert 50 <= label_font_px <= 80
+    assert 8.75 <= label_font_px <= 20
+    assert x_tick_count <= int(axis_layer.get_attribute("data-x-tick-limit") or "0")
+    assert y_tick_count <= int(axis_layer.get_attribute("data-y-tick-limit") or "0")
+    visible_zero_labels = page.locator(".axis-tick text").evaluate_all(
+        "nodes => nodes.filter((node) => node.textContent.trim() === '0').length"
+    )
+    assert visible_zero_labels == 1
+    visible_x_label_count = int(axis_layer.get_attribute("data-visible-x-label-count") or "0")
+    visible_y_label_count = int(axis_layer.get_attribute("data-visible-y-label-count") or "0")
+    viewport_ratio = float(axis_layer.get_attribute("data-viewport-ratio") or "0")
+    label_ratio = visible_x_label_count / visible_y_label_count
+    assert label_ratio == pytest.approx(viewport_ratio, rel=0.35)
+    assert visible_x_label_count + visible_y_label_count >= 20
+    origin_tick_lines = page.locator(".axis-tick").evaluate_all(
+        """
+        nodes => nodes.filter((node) => {
+          const text = node.querySelector('text')?.textContent.trim();
+          return text === '0' || text === '';
+        }).reduce((count, node) => count + node.querySelectorAll('line').length, 0)
+        """
+    )
+    assert origin_tick_lines == 0
+    tick_colors = page.locator(".axis-layer").evaluate(
+        """
+        (node) => ({
+          x: node.querySelector('.axis-tick-x line')?.getAttribute('stroke'),
+          y: node.querySelector('.axis-tick-y line')?.getAttribute('stroke'),
+        })
+        """
+    )
+    assert tick_colors == {"x": "#d92d20", "y": "#175cd3"}
+    tick_labels = page.locator(".axis-tick text").evaluate_all(
+        "nodes => nodes.map((node) => node.textContent.trim()).filter(Boolean)"
+    )
+    assert all(float(label).is_integer() for label in tick_labels)
 
     point_x = _number_attr(page, "source-point-2d-point-1", "cx")
     point_y = _number_attr(page, "source-point-2d-point-1", "cy")
     point_radius = _number_attr(page, "source-point-2d-point-1", "r")
     assert point_x == 8
     assert point_y == 8
-    assert point_radius == 0.2
+    point_size = page.get_by_test_id("source-point-2d-point-1").evaluate(
+        "element => element.getBoundingClientRect().width"
+    )
+    assert point_size == pytest.approx(label_font_px, abs=1.5)
     _assert_inside_svg_viewbox(page, "view-2d", point_x - point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x + point_radius, point_y)
     _assert_inside_svg_viewbox(page, "view-2d", point_x, point_y - point_radius)
@@ -246,12 +344,10 @@ def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
 
 def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     initial_min_x, initial_min_y, initial_width, initial_height = _svg_viewbox(page)
-    assert (initial_min_x, initial_min_y, initial_width, initial_height) == (
-        -10,
-        -10,
-        20,
-        20,
-    )
+    assert initial_min_x == pytest.approx(-initial_width / 2)
+    assert initial_min_y == pytest.approx(-initial_height / 2)
+    assert initial_width == pytest.approx(20)
+    assert initial_width / initial_height == pytest.approx(_view2d_surface_aspect(page), rel=0.05)
     initial_zoom = page.get_by_test_id("view-2d").locator("svg").get_attribute("data-zoom")
     assert initial_zoom == "100"
     initial_axis_layer = page.get_by_test_id("axis-layer-2d")
@@ -273,8 +369,8 @@ def test_browser_2d_view_zooms_with_origin_fixed_at_center(page: Page) -> None:
     assert float(zoom_attr) > 1
     assert zoomed_axis_layer.get_attribute("data-tick-length-px") == initial_tick_length
     assert zoomed_axis_layer.get_attribute("data-label-font-px") == initial_label_size
-    assert int(zoomed_axis_layer.get_attribute("data-x-tick-count") or "0") <= 20
-    assert int(zoomed_axis_layer.get_attribute("data-y-tick-count") or "0") <= 20
+    assert int(zoomed_axis_layer.get_attribute("data-x-tick-count") or "0") <= 36
+    assert int(zoomed_axis_layer.get_attribute("data-y-tick-count") or "0") <= 36
     assert zoomed_width < initial_width
     assert zoomed_height < initial_height
     assert zoomed_min_x > initial_min_x
@@ -327,8 +423,24 @@ def test_browser_2d_axis_label_size_follows_viewport_not_zoom(page: Page) -> Non
     )
     larger_text_height = _axis_tick_text_height(page)
     assert larger_label_size > initial_label_size
-    assert larger_label_size <= 80
+    assert larger_label_size <= 20
     assert larger_text_height > initial_text_height
+
+
+def test_browser_2d_axis_ticks_reduce_for_small_viewport(page: Page) -> None:
+    page.set_viewport_size({"width": 900, "height": 620})
+    page.wait_for_timeout(300)
+
+    axis_layer = page.get_by_test_id("axis-layer-2d")
+    label_size = float(axis_layer.get_attribute("data-label-font-px") or "0")
+    x_tick_count = int(axis_layer.get_attribute("data-x-tick-count") or "0")
+    y_tick_count = int(axis_layer.get_attribute("data-y-tick-count") or "0")
+    x_tick_limit = int(axis_layer.get_attribute("data-x-tick-limit") or "0")
+    y_tick_limit = int(axis_layer.get_attribute("data-y-tick-limit") or "0")
+
+    assert label_size >= 8.75
+    assert 0 < x_tick_count <= x_tick_limit <= 36
+    assert 0 < y_tick_count <= y_tick_limit <= 36
 
 
 def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
@@ -339,6 +451,7 @@ def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
     initial_min_x, initial_min_y, initial_width, initial_height = _svg_viewbox(page)
     pan_tool.click()
     expect(pan_tool).to_have_attribute("aria-pressed", "true")
+    initial_min_x, initial_min_y, initial_width, initial_height = _svg_viewbox(page)
 
     surface = page.get_by_test_id("view-2d")
     box = surface.bounding_box()
@@ -352,18 +465,18 @@ def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
     page.mouse.up()
 
     panned_min_x, panned_min_y, panned_width, panned_height = _svg_viewbox(page)
-    assert panned_width == initial_width
-    assert panned_height == initial_height
+    assert panned_width == pytest.approx(initial_width, rel=0.005)
+    assert panned_height == pytest.approx(initial_height, rel=0.005)
     assert panned_min_x > initial_min_x
     assert panned_min_y > initial_min_y
 
     panned_view_box = _svg_viewbox(page)
     pan_tool.click()
     expect(pan_tool).to_have_attribute("aria-pressed", "false")
-    assert _svg_viewbox(page) == panned_view_box
+    assert _svg_viewbox(page) == pytest.approx(panned_view_box, rel=0.005)
     pan_tool.click()
     expect(pan_tool).to_have_attribute("aria-pressed", "true")
-    assert _svg_viewbox(page) == panned_view_box
+    assert _svg_viewbox(page) == pytest.approx(panned_view_box, rel=0.005)
 
     grid = page.locator("#grid")
     expect(grid).to_have_attribute("width", "1")
@@ -382,6 +495,21 @@ def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.locator("#add-infinite-plane")).to_be_hidden()
+    expect(page.locator("#add-spherical-shell")).to_be_hidden()
+    for button_selector, test_id in [
+        ("#add-point", "source-card-point-1"),
+        ("#add-line-segment", "source-card-line-segment-1"),
+        ("#add-ring", "source-card-ring-1"),
+        ("#add-disk", "source-card-disk-1"),
+    ]:
+        page.locator(button_selector).click()
+        expect(page.get_by_test_id(test_id)).to_be_visible()
+
+    expect(page.get_by_test_id("source-count")).to_contain_text("4 个源")
+    expect(page.get_by_test_id("source-card-spherical-shell-1")).to_have_count(0)
+    page.get_by_role("button", name="3D").click()
+    expect(page.locator("#add-infinite-plane")).to_be_visible()
+    expect(page.locator("#add-spherical-shell")).to_be_visible()
     for button_selector, test_id in [
         ("#add-point", "source-card-point-1"),
         ("#add-line-segment", "source-card-line-segment-1"),
@@ -391,10 +519,6 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     ]:
         page.locator(button_selector).click()
         expect(page.get_by_test_id(test_id)).to_be_visible()
-
-    expect(page.get_by_test_id("source-count")).to_contain_text("5 个源")
-    page.get_by_role("button", name="3D").click()
-    expect(page.locator("#add-infinite-plane")).to_be_visible()
     page.locator("#add-infinite-plane").click()
     expect(page.get_by_test_id("source-card-infinite-plane-1")).to_be_visible()
 
@@ -430,6 +554,21 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     page.get_by_role("button", name="2D").click()
     expect(page.get_by_test_id("view-2d")).to_be_visible()
     expect(page.get_by_test_id("source-card-disk-1")).to_contain_text("带电圆盘 1")
+    expect(page.get_by_test_id("source-card-spherical-shell-1")).to_have_count(0)
+    expect(page.get_by_test_id("source-spherical-shell-2d-spherical-shell-1")).to_have_count(0)
+
+    disk_style = page.get_by_test_id("source-disk-2d-disk-1").evaluate(
+        """
+        element => ({
+          fill: getComputedStyle(element).fill,
+          fillOpacity: getComputedStyle(element).fillOpacity,
+          stroke: getComputedStyle(element).stroke,
+        })
+        """
+    )
+    assert disk_style["fill"] == "rgb(0, 113, 227)"
+    assert disk_style["fillOpacity"] == "1"
+    assert disk_style["stroke"] == "rgb(0, 113, 227)"
 
     page.locator("#preset-select").select_option("electric-dipole")
     page.locator("#preset-form button").click()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from em_workbench.desktop import _bridge_bootstrap_script, _retain_desktop_objects
 from em_workbench.desktop_bridge import WorkbenchDesktopBridge
 from em_workbench.presets import get_preset
 
@@ -74,3 +75,27 @@ def test_desktop_bridge_simulates_trajectory_without_http_server() -> None:
     assert result["request_id"] == "desktop-trajectory-test"
     assert result["step_count"] == 8
     assert len(result["samples"]) == 9
+
+
+def test_desktop_bridge_bootstrap_waits_for_document_root() -> None:
+    script = _bridge_bootstrap_script()
+
+    assert "function appendBridgeScript()" in script
+    assert "if (!document.documentElement)" in script
+    assert "const retryDelayMs = 16;" in script
+    assert "window.setTimeout(appendBridgeScript, retryDelayMs);" in script
+    assert "window.setTimeout(attachBridge, retryDelayMs);" in script
+
+
+def test_desktop_window_retains_bridge_objects() -> None:
+    class View:
+        pass
+
+    view = View()
+    channel = object()
+    bridge = object()
+
+    _retain_desktop_objects(view, channel, bridge)
+
+    assert view._em_workbench_channel is channel
+    assert view._em_workbench_bridge is bridge

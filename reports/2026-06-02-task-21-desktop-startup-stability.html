@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 21: Desktop startup stability</title>
+    <style>
+      body {
+        color: #18202a;
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+        margin: 2rem auto;
+        max-width: 1100px;
+        padding: 0 1rem;
+      }
+      h1, h2 { color: #12355b; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td {
+        border: 1px solid #b8c2cc;
+        padding: 0.55rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: #eef4f8; }
+      code {
+        background: #f3f5f7;
+        border-radius: 3px;
+        padding: 0.1rem 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 21: Desktop startup stability</h1>
+      <p><strong>Completed:</strong> 2026-06-02 00:10:21 +08:00</p>
+
+      <h2>Scope delivered</h2>
+      <ul>
+        <li>Retained the Qt web-channel and bridge objects for the lifetime of the desktop view.</li>
+        <li>Changed bridge bootstrap polling from a zero-delay loop to a 16 ms retry interval.</li>
+        <li>Added regression tests for object retention and throttled bridge initialization.</li>
+        <li>Launched the desktop application and confirmed that its visible window remained responsive.</li>
+      </ul>
+
+      <h2>Scope deferred</h2>
+      <p>No packaging changes were made. Extended manual soak testing with larger scenes remains a follow-up activity.</p>
+
+      <h2>Changed files</h2>
+      <table>
+        <thead>
+          <tr><th>File</th><th>Change</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>src/em_workbench/desktop.py</code></td>
+            <td>Retain Qt bridge objects and throttle bootstrap retry loops.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_desktop_bridge.py</code></td>
+            <td>Add desktop object-lifetime and retry-delay regression coverage.</td>
+          </tr>
+          <tr>
+            <td><code>reports/2026-06-02-task-21-desktop-startup-stability.html</code></td>
+            <td>Record this completed task.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Commands and outcomes</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Outcome</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests\test_desktop_bridge.py -q</code></td>
+            <td>Passed: 6 tests.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests -q -p no:cacheprovider --ignore=tests\test_browser_smoke.py --ignore=tests\test_bootstrap_uv.py --ignore=tests\test_vendor_manifest.py</code></td>
+            <td>Passed: 62 tests.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run ruff check --no-cache src tests</code></td>
+            <td>Passed after replacing constant-name <code>setattr</code> calls with direct assignments.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --extra desktop python -m em_workbench.desktop --check</code></td>
+            <td>Passed: <code>desktop runtime ok</code>.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py -q</code></td>
+            <td>Passed: 11 browser tests.</td>
+          </tr>
+          <tr>
+            <td><code>node --check web\app.js</code> and <code>node --check web\api-client.js</code></td>
+            <td>Passed.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Verification evidence</h2>
+      <ul>
+        <li>The formal desktop entry point was launched through project-local uv.</li>
+        <li>After the initial 10 second check, the window <code>EM Workbench - 电磁工作台</code> was present and responsive.</li>
+        <li>After an additional 15 second delay and the browser regression run, the same desktop process remained present with <code>Responding=True</code>.</li>
+        <li>The browser suite covered shared-state interaction and motion playback while preserving the field-line layer.</li>
+      </ul>
+
+      <h2>Known risks and limitations</h2>
+      <ul>
+        <li>The verification is a focused startup and regression check, not an hours-long desktop soak test.</li>
+        <li>The browser test suite reports upstream deprecation warnings from the installed websocket stack.</li>
+      </ul>
+
+      <h2>Next scheduled task</h2>
+      <p>Collect user confirmation during manual use, especially after adding multiple point charges and running motion playback.</p>
+    </main>
+  </body>
+</html>

@@ -672,6 +672,40 @@ def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: P
     assert all(" C " in item["path"] for item in rendered_metadata)
 
 
+def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) -> None:
+    _add_point_charge(page, x_cm="-11", y_cm="0", charge_c="1e-9")
+    _add_point_charge(page, x_cm="11", y_cm="0", charge_c="-1e-9")
+    page.locator("#toggle-field-lines").click()
+    expect(page.get_by_test_id("field-line-2d")).not_to_have_count(0)
+    page.wait_for_timeout(500)
+
+    page.evaluate(
+        """
+        () => {
+            window.__fieldLineReference = document.querySelector('[data-testid="field-line-2d"]');
+        }
+        """
+    )
+    page.locator("#motion-steps").fill("12")
+    page.locator("#motion-dt").fill("0.001")
+    page.locator("#motion-run").click()
+    page.wait_for_function(
+        """
+        () => Number(
+            document.querySelector('[data-testid="motion-layer-2d"]')?.dataset.pointCount || 0
+        ) > 1
+        """
+    )
+
+    assert page.evaluate(
+        """
+        () => window.__fieldLineReference ===
+            document.querySelector('[data-testid="field-line-2d"]')
+        """
+    )
+    expect(page.get_by_test_id("motion-particle-2d")).to_be_visible()
+
+
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.locator("#add-infinite-plane")).to_be_hidden()
     expect(page.locator("#add-spherical-shell")).to_be_hidden()

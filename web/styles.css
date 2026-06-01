@@ -95,6 +95,19 @@ summary:focus-visible {
   padding: 18px 22px;
 }
 
+.desktop-runtime .topbar,
+.desktop-runtime .panel {
+  backdrop-filter: none;
+}
+
+.desktop-runtime body::before {
+  display: none;
+}
+
+.desktop-runtime .source-point {
+  filter: none;
+}
+
 .identity h1 {
   font-size: clamp(1.5rem, 2.4vw, 2.25rem);
   font-weight: 720;

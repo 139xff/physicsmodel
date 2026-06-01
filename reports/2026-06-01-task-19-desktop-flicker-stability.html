@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 19 - Desktop Flicker Stability</title>
+    <style>
+      body { color: #1f2937; font-family: Arial, sans-serif; line-height: 1.6; margin: 2rem auto; max-width: 980px; padding: 0 1rem; }
+      h1, h2 { color: #0f4c5c; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #d1d5db; padding: 0.55rem; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; }
+      code { background: #f3f4f6; padding: 0.1rem 0.25rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 19: 桌面模式鼠标移动闪烁修复</h1>
+      <p><strong>完成时间：</strong>2026-06-01 23:45:32 +08:00</p>
+
+      <h2>交付范围</h2>
+      <ul>
+        <li>在桌面 Qt 模式识别 <code>window.emWorkbenchBridgeReady</code>，为根元素添加 <code>desktop-runtime</code> 类。</li>
+        <li>仅在桌面模式关闭顶栏和面板的 <code>backdrop-filter</code>，避免鼠标移动时 Qt WebEngine 反复进行模糊合成。</li>
+        <li>保留浏览器模式的原始半透明模糊视觉效果。</li>
+        <li>增加静态回归测试，防止桌面稳定渲染样式被后续整合移除。</li>
+      </ul>
+
+      <h2>变更文件</h2>
+      <table>
+        <thead><tr><th>文件</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>web/app.js</code></td><td>识别桌面运行模式并添加稳定渲染类。</td></tr>
+          <tr><td><code>web/styles.css</code></td><td>桌面模式关闭容易闪烁的面板模糊合成。</td></tr>
+          <tr><td><code>tests/test_app.py</code></td><td>桌面稳定渲染回归检查。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>执行命令与结果</h2>
+      <table>
+        <thead><tr><th>命令</th><th>结果</th></tr></thead>
+        <tbody>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests\test_app.py::test_desktop_runtime_disables_blurred_panel_compositing -q</code></td><td>红绿验证：修复前失败，修复后通过。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests\test_app.py tests\test_desktop_bridge.py -q</code></td><td>通过：12 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests -q -p no:cacheprovider --ignore=tests\test_browser_smoke.py --ignore=tests\test_bootstrap_uv.py --ignore=tests\test_vendor_manifest.py</code></td><td>通过：60 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py -q</code></td><td>通过：10 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run ruff check --no-cache src tests</code></td><td>通过。</td></tr>
+          <tr><td><code>node --check web\app.js</code> 和 <code>node --check web\api-client.js</code></td><td>通过。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>已知风险与限制</h2>
+      <ul>
+        <li>闪烁症状需要用户在 Qt 桌面窗口中进行最终目视确认。</li>
+        <li>桌面模式的面板背景不再使用实时背景模糊，但保留透明层次和阴影。</li>
+      </ul>
+
+      <h2>下一任务</h2>
+      <p>等待桌面目视确认后，将修复同步到草稿 PR。</p>
+    </main>
+  </body>
+</html>

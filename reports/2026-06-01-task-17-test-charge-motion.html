@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 17 - Test Charge Motion</title>
+    <style>
+      body { color: #1f2937; font-family: Arial, sans-serif; line-height: 1.6; margin: 2rem auto; max-width: 980px; padding: 0 1rem; }
+      h1, h2 { color: #0f4c5c; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #d1d5db; padding: 0.55rem; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; }
+      code { background: #f3f4f6; padding: 0.1rem 0.25rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 17: 测试电荷运动整合</h1>
+      <p><strong>完成时间：</strong>2026-06-01 20:30 CST</p>
+
+      <h2>交付范围</h2>
+      <ul>
+        <li>新增复用静电场求解器的测试电荷 RK4 轨迹计算模块。</li>
+        <li>新增 <code>/api/field/trajectory</code> API 和本地桌面桥接方法。</li>
+        <li>在现有 2D 工作台中加入运动参数、轨迹计算、轨迹绘制和粒子播放。</li>
+        <li>增加 API 与桌面桥接回归测试。</li>
+      </ul>
+
+      <h2>延期范围</h2>
+      <ul>
+        <li>本次未实现 3D 轨迹播放。</li>
+        <li>本次未修改默认分支，仅准备独立功能分支和草稿 PR。</li>
+      </ul>
+
+      <h2>变更文件</h2>
+      <table>
+        <thead><tr><th>文件</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>src/em_workbench/physics/dynamics.py</code></td><td>RK4 测试电荷运动积分。</td></tr>
+          <tr><td><code>src/em_workbench/app.py</code></td><td>轨迹 API。</td></tr>
+          <tr><td><code>src/em_workbench/desktop.py</code></td><td>Qt 桥接槽。</td></tr>
+          <tr><td><code>src/em_workbench/desktop_bridge.py</code></td><td>本地轨迹计算桥接。</td></tr>
+          <tr><td><code>web/api-client.js</code></td><td>浏览器与桌面轨迹请求。</td></tr>
+          <tr><td><code>web/index.html</code></td><td>运动参数面板。</td></tr>
+          <tr><td><code>web/app.js</code></td><td>轨迹计算、绘制和播放。</td></tr>
+          <tr><td><code>web/styles.css</code></td><td>运动面板和轨迹样式。</td></tr>
+          <tr><td><code>tests/test_app.py</code></td><td>轨迹 API 测试。</td></tr>
+          <tr><td><code>tests/test_desktop_bridge.py</code></td><td>本地桥接测试。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>执行命令与结果</h2>
+      <table>
+        <thead><tr><th>命令</th><th>结果</th></tr></thead>
+        <tbody>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests\test_app.py tests\test_desktop_bridge.py -q</code></td><td>通过：11 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run ruff check --no-cache src tests</code></td><td>通过。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests -q -p no:cacheprovider --ignore=tests\test_browser_smoke.py --ignore=tests\test_bootstrap_uv.py --ignore=tests\test_vendor_manifest.py</code></td><td>通过：59 tests。</td></tr>
+          <tr><td><code>node --check web\app.js</code> 和 <code>node --check web\api-client.js</code></td><td>通过。</td></tr>
+          <tr><td><code>Invoke-WebRequest http://127.0.0.1:8011/health</code></td><td>通过：本地预览服务返回 <code>status=ok</code>。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>验证证据</h2>
+      <p>API、桌面桥接、核心测试、Ruff、JavaScript 语法检查和本地服务健康检查均通过。桌面内置浏览器连接尝试两次均被当前 Windows 沙箱阻止，因此没有取得页面截图。</p>
+
+      <h2>已知风险与限制</h2>
+      <ul>
+        <li>点电荷附近电场变化剧烈，用户仍需选择足够小的时间步长。</li>
+        <li>轨迹播放目前限定在 2D 视图。</li>
+      </ul>
+
+      <h2>下一任务</h2>
+      <p>在团队评审后决定是否合并，并按需要补充 3D 轨迹播放与浏览器截图验证。</p>
+    </main>
+  </body>
+</html>

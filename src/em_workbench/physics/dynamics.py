@@ -1,0 +1,200 @@
+"""Test-charge dynamics: move a probe charge through the electrostatic field.
+
+This module is the missing "make it move" layer. It does NOT introduce any new
+field physics -- it reuses ``evaluate_scene`` from ``solver.py`` to read the
+electric field E at the particle's current position, then integrates Newton's
+second law
+
+    F = q E          (force on the test charge)
+    a = F / m        (Newton's second law)
+    dx/dt = v        (kinematics)
+    dv/dt = a
+
+with a 4th-order Runge-Kutta (RK4) step. RK4 is chosen over plain Euler because
+it stays accurate with much larger time steps, which matters once the field is
+non-uniform (e.g. near a point charge).
+
+The test charge is assumed to be small enough that it does not disturb the
+sources that create the field (the standard "test charge" idealisation).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
+
+from em_workbench.models import Position, Scene
+from em_workbench.physics.solver import SolverQuality, evaluate_scene
+from em_workbench.physics.vectors import Vector3
+
+
+class DynamicsModel(BaseModel):
+    """Strict serializable DTO base, matching the solver's conventions."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class TestCharge(DynamicsModel):
+    """A movable probe charge driven by the scene's field."""
+
+    charge_c: FiniteFloat
+    mass_kg: FiniteFloat = Field(gt=0)
+    position: Position
+    velocity: Position  # reused as a 3-component vector in m/s
+
+
+class TrajectorySample(DynamicsModel):
+    """One recorded state along the trajectory."""
+
+    t_s: FiniteFloat
+    position: Position
+    velocity: Position
+    acceleration: Position
+    field_v_per_m: Position
+    field_magnitude_v_per_m: FiniteFloat
+
+
+class TrajectoryResponse(DynamicsModel):
+    """Full integrated trajectory for API/UI consumption."""
+
+    request_id: str | None = None
+    dt_s: FiniteFloat
+    step_count: int
+    samples: list[TrajectorySample]
+    warnings: list[str] = Field(default_factory=list)
+
+
+def _vec(p: Position | Vector3) -> Vector3:
+    return Vector3.from_components(p.x, p.y, p.z)
+
+
+def _pos(v: Vector3) -> Position:
+    return Position(x=v.x, y=v.y, z=v.z)
+
+
+def field_at(scene: Scene, point: Vector3, quality: SolverQuality) -> Vector3:
+    """Read the total electric field E (V/m) at one point by reusing the solver."""
+    response = evaluate_scene(scene, [Position(x=point.x, y=point.y, z=point.z)], quality=quality)
+    e = response.samples[0].field_v_per_m
+    return Vector3.from_components(e.x, e.y, e.z)
+
+
+def acceleration(
+    scene: Scene, position: Vector3, charge_c: float, mass_kg: float, quality: SolverQuality
+) -> Vector3:
+    """a = qE/m -- the only line where charge, field and mass meet."""
+    return field_at(scene, position, quality).scale(charge_c / mass_kg)
+
+
+def simulate_trajectory(
+    scene: Scene,
+    particle: TestCharge,
+    *,
+    dt_s: float,
+    steps: int,
+    quality: SolverQuality = "preview",
+    record_every: int = 1,
+    request_id: str | None = None,
+) -> TrajectoryResponse:
+    """Integrate the test charge through the scene field with RK4.
+
+    Parameters
+    ----------
+    dt_s:
+        Time step. Smaller is more accurate but slower. For a uniform field any
+        value is essentially exact; near a point charge use something small
+        (e.g. 1e-3 s scaled to your units).
+    steps:
+        Number of integration steps to run.
+    record_every:
+        Store every Nth state in the returned trajectory to keep payloads small.
+    """
+    if dt_s <= 0.0:
+        raise ValueError("dt_s must be positive.")
+    if steps < 1:
+        raise ValueError("steps must be at least 1.")
+
+    q = particle.charge_c
+    m = particle.mass_kg
+    x = _vec(particle.position)
+    v = _vec(particle.velocity)
+
+    def accel(pos: Vector3) -> Vector3:
+        return acceleration(scene, pos, q, m, quality)
+
+    samples: list[TrajectorySample] = []
+
+    def record(t: float, pos: Vector3, vel: Vector3) -> None:
+        e = field_at(scene, pos, quality)
+        a = e.scale(q / m)
+        samples.append(
+            TrajectorySample(
+                t_s=t,
+                position=_pos(pos),
+                velocity=_pos(vel),
+                acceleration=_pos(a),
+                field_v_per_m=_pos(e),
+                field_magnitude_v_per_m=e.magnitude(),
+            )
+        )
+
+    record(0.0, x, v)
+    t = 0.0
+    for step in range(1, steps + 1):
+        # Classic RK4 on the coupled system (x' = v, v' = a(x)).
+        k1x = v
+        k1v = accel(x)
+        k2x = v + k1v.scale(dt_s / 2.0)
+        k2v = accel(x + k1x.scale(dt_s / 2.0))
+        k3x = v + k2v.scale(dt_s / 2.0)
+        k3v = accel(x + k2x.scale(dt_s / 2.0))
+        k4x = v + k3v.scale(dt_s)
+        k4v = accel(x + k3x.scale(dt_s))
+
+        x = x + (k1x + k2x.scale(2.0) + k3x.scale(2.0) + k4x).scale(dt_s / 6.0)
+        v = v + (k1v + k2v.scale(2.0) + k3v.scale(2.0) + k4v).scale(dt_s / 6.0)
+        t += dt_s
+
+        if step % record_every == 0 or step == steps:
+            record(t, x, v)
+
+    return TrajectoryResponse(
+        request_id=request_id,
+        dt_s=dt_s,
+        step_count=steps,
+        samples=samples,
+    )
+
+
+def iter_states(
+    scene: Scene,
+    particle: TestCharge,
+    *,
+    dt_s: float,
+    quality: SolverQuality = "preview",
+) -> Iterable[tuple[float, Vector3, Vector3]]:
+    """Streaming variant: yield (t, position, velocity) one RK4 step at a time.
+
+    Use this if you prefer to drive the animation from the backend step-by-step
+    instead of precomputing the whole trajectory.
+    """
+    q = particle.charge_c
+    m = particle.mass_kg
+    x = _vec(particle.position)
+    v = _vec(particle.velocity)
+
+    def accel(pos: Vector3) -> Vector3:
+        return acceleration(scene, pos, q, m, quality)
+
+    t = 0.0
+    yield t, x, v
+    while True:
+        k1x, k1v = v, accel(x)
+        k2x, k2v = v + k1v.scale(dt_s / 2.0), accel(x + k1x.scale(dt_s / 2.0))
+        k3x, k3v = v + k2v.scale(dt_s / 2.0), accel(x + k2x.scale(dt_s / 2.0))
+        k4x, k4v = v + k3v.scale(dt_s), accel(x + k3x.scale(dt_s))
+        x = x + (k1x + k2x.scale(2.0) + k3x.scale(2.0) + k4x).scale(dt_s / 6.0)
+        v = v + (k1v + k2v.scale(2.0) + k3v.scale(2.0) + k4v).scale(dt_s / 6.0)
+        t += dt_s
+        yield t, x, v

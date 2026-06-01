@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 18: Merge test charge motion branch</title>
+    <style>
+      body { color: #1f2937; font-family: Arial, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1080px; padding: 0 1rem; }
+      h1, h2 { color: #111827; }
+      table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+      th, td { border: 1px solid #d1d5db; padding: 0.55rem; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; }
+      code { background: #f3f4f6; padding: 0.1rem 0.25rem; }
+      .pass { color: #166534; font-weight: 700; }
+      .fail { color: #991b1b; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 18: Merge test charge motion branch</h1>
+      <p><strong>Completed:</strong> 2026-06-01 22:20:00 +08:00</p>
+
+      <h2>Scope delivered</h2>
+      <ul>
+        <li>Merged <code>origin/codex/integrate-test-charge-motion</code> into <code>feature/em-workbench-foundation</code>.</li>
+        <li>Kept the current branch's scaled 2D field-line overlay and point-source form overrides while integrating trajectory invalidation and rendering.</li>
+        <li>Added wide-screen sidebar scrolling so the new motion panel does not expand the 2D canvas beyond the visible browser area.</li>
+      </ul>
+
+      <h2>Scope deferred</h2>
+      <ul>
+        <li>Publishing the local merge commit to GitHub.</li>
+        <li>Rebuilding the Windows portable desktop package.</li>
+      </ul>
+
+      <h2>Changed files</h2>
+      <table>
+        <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>src/em_workbench/physics/dynamics.py</code></td><td>Test-charge trajectory integration.</td></tr>
+          <tr><td><code>src/em_workbench/app.py</code>, <code>src/em_workbench/desktop.py</code>, <code>src/em_workbench/desktop_bridge.py</code></td><td>API and desktop bridge support.</td></tr>
+          <tr><td><code>web/api-client.js</code>, <code>web/app.js</code>, <code>web/index.html</code>, <code>web/styles.css</code></td><td>Motion controls, trajectory rendering, merge resolution, and sidebar height correction.</td></tr>
+          <tr><td><code>tests/test_app.py</code>, <code>tests/test_desktop_bridge.py</code></td><td>API and desktop bridge coverage.</td></tr>
+          <tr><td><code>reports/2026-06-01-task-17-test-charge-motion.html</code></td><td>Incoming feature report.</td></tr>
+          <tr><td><code>reports/2026-06-01-task-18-merge-test-charge-motion.html</code></td><td>This merge report.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Commands and outcomes</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+        <tbody>
+          <tr><td><code>git merge --no-ff origin/codex/integrate-test-charge-motion -m "Merge branch 'codex/integrate-test-charge-motion' into feature/em-workbench-foundation"</code></td><td>Content conflict detected in <code>web/app.js</code>; resolved manually.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td><span class="fail">Initial failure:</span> local environment had not been synced and <code>ruff</code> was absent. <span class="pass">Final result:</span> all checks passed.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td><span class="fail">Initial failure:</span> local environment had not been synced and <code>pytest</code> was absent. After dependency sync, one browser zoom test exposed the sidebar height issue. <span class="pass">Final result:</span> 76 passed, 2 dependency deprecation warnings.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td><span class="pass">Passed:</span> installed the locked development environment.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py::test_browser_2d_view_zooms_with_origin_fixed_at_center -q</code></td><td><span class="pass">Passed</span> after the sidebar height correction.</td></tr>
+          <tr><td><code>@'...Playwright viewport probe...'@ | .\.tools\uv\uv.exe run --locked --no-sync python -</code></td><td><span class="pass">Passed:</span> 2D view measured about 668 x 734 px and the second wheel target remained inside the SVG.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Verification evidence</h2>
+      <ul>
+        <li><span class="pass">Lint:</span> <code>ruff</code> completed with <code>All checks passed!</code>.</li>
+        <li><span class="pass">Tests:</span> full <code>pytest</code> suite completed with <code>76 passed</code>.</li>
+        <li><span class="pass">Browser:</span> Playwright smoke coverage passed, including repeated 2D zoom with the origin fixed at center.</li>
+      </ul>
+
+      <h2>Known risks or limitations</h2>
+      <ul>
+        <li>The full suite reports two upstream deprecation warnings from <code>websockets</code> and <code>uvicorn</code>.</li>
+        <li>The Windows portable package has not been rebuilt after this merge.</li>
+      </ul>
+
+      <h2>Next scheduled task</h2>
+      <p>Publish the reviewed merge when requested, then rebuild and smoke-check the Windows portable package before a desktop release.</p>
+    </main>
+  </body>
+</html>

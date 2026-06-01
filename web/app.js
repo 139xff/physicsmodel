@@ -1,4 +1,4 @@
-import { evaluateField, getConfig, getPreset, listPresets } from "./api-client.js";
+import { evaluateField, evaluateTrajectory, getConfig, getPreset, listPresets } from "./api-client.js";
 import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-axis-labels-pan-preserve";
 
 const runtimeStatus = document.querySelector("#runtime-status");
@@ -33,6 +33,18 @@ const qualitySelect = document.querySelector("#quality-select");
 const presetSelect = document.querySelector("#preset-select");
 const presetForm = document.querySelector("#preset-form");
 const presetStatus = document.querySelector("[data-testid='preset-status']");
+const motionState = document.querySelector("[data-testid='motion-state']");
+const motionReadout = document.querySelector("[data-testid='motion-readout']");
+const motionInputs = {
+  charge: document.querySelector("#motion-charge"),
+  mass: document.querySelector("#motion-mass"),
+  x: document.querySelector("#motion-x"),
+  y: document.querySelector("#motion-y"),
+  vx: document.querySelector("#motion-vx"),
+  vy: document.querySelector("#motion-vy"),
+  dt: document.querySelector("#motion-dt"),
+  steps: document.querySelector("#motion-steps"),
+};
 let probeInputs = {
   x: document.querySelector("#probe-x"),
   y: document.querySelector("#probe-y"),
@@ -133,6 +145,12 @@ const state = {
   lastResult: null,
   overlayResult: null,
   overlaySamples: [],
+  motion: {
+    samples: [],
+    frameIndex: 0,
+    animationId: null,
+    running: false,
+  },
 };
 
 let fieldLineTraceCache = {
@@ -328,6 +346,7 @@ function addSource(kind, overrides = {}) {
   if (state.mode === "2D" && kind === "spherical_shell") {
     return;
   }
+  clearMotionTrajectory();
   state.scene.sources.push(sourceDefaults(kind, overrides));
   fieldLineTraceCache = { key: "", result: null };
   renderAll();
@@ -370,6 +389,7 @@ function renderPointSourceForm() {
 }
 
 function removeSource(sourceId) {
+  clearMotionTrajectory();
   state.scene.sources = state.scene.sources.filter((source) => source.id !== sourceId);
   fieldLineTraceCache = { key: "", result: null };
   if (state.scene.sources.length === 0) {
@@ -385,6 +405,7 @@ function updateSource(sourceId, field, value) {
     return;
   }
 
+  clearMotionTrajectory();
   if (field === "label") {
     source.label = value || source.id;
   } else if (field.includes(".")) {
@@ -2598,9 +2619,139 @@ function render2d() {
       ${render2dAxes(viewBox, axisOrigin, scale)}
       ${renderHeatmap2d()}
       ${renderOverlay2d(scale)}
+      ${renderMotionLayer2d()}
       ${sourceMarkup}
     </svg>
   `;
+}
+
+function renderMotionLayer2d() {
+  const samples = state.motion.samples;
+  if (samples.length === 0) {
+    return '<g data-testid="motion-layer-2d" data-point-count="0"></g>';
+  }
+  const visibleSamples = samples.slice(0, state.motion.frameIndex + 1);
+  const path = visibleSamples
+    .map((sample, index) => {
+      const point = mapToViewport(sample.position.x, sample.position.y);
+      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+    })
+    .join(" ");
+  const current = visibleSamples[visibleSamples.length - 1];
+  const marker = mapToViewport(current.position.x, current.position.y);
+  const charge = Number(motionInputs.charge.value);
+  return `
+    <g class="motion-layer" data-testid="motion-layer-2d" data-point-count="${visibleSamples.length}">
+      <path class="motion-trail" d="${path}"></path>
+      <circle
+        class="motion-particle ${charge >= 0 ? "positive" : "negative"}"
+        data-testid="motion-particle-2d"
+        cx="${marker.x}"
+        cy="${marker.y}"
+        r="0.32"
+      ></circle>
+    </g>
+  `;
+}
+
+function cancelMotionAnimation() {
+  if (state.motion.animationId !== null) {
+    window.cancelAnimationFrame(state.motion.animationId);
+    state.motion.animationId = null;
+  }
+  state.motion.running = false;
+}
+
+function updateMotionReadout() {
+  if (state.motion.samples.length === 0) {
+    motionReadout.textContent = "先添加或加载电场源，再计算测试电荷轨迹。";
+    return;
+  }
+  const sample = state.motion.samples[state.motion.frameIndex];
+  motionReadout.textContent =
+    `t=${formatNumber(sample.t_s, 4)} s；` +
+    `位置 (${formatNumber(sample.position.x * 100, 4)}, ${formatNumber(sample.position.y * 100, 4)}) cm；` +
+    `速度 (${formatNumber(sample.velocity.x * 100, 4)}, ${formatNumber(sample.velocity.y * 100, 4)}) cm/s`;
+}
+
+function clearMotionTrajectory() {
+  cancelMotionAnimation();
+  state.motion.samples = [];
+  state.motion.frameIndex = 0;
+  motionState.textContent = "待命";
+  updateMotionReadout();
+}
+
+function animateMotionTrajectory() {
+  cancelMotionAnimation();
+  if (state.motion.samples.length === 0) {
+    return;
+  }
+  state.motion.running = true;
+  state.motion.frameIndex = 0;
+  motionState.textContent = "播放中";
+  let previousTime = 0;
+
+  function tick(timestamp) {
+    if (!state.motion.running) {
+      return;
+    }
+    if (previousTime === 0 || timestamp - previousTime >= 28) {
+      previousTime = timestamp;
+      state.motion.frameIndex += 1;
+      render2d();
+      updateMotionReadout();
+    }
+    if (state.motion.frameIndex >= state.motion.samples.length - 1) {
+      cancelMotionAnimation();
+      motionState.textContent = "播放完成";
+      return;
+    }
+    state.motion.animationId = window.requestAnimationFrame(tick);
+  }
+
+  render2d();
+  updateMotionReadout();
+  state.motion.animationId = window.requestAnimationFrame(tick);
+}
+
+async function runMotionSimulation() {
+  if (state.scene.sources.length === 0) {
+    motionState.textContent = "请先添加电场源";
+    return;
+  }
+  cancelMotionAnimation();
+  motionState.textContent = "计算中";
+  setMode("2D");
+  const cm = 0.01;
+  const result = await evaluateTrajectory({
+    request_id: `ui-trajectory-${Date.now()}`,
+    scene: state.scene,
+    particle: {
+      charge_c: Number(motionInputs.charge.value) * 1e-9,
+      mass_kg: Number(motionInputs.mass.value) * 1e-6,
+      position: {
+        x: Number(motionInputs.x.value) * cm,
+        y: Number(motionInputs.y.value) * cm,
+        z: 0,
+        unit: "m",
+      },
+      velocity: {
+        x: Number(motionInputs.vx.value) * cm,
+        y: Number(motionInputs.vy.value) * cm,
+        z: 0,
+        unit: "m",
+      },
+    },
+    dt_s: Number(motionInputs.dt.value),
+    steps: Number(motionInputs.steps.value),
+    quality: state.quality,
+    record_every: 1,
+  });
+  state.motion.samples = result.samples;
+  state.motion.frameIndex = 0;
+  motionState.textContent = `已计算 ${result.samples.length} 帧`;
+  animateMotionTrajectory();
 }
 
 function zoom2d(deltaY) {
@@ -2893,6 +3044,7 @@ async function loadSelectedPreset() {
   }
   presetStatus.textContent = `正在加载 ${presetId}...`;
   const preset = await getPreset(presetId);
+  clearMotionTrajectory();
   state.scene = preset.scene;
   state.lastResult = null;
   state.overlayResult = null;
@@ -2950,6 +3102,13 @@ probeForm.addEventListener("submit", measureProbeFromInputs);
 probeForm.addEventListener("input", () => {
   solverStatus.textContent = state.scene.sources.length === 0 ? "等待源" : "等待确定";
 });
+document.querySelector("#motion-run").addEventListener("click", () => {
+  runMotionSimulation().catch((error) => {
+    motionState.textContent = "计算失败";
+    motionReadout.textContent = error.message;
+  });
+});
+document.querySelector("#motion-reset").addEventListener("click", clearMotionTrajectory);
 presetForm.addEventListener("submit", (event) => {
   event.preventDefault();
   loadSelectedPreset().catch((error) => {

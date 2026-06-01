@@ -745,6 +745,92 @@ summary:focus-visible {
   stroke-width: 0.8;
 }
 
+.motion-layer {
+  pointer-events: none;
+}
+
+.motion-trail {
+  fill: none;
+  stroke: #b7791f;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.44;
+}
+
+.motion-particle {
+  stroke: #fff;
+  stroke-width: 0.12;
+}
+
+.motion-particle.positive {
+  fill: #0f766e;
+}
+
+.motion-particle.negative {
+  fill: #c53030;
+}
+
+.motion-heading,
+.motion-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.motion-heading span {
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.motion-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.motion-grid label {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.motion-grid input {
+  margin-top: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.motion-actions {
+  margin-top: 12px;
+}
+
+.motion-actions button {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  flex: 1;
+  font-size: 0.76rem;
+  font-weight: 650;
+  min-height: 36px;
+  padding: 8px;
+}
+
+.motion-actions .motion-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.motion-readout {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.55;
+  margin: 10px 0 0;
+}
+
 .analysis {
   padding: 20px;
 }
@@ -856,6 +942,14 @@ summary:focus-visible {
 .statusbar span:first-child {
   color: var(--accent);
   font-weight: 700;
+}
+
+@media (min-width: 1181px) {
+  .sidebar,
+  .analysis {
+    max-height: calc(100vh - 44px);
+    overflow-y: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

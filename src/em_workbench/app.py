@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from em_workbench.models import Position, Preset, PresetSummary, Scene, SceneValidationResponse
+from em_workbench.physics.dynamics import TestCharge, TrajectoryResponse, simulate_trajectory
 from em_workbench.physics.solver import FieldEvaluationResponse, SolverQuality, evaluate_scene
 from em_workbench.presets import get_preset, list_presets
 
@@ -73,6 +74,18 @@ class FieldEvaluateRequest(BaseModel):
     scene: Scene
     sample_points: list[Position] = Field(min_length=1)
     quality: SolverQuality = "preview"
+
+
+class TrajectoryEvaluateRequest(BaseModel):
+    """Test-charge trajectory request from the static client."""
+
+    request_id: str = Field(min_length=1)
+    scene: Scene
+    particle: TestCharge
+    dt_s: float = Field(gt=0)
+    steps: int = Field(ge=1, le=5000)
+    quality: SolverQuality = "preview"
+    record_every: int = Field(default=1, ge=1)
 
 
 def _vendor_version() -> str:
@@ -153,6 +166,20 @@ def evaluate_field(request: FieldEvaluateRequest) -> FieldEvaluationResponse:
         request.scene,
         request.sample_points,
         quality=request.quality,
+        request_id=request.request_id,
+    )
+
+
+@app.post("/api/field/trajectory", response_model=TrajectoryResponse)
+def evaluate_trajectory(request: TrajectoryEvaluateRequest) -> TrajectoryResponse:
+    """Simulate a test charge moving through the scene's electrostatic field."""
+    return simulate_trajectory(
+        request.scene,
+        request.particle,
+        dt_s=request.dt_s,
+        steps=request.steps,
+        quality=request.quality,
+        record_every=request.record_every,
         request_id=request.request_id,
     )
 

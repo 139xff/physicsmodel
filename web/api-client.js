@@ -67,3 +67,17 @@ export async function evaluateField(request) {
   });
   return parseJsonResponse(response, "Field evaluation failed");
 }
+
+export async function evaluateTrajectory(request) {
+  const bridgeResult = await callDesktopBridge("evaluateTrajectory", request);
+  if (bridgeResult !== null) {
+    return bridgeResult;
+  }
+
+  const response = await fetch("/api/field/trajectory", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJsonResponse(response, "Trajectory evaluation failed");
+}

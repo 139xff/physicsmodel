@@ -129,6 +129,28 @@
           </dl>
         </section>
 
+        <section class="status-block motion-block">
+          <div class="motion-heading">
+            <h3>测试电荷运动</h3>
+            <span data-testid="motion-state">待命</span>
+          </div>
+          <div class="motion-grid">
+            <label>电荷 q (nC)<input id="motion-charge" type="number" step="0.5" value="-1"></label>
+            <label>质量 m (mg)<input id="motion-mass" type="number" step="0.5" min="0.01" value="6"></label>
+            <label>初始 x (cm)<input id="motion-x" type="number" step="1" value="-8"></label>
+            <label>初始 y (cm)<input id="motion-y" type="number" step="1" value="4"></label>
+            <label>初速 vx (cm/s)<input id="motion-vx" type="number" step="1" value="6"></label>
+            <label>初速 vy (cm/s)<input id="motion-vy" type="number" step="1" value="0"></label>
+            <label>时间步 dt (s)<input id="motion-dt" type="number" step="0.001" min="0.000001" value="0.005"></label>
+            <label>步数<input id="motion-steps" type="number" step="10" min="1" max="5000" value="400"></label>
+          </div>
+          <div class="motion-actions">
+            <button id="motion-run" class="motion-primary" type="button">计算并播放</button>
+            <button id="motion-reset" type="button">重置轨迹</button>
+          </div>
+          <p class="motion-readout" data-testid="motion-readout">先添加或加载电场源，再计算测试电荷轨迹。</p>
+        </section>
+
         <section class="status-block">
           <h3>场显示</h3>
           <label class="quality-control">计算质量

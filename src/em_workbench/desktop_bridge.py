@@ -6,8 +6,9 @@ import json
 
 from pydantic import BaseModel, Field
 
-from em_workbench.app import config
+from em_workbench.app import TrajectoryEvaluateRequest, config
 from em_workbench.models import Position, Preset, PresetSummary, Scene
+from em_workbench.physics.dynamics import TrajectoryResponse, simulate_trajectory
 from em_workbench.physics.solver import FieldEvaluationResponse, SolverQuality, evaluate_scene
 from em_workbench.presets import get_preset, list_presets
 
@@ -50,6 +51,26 @@ class WorkbenchDesktopBridge:
         )
         return result.model_dump_json()
 
+    def evaluate_trajectory(self, payload: str) -> str:
+        request = TrajectoryEvaluateRequest.model_validate_json(payload)
+        result = simulate_trajectory(
+            request.scene,
+            request.particle,
+            dt_s=request.dt_s,
+            steps=request.steps,
+            quality=request.quality,
+            record_every=request.record_every,
+            request_id=request.request_id,
+        )
+        return result.model_dump_json()
 
-def _json_list(items: list[PresetSummary] | list[Preset] | list[FieldEvaluationResponse]) -> str:
+
+def _json_list(
+    items: (
+        list[PresetSummary]
+        | list[Preset]
+        | list[FieldEvaluationResponse]
+        | list[TrajectoryResponse]
+    ),
+) -> str:
     return json.dumps([item.model_dump(mode="json") for item in items], ensure_ascii=False)

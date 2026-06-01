@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 19: CPU/CUDA performance design</title>
+    <style>
+      body { color: #1f2937; font-family: Arial, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1080px; padding: 0 1rem; }
+      h1, h2 { color: #111827; }
+      table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+      th, td { border: 1px solid #d1d5db; padding: 0.55rem; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; }
+      code { background: #f3f4f6; padding: 0.1rem 0.25rem; }
+      .pass { color: #166534; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 19: CPU/CUDA performance design</h1>
+      <p><strong>Completed:</strong> 2026-06-02 00:48:22 +08:00</p>
+
+      <h2>Scope delivered</h2>
+      <ul>
+        <li>Measured the existing scalar Python solver and single-particle trajectory baseline.</li>
+        <li>Inspected the Python solver, browser 2D field-line tracer, dependency model, CPU, and GPU.</li>
+        <li>Specified a complete optional-CUDA performance redesign with compiled CPU fallback.</li>
+        <li>Defined API, caching, concurrency, warm-up, correctness, benchmark, and packaging requirements.</li>
+      </ul>
+
+      <h2>Scope deferred</h2>
+      <ul>
+        <li>Implementation of CPU JIT and CUDA kernels.</li>
+        <li>Dependency lock updates.</li>
+        <li>Desktop bridge bug fix from the previously interrupted debugging task.</li>
+      </ul>
+
+      <h2>Changed files</h2>
+      <table>
+        <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>docs/superpowers/specs/2026-06-02-cpu-cuda-performance-design.md</code></td><td>Approved CPU/CUDA performance redesign specification.</td></tr>
+          <tr><td><code>reports/2026-06-02-task-19-cpu-cuda-performance-design.html</code></td><td>This engineering record.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Commands and outcomes</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+        <tbody>
+          <tr><td><code>nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader</code></td><td><span class="pass">Passed:</span> RTX 5060 Ti, driver 596.49, 16311 MiB, compute capability 12.0.</td></tr>
+          <tr><td><code>Get-CimInstance Win32_Processor</code></td><td><span class="pass">Passed:</span> Intel Core i5-14490F, 10 cores, 16 logical processors.</td></tr>
+          <tr><td><code>nvcc --version</code></td><td><span class="pass">Expected absence:</span> <code>nvcc</code> is not installed; the design does not require it.</td></tr>
+          <tr><td><code>@'&lt;inline baseline benchmark&gt;'@ | .\.tools\uv\uv.exe run --locked --no-sync python -</code></td><td><span class="pass">Passed:</span> recorded field evaluation and trajectory medians.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Baseline evidence</h2>
+      <table>
+        <thead><tr><th>Workload</th><th>Median</th></tr></thead>
+        <tbody>
+          <tr><td><code>preview</code>, 400 field samples</td><td>1777.212 ms</td></tr>
+          <tr><td><code>refined</code>, 400 field samples</td><td>12223.973 ms</td></tr>
+          <tr><td><code>preview</code>, 400-step trajectory</td><td>8390.564 ms</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Verification evidence</h2>
+      <ul>
+        <li><span class="pass">Design review:</span> deployment, precision, field-line backend, API, caching, concurrency, testing, and delivery phases were approved interactively.</li>
+        <li><span class="pass">Hardware evidence:</span> the development machine has an NVIDIA CUDA-capable GPU without a required local compiler toolchain.</li>
+        <li><span class="pass">Scope isolation:</span> the interrupted desktop bridge regression test remains unstaged and is excluded from this design task.</li>
+        <li><strong>Lint, tests, and browser verification:</strong> not run because this task changes documentation only. Runtime verification is scheduled for implementation tasks.</li>
+      </ul>
+
+      <h2>Known risks or limitations</h2>
+      <ul>
+        <li>This task is a design deliverable; no runtime performance improvement is claimed yet.</li>
+        <li>CUDA package versions must be resolved and locked through project-local uv during implementation.</li>
+        <li>Cold JIT timings and warm interactive timings must be reported separately.</li>
+      </ul>
+
+      <h2>Next scheduled task</h2>
+      <p>Review the written specification, then create the implementation plan after approval.</p>
+    </main>
+  </body>
+</html>

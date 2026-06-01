@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>电磁工作台 | 静电场</title>
-  <link rel="stylesheet" href="./styles.css?v=20260530-point-sphere">
+  <link rel="stylesheet" href="./styles.css?v=20260601-point-form-field-focus">
   <script type="importmap">
     {
       "imports": {
@@ -13,7 +13,7 @@
       }
     }
   </script>
-  <script type="module" src="./app.js?v=20260531-field-lines-measure-cm"></script>
+  <script type="module" src="./app.js?v=20260601-uniform-charge-rays"></script>
 </head>
 <body>
   <div class="workbench">
@@ -41,8 +41,20 @@
             <span>可编辑</span>
           </div>
           <p class="panel-copy">把不同带电体加入同一个场景，自由组合、观察和测量。</p>
+          <form id="point-source-form" class="point-source-form">
+            <div class="source-form-heading">
+              <strong>点电荷参数</strong>
+              <span>创建后只读</span>
+            </div>
+            <div class="mini-grid">
+              <label>位置 x / cm <input id="point-source-x" type="number" step="0.1" value="-16"></label>
+              <label>位置 y / cm <input id="point-source-y" type="number" step="0.1" value="0"></label>
+              <label id="point-source-z-field">位置 z / cm <input id="point-source-z" type="number" step="0.1" value="0"></label>
+              <label>电荷量 C <input id="point-source-charge" type="number" step="1e-10" value="1e-9"></label>
+            </div>
+            <button id="add-point" type="submit">加入点电荷</button>
+          </form>
           <div class="source-grid" aria-label="Electrostatic source types">
-            <button id="add-point" type="button">加入点电荷</button>
             <button id="add-line-segment" type="button">加入带电线段</button>
             <button id="add-ring" type="button">加入带电圆环</button>
             <button id="add-disk" type="button">加入带电圆盘</button>

@@ -71,6 +71,28 @@ def _fill_number(page: Page, label: str, value: str) -> None:
     field.press("Tab")
 
 
+def _set_source_number(page: Page, source_id: str, field: str, value: str) -> None:
+    control = page.locator(f'[data-source-id="{source_id}"][data-field="{field}"]')
+    control.fill(value)
+    control.press("Tab")
+
+
+def _add_point_charge(
+    page: Page,
+    *,
+    x_cm: str = "-16",
+    y_cm: str = "0",
+    z_cm: str = "0",
+    charge_c: str = "1e-9",
+) -> None:
+    page.locator("#point-source-x").fill(x_cm)
+    page.locator("#point-source-y").fill(y_cm)
+    if page.locator("#point-source-z").is_visible():
+        page.locator("#point-source-z").fill(z_cm)
+    page.locator("#point-source-charge").fill(charge_c)
+    page.locator("#add-point").click()
+
+
 def _number_attr(page: Page, test_id: str, attribute: str) -> float:
     value = page.get_by_test_id(test_id).get_attribute(attribute)
     assert value is not None
@@ -111,12 +133,20 @@ def _axis_tick_text_height(page: Page) -> float:
 def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -> None:
     expect(page.get_by_role("heading", name="电磁工作台")).to_be_visible()
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
+    expect(page.locator("#point-source-z-field")).to_be_hidden()
 
-    page.locator("#add-point").click()
+    _add_point_charge(page)
     page.locator("#add-line-segment").click()
     page.locator("#add-ring").click()
 
     expect(page.get_by_test_id("source-card-point-1")).to_contain_text("点电荷 1")
+    expect(page.get_by_test_id("source-card-point-1")).to_have_attribute(
+        "data-source-readonly",
+        "true",
+    )
+    expect(page.locator('[data-source-id="point-1"][data-field="position.x"]')).to_have_count(0)
+    expect(page.get_by_test_id("source-readout-point-1-position-x")).to_contain_text("-16")
+    expect(page.get_by_test_id("source-readout-point-1-charge-c")).to_contain_text("1.00")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
     expect(page.get_by_test_id("view-2d")).to_contain_text("点电荷 1")
     expect(page.get_by_test_id("view-2d")).to_contain_text("带电圆环 1")
@@ -228,22 +258,20 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     page.get_by_role("button", name="3D").click()
     expect(page.get_by_test_id("view-3d")).to_be_visible()
     expect(page.get_by_test_id("mode-label")).to_contain_text("3D")
+    expect(page.locator("#point-source-z-field")).to_be_visible()
     expect(page.get_by_test_id("source-count")).to_contain_text("0 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("20")
 
     page.get_by_role("button", name="2D").click()
     expect(page.get_by_test_id("view-2d")).to_be_visible()
+    expect(page.locator("#point-source-z-field")).to_be_hidden()
     expect(page.get_by_test_id("source-count")).to_contain_text("3 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("22")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
 
 
 def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
-    page.locator("#add-point").click()
-
-    page.locator('[data-source-id="point-1"][data-field="position.x"]').fill("0.08")
-    page.locator('[data-source-id="point-1"][data-field="position.y"]').fill("-0.08")
-    page.locator('[data-source-id="point-1"][data-field="position.y"]').press("Tab")
+    _add_point_charge(page, x_cm="8", y_cm="-8")
 
     page.locator("#probe-x").fill("-5")
     page.locator("#probe-y").fill("4.5")
@@ -534,6 +562,110 @@ def test_browser_pan_tool_moves_view_without_moving_axes(page: Page) -> None:
     expect(page.get_by_test_id("view-3d")).to_have_attribute("data-pan-speed", "1")
 
 
+def test_browser_field_lines_use_global_display_cap_for_same_sign_charges(page: Page) -> None:
+    _add_point_charge(page, x_cm="-11", y_cm="0", charge_c="1e-9")
+    _add_point_charge(page, x_cm="11", y_cm="0", charge_c="1e-9")
+
+    page.locator("#toggle-field-lines").click()
+    field_line_layer = page.get_by_test_id("field-line-layer")
+    expect(field_line_layer).to_have_attribute("data-display-strategy", "uniform-charge-angle")
+    expect(field_line_layer).to_have_attribute("data-candidates-per-point-charge", "48")
+    expect(field_line_layer).to_have_attribute("data-target-total-charge-rays", "96")
+    expect(field_line_layer).to_have_attribute("data-display-max-line-count", "120")
+    expect(field_line_layer).to_have_attribute("data-target-line-count", "120")
+    expect(field_line_layer).to_have_attribute("data-conflict-filter", "display-spatial")
+    candidate_count = int(field_line_layer.get_attribute("data-candidate-line-count") or "0")
+    raw_count = int(field_line_layer.get_attribute("data-raw-line-count") or "0")
+    display_count = int(field_line_layer.get_attribute("data-field-line-count") or "0")
+    assert candidate_count == 96
+    assert 0 < raw_count <= candidate_count
+    assert 48 <= display_count <= 96
+    expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(display_count)
+    source_counts = page.get_by_test_id("field-line-2d").evaluate_all(
+        """
+        nodes => nodes.reduce((counts, node) => {
+            const sourceId = node.getAttribute("data-field-start-id") === "infinity"
+                ? node.getAttribute("data-field-end-id")
+                : node.getAttribute("data-field-start-id");
+            counts[sourceId] = (counts[sourceId] || 0) + 1;
+            return counts;
+        }, {})
+        """
+    )
+    assert set(source_counts) == {"point-1", "point-2"}
+    assert sum(source_counts.values()) == display_count
+    assert all(count > 0 for count in source_counts.values())
+
+
+def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: Page) -> None:
+    _add_point_charge(page, x_cm="-11", y_cm="0", charge_c="1e-9")
+    _add_point_charge(page, x_cm="11", y_cm="0", charge_c="-2e-9")
+
+    page.locator("#toggle-field-lines").click()
+    field_line_layer = page.get_by_test_id("field-line-layer")
+    expect(field_line_layer).to_have_attribute("data-display-strategy", "uniform-charge-angle")
+    expect(field_line_layer).to_have_attribute("data-candidates-per-point-charge", "48")
+    expect(field_line_layer).to_have_attribute("data-target-total-charge-rays", "96")
+    expect(field_line_layer).to_have_attribute("data-boundary-candidate-count", "0")
+    expect(field_line_layer).to_have_attribute("data-display-max-line-count", "120")
+    expect(field_line_layer).to_have_attribute("data-target-line-count", "120")
+    expect(field_line_layer).to_have_attribute("data-conflict-filter", "display-spatial")
+
+    candidate_count = int(field_line_layer.get_attribute("data-candidate-line-count") or "0")
+    display_count = int(field_line_layer.get_attribute("data-field-line-count") or "0")
+    raw_count = int(field_line_layer.get_attribute("data-raw-line-count") or "0")
+    paired_count = int(field_line_layer.get_attribute("data-paired-line-count") or "0")
+    display_rejected = int(
+        field_line_layer.get_attribute("data-display-conflict-rejected-line-count") or "0"
+    )
+    display_deduped = int(field_line_layer.get_attribute("data-display-deduped-line-count") or "0")
+    assert candidate_count == 96
+    assert 0 < raw_count <= candidate_count
+    assert 40 <= display_count <= 96
+    assert 0 < paired_count <= 72
+    assert display_rejected + display_deduped > 0
+    expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(display_count)
+
+    topology_counts = page.get_by_test_id("field-line-2d").evaluate_all(
+        """
+        nodes => nodes.reduce((counts, node) => {
+            const topology = node.getAttribute("data-field-topology");
+            const startId = node.getAttribute("data-field-start-id");
+            const endId = node.getAttribute("data-field-end-id");
+            const key = `${topology}:${startId}->${endId}`;
+            counts[key] = (counts[key] || 0) + 1;
+            return counts;
+        }, {})
+        """
+    )
+    assert 0 < topology_counts["charge-to-charge:point-1->point-2"] <= 72
+    assert topology_counts["infinity-to-charge:infinity->point-2"] > 0
+    assert "charge-to-charge:point-2->point-1" not in topology_counts
+
+    rendered_metadata = page.get_by_test_id("field-line-2d").evaluate_all(
+        """
+        nodes => nodes.map((node) => ({
+            method: node.getAttribute("data-trace-method"),
+            pathModel: node.getAttribute("data-path-model"),
+            endpointClass: node.getAttribute("data-endpoint-class"),
+            stopReason: node.getAttribute("data-stop-reason"),
+            path: node.getAttribute("d"),
+        }))
+        """
+    )
+    assert all(item["method"] == "adaptive-rk4" for item in rendered_metadata)
+    assert all(item["pathModel"] == "adaptive-rk4-spline" for item in rendered_metadata)
+    assert all(
+        item["endpointClass"] in {"opposite-charge", "infinity"}
+        for item in rendered_metadata
+    )
+    assert all(
+        item["stopReason"] in {"opposite-charge", "view-boundary"}
+        for item in rendered_metadata
+    )
+    assert all(" C " in item["path"] for item in rendered_metadata)
+
+
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.locator("#add-infinite-plane")).to_be_hidden()
     expect(page.locator("#add-spherical-shell")).to_be_hidden()
@@ -554,10 +686,127 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.get_by_test_id("field-line-layer")).to_have_attribute("data-enabled", "true")
     field_line_layer = page.get_by_test_id("field-line-layer")
     field_line_count = int(field_line_layer.get_attribute("data-field-line-count") or "0")
-    assert field_line_count == 36
-    expect(field_line_layer).to_have_attribute("data-target-line-count", "36")
-    expect(field_line_layer).to_have_attribute("data-arrow-distance-cm", "5")
-    expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(36)
+    assert 0 < field_line_count <= 120
+    expect(field_line_layer).to_have_attribute("data-display-strategy", "uniform-charge-angle")
+    expect(field_line_layer).to_have_attribute("data-candidates-per-point-charge", "64")
+    expect(field_line_layer).to_have_attribute("data-target-total-charge-rays", "96")
+    expect(field_line_layer).to_have_attribute("data-display-max-line-count", "120")
+    expect(field_line_layer).to_have_attribute("data-target-line-count", "120")
+    expect(field_line_layer).to_have_attribute("data-raw-line-count", "64")
+    expect(field_line_layer).to_have_attribute("data-arrow-placement", "arc-fraction")
+    expect(field_line_layer).to_have_attribute("data-arrow-fraction-base", "0.42")
+    expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(field_line_count)
+    line_trace_metadata = page.get_by_test_id("field-line-2d").evaluate_all(
+        """
+        nodes => nodes.map((node) => ({
+            method: node.getAttribute("data-trace-method"),
+            pathModel: node.getAttribute("data-path-model"),
+            endpointClass: node.getAttribute("data-endpoint-class"),
+            stopReason: node.getAttribute("data-stop-reason"),
+            path: node.getAttribute("d"),
+            markerEnd: node.getAttribute("marker-end"),
+            finitePath: [...(node.getAttribute("d").matchAll(/-?\\d+(?:\\.\\d+)?/g))]
+                .every((match) => Number.isFinite(Number(match[0]))),
+        }))
+        """
+    )
+    assert all(item["method"] == "adaptive-rk4" for item in line_trace_metadata)
+    assert all(item["pathModel"] == "adaptive-rk4-spline" for item in line_trace_metadata)
+    assert all(item["endpointClass"] != "numerical-artifact" for item in line_trace_metadata)
+    assert all(
+        item["stopReason"] not in {"direction-reversal", "self-approach"}
+        for item in line_trace_metadata
+    )
+    assert all(item["finitePath"] for item in line_trace_metadata)
+    assert all(" C " in item["path"] for item in line_trace_metadata)
+    assert all(item["markerEnd"] is None for item in line_trace_metadata)
+    arrow_metadata = page.get_by_test_id("field-line-arrow-2d").evaluate_all(
+        """
+        nodes => nodes.map((node) => ({
+            tagName: node.tagName.toLowerCase(),
+            onLine: node.getAttribute("data-arrow-on-line"),
+            sizePx: node.getAttribute("data-arrow-size-px"),
+            direction: node.getAttribute("data-arrow-direction"),
+            placement: node.getAttribute("data-arrow-placement"),
+            fraction: Number(node.getAttribute("data-arrow-fraction")),
+        }))
+        """
+    )
+    assert all(item["tagName"] == "path" for item in arrow_metadata)
+    assert all(item["onLine"] == "true" for item in arrow_metadata)
+    assert all(item["sizePx"] == "9" for item in arrow_metadata)
+    assert all(item["direction"] == "field" for item in arrow_metadata)
+    assert all(item["placement"] == "arc-fraction" for item in arrow_metadata)
+    assert all(0.22 <= item["fraction"] <= 0.72 for item in arrow_metadata)
+    arrow_geometry = page.evaluate(
+        """
+        () => {
+            const parsePoints = (path) => {
+                const numbers = [...path.matchAll(/-?\\d+(?:\\.\\d+)?/g)]
+                    .map((match) => Number(match[0]));
+                const points = [];
+                for (let index = 0; index < numbers.length; index += 2) {
+                    points.push({ x: numbers[index], y: numbers[index + 1] });
+                }
+                return points;
+            };
+            const distanceToSegment = (point, start, end) => {
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+                const lengthSq = dx * dx + dy * dy;
+                const projection = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq;
+                const t = lengthSq > 0
+                    ? Math.max(0, Math.min(1, projection))
+                    : 0;
+                return Math.hypot(point.x - (start.x + dx * t), point.y - (start.y + dy * t));
+            };
+            const toScreen = (svg, point) => {
+                const svgPoint = svg.createSVGPoint();
+                svgPoint.x = point.x;
+                svgPoint.y = point.y;
+                const screenPoint = svgPoint.matrixTransform(svg.getScreenCTM());
+                return { x: screenPoint.x, y: screenPoint.y };
+            };
+            const lines = [...document.querySelectorAll('[data-testid="field-line-2d"]')];
+            const arrows = [...document.querySelectorAll('[data-testid="field-line-arrow-2d"]')];
+            const metrics = arrows.map((arrow, index) => {
+                const arrowPoints = parsePoints(arrow.getAttribute("d"));
+                const linePoints = parsePoints(lines[index].getAttribute("d"));
+                let tipDistance = Infinity;
+                for (let pointIndex = 1; pointIndex < linePoints.length; pointIndex += 1) {
+                    tipDistance = Math.min(
+                        tipDistance,
+                        distanceToSegment(
+                            arrowPoints[0],
+                            linePoints[pointIndex - 1],
+                            linePoints[pointIndex],
+                        ),
+                    );
+                }
+                const svg = arrow.ownerSVGElement;
+                const tip = toScreen(svg, arrowPoints[0]);
+                const left = toScreen(svg, arrowPoints[1]);
+                const right = toScreen(svg, arrowPoints[2]);
+                const base = { x: (left.x + right.x) / 2, y: (left.y + right.y) / 2 };
+                return {
+                    tipDistance,
+                    lengthPx: Math.hypot(tip.x - base.x, tip.y - base.y),
+                    widthPx: Math.hypot(left.x - right.x, left.y - right.y),
+                };
+            });
+            return {
+                maxTipDistance: Math.max(...metrics.map((metric) => metric.tipDistance)),
+                minLengthPx: Math.min(...metrics.map((metric) => metric.lengthPx)),
+                maxLengthPx: Math.max(...metrics.map((metric) => metric.lengthPx)),
+                minWidthPx: Math.min(...metrics.map((metric) => metric.widthPx)),
+                maxWidthPx: Math.max(...metrics.map((metric) => metric.widthPx)),
+            };
+        }
+        """
+    )
+    assert arrow_geometry["maxTipDistance"] < 0.01
+    assert 8 <= arrow_geometry["minLengthPx"] <= arrow_geometry["maxLengthPx"] <= 10
+    assert 6 <= arrow_geometry["minWidthPx"] <= arrow_geometry["maxWidthPx"] <= 8
     expect(page.get_by_test_id("overlay-summary")).to_contain_text("电场线")
     page.locator("#toggle-field-lines").click()
     page.get_by_role("button", name="3D").click()

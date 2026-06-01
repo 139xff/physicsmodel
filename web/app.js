@@ -13,6 +13,12 @@ const panToolButton = document.querySelector("#pan-tool");
 const toggleFieldLinesButton = document.querySelector("#toggle-field-lines");
 const addInfinitePlaneButton = document.querySelector("#add-infinite-plane");
 const addSphericalShellButton = document.querySelector("#add-spherical-shell");
+const pointSourceForm = document.querySelector("#point-source-form");
+const pointSourceXInput = document.querySelector("#point-source-x");
+const pointSourceYInput = document.querySelector("#point-source-y");
+const pointSourceZInput = document.querySelector("#point-source-z");
+const pointSourceZField = document.querySelector("#point-source-z-field");
+const pointSourceChargeInput = document.querySelector("#point-source-charge");
 const solverStatus = document.querySelector("[data-testid='solver-status']");
 const overlayStatus = document.querySelector("[data-testid='overlay-status']");
 const overlaySummary = document.querySelector("[data-testid='overlay-summary']");
@@ -58,15 +64,43 @@ const AXIS_Y_COLOR = "#175cd3";
 const POSITIVE_SOURCE_COLOR = "#d92d20";
 const NEGATIVE_SOURCE_COLOR = "#175cd3";
 const OVERLAY_SAMPLE_STEPS = [-1, -0.5, 0, 0.5, 1];
-const FIELD_LINE_TOTAL_COUNT = 36;
+const FIELD_LINE_TARGET_TOTAL_CHARGE_RAYS = 96;
+const FIELD_LINE_MIN_CHARGE_RAYS = 24;
+const FIELD_LINE_MAX_CHARGE_RAYS = 64;
+const FIELD_LINE_DISPLAY_MAX_COUNT = 120;
+const FIELD_LINE_MAX_PAIR_DISPLAY_COUNT = 72;
 const FIELD_LINE_START_RADIUS_M = POINT_VISUAL_RADIUS_CM / 100;
-const FIELD_LINE_STOP_RADIUS_M = 0.014;
-const FIELD_LINE_STEP_M = 0.065;
-const FIELD_LINE_MAX_STEPS = 420;
-const FIELD_LINE_MIN_FIELD = 1e-18;
-const FIELD_LINE_SOFTENING_M = 0.006;
-const FIELD_LINE_ARROW_DISTANCE_M = 0.05;
-const FIELD_LINE_ARROW_STEM_M = 0.012;
+const FIELD_LINE_ENDPOINT_MARGIN_M = 0.0015;
+const FIELD_LINE_BASE_STEP_M = 0.025;
+const FIELD_LINE_MIN_STEP_M = 0.004;
+const FIELD_LINE_MAX_STEP_M = 0.06;
+const FIELD_LINE_MAX_STEPS = 700;
+const FIELD_LINE_MAX_POINTS = 420;
+const FIELD_LINE_MIN_FIELD = 1e-15;
+const FIELD_LINE_SINGULARITY_RADIUS_M = 1e-6;
+const FIELD_LINE_REVERSAL_DOT_LIMIT = -0.2;
+const FIELD_LINE_ADAPT_RETRY_DOT = 0.985;
+const FIELD_LINE_ADAPT_GROW_DOT = 0.998;
+const FIELD_LINE_ADAPT_SHRINK_DOT = 0.992;
+const FIELD_LINE_ADAPT_ERROR_MIN_M = 0.0012;
+const FIELD_LINE_ADAPT_ERROR_FRACTION = 0.035;
+const FIELD_LINE_SELF_APPROACH_M = 0.006;
+const FIELD_LINE_SEED_ATTEMPTS = 1;
+const FIELD_LINE_MIN_RENDER_POINTS = 4;
+const FIELD_LINE_ACCEPTED_CLEARANCE_M = 0.001;
+const FIELD_LINE_CHARGE_CLEARANCE_RADIUS_M = 0.025;
+const FIELD_LINE_SPATIAL_CELL_M = 0.025;
+const FIELD_LINE_CURVE_CONTROL_FACTOR = 0.42;
+const FIELD_LINE_DISPLAY_SMOOTHING_ITERATIONS = 0;
+const FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT = 0.18;
+const FIELD_LINE_DIRECTION_DOT_MIN = -0.05;
+const FIELD_LINE_DISPLAY_STRATEGY = "uniform-charge-angle";
+const FIELD_LINE_ARROW_FRACTION_BASE = 0.42;
+const FIELD_LINE_ARROW_FRACTION_SPREAD = 0.18;
+const FIELD_LINE_ARROW_FRACTION_MIN = 0.22;
+const FIELD_LINE_ARROW_FRACTION_MAX = 0.72;
+const FIELD_LINE_ARROW_LENGTH_PX = 9;
+const FIELD_LINE_ARROW_WIDTH_PX = 7;
 
 const state = {
   mode: "2D",
@@ -93,6 +127,11 @@ const state = {
   lastResult: null,
   overlayResult: null,
   overlaySamples: [],
+};
+
+let fieldLineTraceCache = {
+  key: "",
+  result: null,
 };
 
 const modeStates = {
@@ -199,23 +238,34 @@ function kindLabel(kind) {
   return KIND_LABELS[kind] ?? kind;
 }
 
-function sourceDefaults(kind) {
+function sourceDefaults(kind, overrides = {}) {
   state.sourceIndex[kind] += 1;
   const index = state.sourceIndex[kind];
   const idPrefix = kind.replaceAll("_", "-");
+  const overridePosition = overrides.position || {};
   const base = {
     id: `${idPrefix}-${index}`,
     kind,
     label: `${kindLabel(kind)} ${index}`,
-    position: { x: 0, y: 0, z: 0, unit: "m" },
+    position: {
+      x: Number(overridePosition.x ?? 0),
+      y: Number(overridePosition.y ?? 0),
+      z: Number(overridePosition.z ?? 0),
+      unit: "m",
+    },
   };
 
   if (kind === "point") {
     return {
       ...base,
       label: `点电荷 ${index}`,
-      position: { x: -0.16, y: 0, z: 0, unit: "m" },
-      charge_c: 1e-9,
+      position: {
+        x: Number(overridePosition.x ?? -0.16),
+        y: Number(overridePosition.y ?? 0),
+        z: Number(overridePosition.z ?? 0),
+        unit: "m",
+      },
+      charge_c: Number(overrides.charge_c ?? 1e-9),
     };
   }
   if (kind === "line_segment") {
@@ -268,17 +318,54 @@ function sourceDefaults(kind) {
   };
 }
 
-function addSource(kind) {
+function addSource(kind, overrides = {}) {
   if (state.mode === "2D" && kind === "spherical_shell") {
     return;
   }
-  state.scene.sources.push(sourceDefaults(kind));
+  state.scene.sources.push(sourceDefaults(kind, overrides));
+  fieldLineTraceCache = { key: "", result: null };
   renderAll();
   scheduleEvaluation();
 }
 
+function inputNumberValue(input, fallback = 0) {
+  if (!input) {
+    return fallback;
+  }
+  const value = Number(input.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function addPointSourceFromForm(event) {
+  event.preventDefault();
+  const xCm = inputNumberValue(pointSourceXInput);
+  const yCm = inputNumberValue(pointSourceYInput);
+  const zCm = state.mode === "2D" ? 0 : inputNumberValue(pointSourceZInput);
+  const charge = inputNumberValue(pointSourceChargeInput, 1e-9);
+  if (![xCm, yCm, zCm, charge].every(Number.isFinite)) {
+    solverStatus.textContent = "点电荷参数必须是有限数值。";
+    return;
+  }
+  addSource("point", {
+    position: {
+      x: centimetersToMeters(xCm),
+      y: centimetersToMeters(yCm),
+      z: centimetersToMeters(zCm),
+    },
+    charge_c: charge,
+  });
+}
+
+function renderPointSourceForm() {
+  if (!pointSourceForm || !pointSourceZField) {
+    return;
+  }
+  pointSourceZField.hidden = state.mode === "2D";
+}
+
 function removeSource(sourceId) {
   state.scene.sources = state.scene.sources.filter((source) => source.id !== sourceId);
+  fieldLineTraceCache = { key: "", result: null };
   if (state.scene.sources.length === 0) {
     setEmptyComputationState();
   }
@@ -301,6 +388,7 @@ function updateSource(sourceId, field, value) {
     source[field] = Number(value);
   }
 
+  fieldLineTraceCache = { key: "", result: null };
   renderAll();
   scheduleEvaluation();
 }
@@ -481,6 +569,40 @@ function sourceField(source, field, label, step = "0.01") {
   `;
 }
 
+function sourceReadout(source, key, label, value) {
+  return `
+    <div class="source-readout" data-testid="source-readout-${source.id}-${key}">
+      <span>${label}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function readonlyPointSourceCard(source, label) {
+  const zReadout = state.mode === "2D"
+    ? ""
+    : sourceReadout(source, "position-z", "位置 z / cm", formatCentimeters(source.position.z));
+  return `
+    <article
+      class="source-card"
+      data-testid="source-card-${source.id}"
+      data-source-readonly="true"
+    >
+      <div class="source-card-heading">
+        <strong>${label}</strong>
+        <button class="source-delete-button" type="button" data-source-id="${source.id}" title="移除此源">移除</button>
+        <span>${KIND_LABELS[source.kind] ?? source.kind}</span>
+      </div>
+      <div class="source-readout-grid">
+        ${sourceReadout(source, "position-x", "位置 x / cm", formatCentimeters(source.position.x))}
+        ${sourceReadout(source, "position-y", "位置 y / cm", formatCentimeters(source.position.y))}
+        ${zReadout}
+        ${sourceReadout(source, "charge-c", "电荷量 C", formatNumber(source.charge_c, 4))}
+      </div>
+    </article>
+  `;
+}
+
 function vectorFields(source, group, heading) {
   if (!source[group]) {
     return "";
@@ -539,6 +661,9 @@ function renderSourceList() {
   sourceList.innerHTML = listedSources
     .map((source) => {
       const label = escapeHtml(source.label);
+      if (source.kind === "point") {
+        return readonlyPointSourceCard(source, label);
+      }
       const positionZField = state.mode === "2D"
         ? ""
         : sourceField(source, "position.z", "位置 z m");
@@ -887,7 +1012,10 @@ function electricField2dAt(x, y, fieldSamples) {
     (field, sample) => {
       const dx = x - sample.x;
       const dy = y - sample.y;
-      const distanceSq = dx * dx + dy * dy + FIELD_LINE_SOFTENING_M * FIELD_LINE_SOFTENING_M;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq < FIELD_LINE_SINGULARITY_RADIUS_M * FIELD_LINE_SINGULARITY_RADIUS_M) {
+        return field;
+      }
       const invDistanceCubed = 1 / (distanceSq * Math.sqrt(distanceSq));
       return {
         x: field.x + sample.charge * dx * invDistanceCubed,
@@ -898,13 +1026,64 @@ function electricField2dAt(x, y, fieldSamples) {
   );
 }
 
+function fieldLineDirectionAt(x, y, traceDirection, fieldSamples) {
+  const field = electricField2dAt(x, y, fieldSamples);
+  const magnitude = Math.hypot(field.x, field.y);
+  if (!Number.isFinite(magnitude) || magnitude < FIELD_LINE_MIN_FIELD) {
+    return null;
+  }
+  return {
+    x: (field.x / magnitude) * traceDirection,
+    y: (field.y / magnitude) * traceDirection,
+    magnitude,
+  };
+}
+
+function rk4FieldLineStep(x, y, traceDirection, fieldSamples, stepSize) {
+  const k1 = fieldLineDirectionAt(x, y, traceDirection, fieldSamples);
+  if (!k1) {
+    return null;
+  }
+  const halfStep = stepSize / 2;
+  const k2 = fieldLineDirectionAt(
+    x + k1.x * halfStep,
+    y + k1.y * halfStep,
+    traceDirection,
+    fieldSamples,
+  );
+  if (!k2) {
+    return null;
+  }
+  const k3 = fieldLineDirectionAt(
+    x + k2.x * halfStep,
+    y + k2.y * halfStep,
+    traceDirection,
+    fieldSamples,
+  );
+  if (!k3) {
+    return null;
+  }
+  const k4 = fieldLineDirectionAt(
+    x + k3.x * stepSize,
+    y + k3.y * stepSize,
+    traceDirection,
+    fieldSamples,
+  );
+  if (!k4) {
+    return null;
+  }
+
+  return {
+    x: x + (stepSize / 6) * (k1.x + 2 * k2.x + 2 * k3.x + k4.x),
+    y: y + (stepSize / 6) * (k1.y + 2 * k2.y + 2 * k3.y + k4.y),
+    direction: k1,
+    stepSize,
+  };
+}
+
 function fieldLineSeedSources2d() {
   const chargedSources = state.scene.sources.filter((source) => Math.abs(sourceChargeValue(source)) > 1e-30);
   const pointSources = chargedSources.filter((source) => source.kind === "point");
-  const positivePointSources = pointSources.filter((source) => sourceChargeValue(source) > 0);
-  if (positivePointSources.length > 0) {
-    return positivePointSources;
-  }
   if (pointSources.length > 0) {
     return pointSources;
   }
@@ -921,13 +1100,13 @@ function fieldLineStartRadiusMeters(source) {
 
 function fieldLineTerminalRadiusMeters(source) {
   if (source.kind === "point") {
-    return Math.max(FIELD_LINE_STOP_RADIUS_M, POINT_VISUAL_RADIUS_CM / 100 + 0.009);
+    return fieldLineStartRadiusMeters(source) + FIELD_LINE_ENDPOINT_MARGIN_M;
   }
-  return Math.max(FIELD_LINE_STOP_RADIUS_M, sourceWorldRadius(source) + 0.01);
+  return Math.max(FIELD_LINE_START_RADIUS_M, sourceWorldRadius(source) + FIELD_LINE_ENDPOINT_MARGIN_M);
 }
 
 function isInsideFieldLineBounds(x, y, bounds) {
-  const margin = FIELD_LINE_STEP_M * 2;
+  const margin = FIELD_LINE_MAX_STEP_M * 2;
   return (
     x >= bounds.minX - margin &&
     x <= bounds.maxX + margin &&
@@ -936,132 +1115,992 @@ function isInsideFieldLineBounds(x, y, bounds) {
   );
 }
 
-function isNearNegativeTerminal(x, y, seedSource) {
-  return state.scene.sources.some((source) => {
-    if (source.id === seedSource.id || sourceChargeValue(source) >= 0 || !source.position) {
-      return false;
+function fieldLineTerminalAt(x, y, seedSource) {
+  let nearestTerminal = null;
+  for (const source of state.scene.sources) {
+    if (
+      source.id === seedSource.id ||
+      source.kind !== "point" ||
+      !source.position ||
+      Math.abs(sourceChargeValue(source)) <= 1e-30
+    ) {
+      continue;
     }
     const radius = fieldLineTerminalRadiusMeters(source);
-    return Math.hypot(x - source.position.x, y - source.position.y) <= radius;
-  });
+    const distance = Math.hypot(x - source.position.x, y - source.position.y);
+    if (distance > radius) {
+      continue;
+    }
+    if (!nearestTerminal || distance < nearestTerminal.distance) {
+      nearestTerminal = { source, distance };
+    }
+  }
+  return nearestTerminal;
 }
 
-function traceFieldLine(seed, seedSource, traceDirection, fieldSamples, bounds) {
+function isNearExistingFieldLinePoint(x, y, points) {
+  return points.slice(0, -8).some((point) => (
+    Math.hypot(x - point.x, y - point.y) < FIELD_LINE_SELF_APPROACH_M
+  ));
+}
+
+function isNearFieldLineCharge(x, y) {
+  return state.scene.sources.some((source) => (
+    source.kind === "point" &&
+    source.position &&
+    Math.abs(sourceChargeValue(source)) > 1e-30 &&
+    Math.hypot(x - source.position.x, y - source.position.y) <= FIELD_LINE_CHARGE_CLEARANCE_RADIUS_M
+  ));
+}
+
+function fieldLineSegmentMidpoint(start, end) {
+  return {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+}
+
+function fieldLineOrientation(a, b, c) {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+function fieldLinePointOnSegment(point, start, end) {
+  const tolerance = 1e-10;
+  return (
+    point.x >= Math.min(start.x, end.x) - tolerance &&
+    point.x <= Math.max(start.x, end.x) + tolerance &&
+    point.y >= Math.min(start.y, end.y) - tolerance &&
+    point.y <= Math.max(start.y, end.y) + tolerance
+  );
+}
+
+function fieldLineSegmentsIntersect(a, b, c, d) {
+  const boxSeparated =
+    Math.max(a.x, b.x) < Math.min(c.x, d.x) ||
+    Math.max(c.x, d.x) < Math.min(a.x, b.x) ||
+    Math.max(a.y, b.y) < Math.min(c.y, d.y) ||
+    Math.max(c.y, d.y) < Math.min(a.y, b.y);
+  if (boxSeparated) {
+    return false;
+  }
+
+  const o1 = fieldLineOrientation(a, b, c);
+  const o2 = fieldLineOrientation(a, b, d);
+  const o3 = fieldLineOrientation(c, d, a);
+  const o4 = fieldLineOrientation(c, d, b);
+  const tolerance = 1e-12;
+
+  if (
+    ((o1 > tolerance && o2 < -tolerance) || (o1 < -tolerance && o2 > tolerance)) &&
+    ((o3 > tolerance && o4 < -tolerance) || (o3 < -tolerance && o4 > tolerance))
+  ) {
+    return true;
+  }
+
+  return (
+    (Math.abs(o1) <= tolerance && fieldLinePointOnSegment(c, a, b)) ||
+    (Math.abs(o2) <= tolerance && fieldLinePointOnSegment(d, a, b)) ||
+    (Math.abs(o3) <= tolerance && fieldLinePointOnSegment(a, c, d)) ||
+    (Math.abs(o4) <= tolerance && fieldLinePointOnSegment(b, c, d))
+  );
+}
+
+function fieldLinePointToSegmentDistance(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq <= 1e-18) {
+    return Math.hypot(point.x - start.x, point.y - start.y);
+  }
+  const projection = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq;
+  const t = Math.max(0, Math.min(1, projection));
+  return Math.hypot(point.x - (start.x + dx * t), point.y - (start.y + dy * t));
+}
+
+function fieldLineSegmentDistance(a, b, c, d) {
+  if (fieldLineSegmentsIntersect(a, b, c, d)) {
+    return 0;
+  }
+  return Math.min(
+    fieldLinePointToSegmentDistance(a, c, d),
+    fieldLinePointToSegmentDistance(b, c, d),
+    fieldLinePointToSegmentDistance(c, a, b),
+    fieldLinePointToSegmentDistance(d, a, b),
+  );
+}
+
+function createFieldLineSpatialIndex() {
+  return {
+    cells: new Map(),
+    nextSegmentId: 1,
+  };
+}
+
+function fieldLineSpatialKey(cellX, cellY) {
+  return `${cellX}:${cellY}`;
+}
+
+function fieldLineSegmentCells(start, end) {
+  const padding = FIELD_LINE_ACCEPTED_CLEARANCE_M;
+  const minX = Math.floor((Math.min(start.x, end.x) - padding) / FIELD_LINE_SPATIAL_CELL_M);
+  const maxX = Math.floor((Math.max(start.x, end.x) + padding) / FIELD_LINE_SPATIAL_CELL_M);
+  const minY = Math.floor((Math.min(start.y, end.y) - padding) / FIELD_LINE_SPATIAL_CELL_M);
+  const maxY = Math.floor((Math.max(start.y, end.y) + padding) / FIELD_LINE_SPATIAL_CELL_M);
+  const cells = [];
+  for (let cellX = minX; cellX <= maxX; cellX += 1) {
+    for (let cellY = minY; cellY <= maxY; cellY += 1) {
+      cells.push(fieldLineSpatialKey(cellX, cellY));
+    }
+  }
+  return cells;
+}
+
+function addAcceptedFieldLine(spatialIndex, points) {
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const midpoint = fieldLineSegmentMidpoint(start, end);
+    if (isNearFieldLineCharge(midpoint.x, midpoint.y)) {
+      continue;
+    }
+    const segment = {
+      id: spatialIndex.nextSegmentId,
+      start,
+      end,
+      midpoint,
+    };
+    spatialIndex.nextSegmentId += 1;
+    for (const cell of fieldLineSegmentCells(start, end)) {
+      const segments = spatialIndex.cells.get(cell) || [];
+      segments.push(segment);
+      spatialIndex.cells.set(cell, segments);
+    }
+  }
+}
+
+function fieldLineConflictsWithAccepted(points, spatialIndex) {
+  if (spatialIndex.cells.size === 0) {
+    return false;
+  }
+  const checkedSegmentIds = new Set();
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const midpoint = fieldLineSegmentMidpoint(start, end);
+    if (isNearFieldLineCharge(midpoint.x, midpoint.y)) {
+      continue;
+    }
+    checkedSegmentIds.clear();
+    for (const cell of fieldLineSegmentCells(start, end)) {
+      const segments = spatialIndex.cells.get(cell) || [];
+      for (const segment of segments) {
+        if (checkedSegmentIds.has(segment.id)) {
+          continue;
+        }
+        checkedSegmentIds.add(segment.id);
+        if (isNearFieldLineCharge(segment.midpoint.x, segment.midpoint.y)) {
+          continue;
+        }
+        if (
+          fieldLineSegmentsIntersect(start, end, segment.start, segment.end) ||
+          fieldLineSegmentDistance(start, end, segment.start, segment.end) < FIELD_LINE_ACCEPTED_CLEARANCE_M
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function fieldLineCandidateAngle(index, lineCount, attempt) {
+  if (attempt === 0) {
+    return (Math.PI * 2 * index) / lineCount;
+  }
+  const direction = attempt % 2 === 1 ? 1 : -1;
+  const offsetRank = Math.ceil(attempt / 2);
+  const slotOffset = (direction * offsetRank) / ((FIELD_LINE_SEED_ATTEMPTS + 1) * lineCount);
+  return Math.PI * 2 * (index / lineCount + slotOffset);
+}
+
+function roundFieldLineRayCount(value) {
+  return Math.max(
+    FIELD_LINE_MIN_CHARGE_RAYS,
+    Math.min(FIELD_LINE_MAX_CHARGE_RAYS, Math.round(value / 4) * 4),
+  );
+}
+
+function fieldLineChargeRayCount(seedSources) {
+  const sourceCount = Math.max(1, seedSources.length);
+  return roundFieldLineRayCount(FIELD_LINE_TARGET_TOTAL_CHARGE_RAYS / sourceCount);
+}
+
+function fieldLineTraceCandidates(seedSources) {
+  const candidates = [];
+  const rayCount = fieldLineChargeRayCount(seedSources);
+  for (const [sourceOrder, source] of seedSources.entries()) {
+    const charge = sourceChargeValue(source);
+    const startRadius = fieldLineStartRadiusMeters(source);
+    const traceDirection = charge >= 0 ? 1 : -1;
+    for (let index = 0; index < rayCount; index += 1) {
+      for (let attempt = 0; attempt < FIELD_LINE_SEED_ATTEMPTS; attempt += 1) {
+        const angle = fieldLineCandidateAngle(index, rayCount, attempt);
+        candidates.push({
+          source,
+          charge,
+          traceDirection,
+          seed: {
+            x: source.position.x + Math.cos(angle) * startRadius,
+            y: source.position.y + Math.sin(angle) * startRadius,
+          },
+          seedAttempt: attempt,
+          seedIndex: index,
+          seedCount: rayCount,
+          sourceOrder,
+          seedKind: "charge",
+        });
+      }
+    }
+  }
+
+  return { candidates, rayCount };
+}
+
+function fieldLineEndpointClass(stopReason) {
+  if (stopReason === "opposite-charge") {
+    return "opposite-charge";
+  }
+  if (stopReason === "view-boundary") {
+    return "infinity";
+  }
+  if (stopReason === "field-null") {
+    return "zero-field";
+  }
+  return "numerical-artifact";
+}
+
+function fieldLineDisplayEndpoints(candidate, trace) {
+  const source = candidate.source;
+  const charge = candidate.charge;
+  if (candidate.seedKind === "boundary") {
+    if (trace.stopReason === "opposite-charge" && trace.terminalSourceId) {
+      const terminalSource = fieldLineSourceById(trace.terminalSourceId);
+      const terminalCharge = terminalSource ? sourceChargeValue(terminalSource) : 0;
+      if (candidate.traceDirection < 0 && terminalCharge > 0) {
+        return {
+          startId: trace.terminalSourceId,
+          endId: "infinity",
+          topology: "charge-to-infinity",
+        };
+      }
+      if (candidate.traceDirection > 0 && terminalCharge < 0) {
+        return {
+          startId: "infinity",
+          endId: trace.terminalSourceId,
+          topology: "infinity-to-charge",
+        };
+      }
+    }
+    return {
+      startId: "infinity",
+      endId: "infinity",
+      topology: "infinity-to-infinity",
+    };
+  }
+  if (trace.stopReason === "opposite-charge" && trace.terminalSourceId) {
+    return charge >= 0
+      ? {
+          startId: source.id,
+          endId: trace.terminalSourceId,
+          topology: "charge-to-charge",
+        }
+      : {
+          startId: trace.terminalSourceId,
+          endId: source.id,
+          topology: "charge-to-charge",
+        };
+  }
+  if (trace.stopReason === "view-boundary") {
+    return charge >= 0
+      ? {
+          startId: source.id,
+          endId: "infinity",
+          topology: "charge-to-infinity",
+        }
+      : {
+          startId: "infinity",
+          endId: source.id,
+          topology: "infinity-to-charge",
+        };
+  }
+  return {
+    startId: source.id,
+    endId: trace.terminalSourceId || "",
+    topology: "artifact",
+  };
+}
+
+function isRenderableFieldLine(trace, candidate) {
+  if (candidate.seedKind === "boundary") {
+    return trace.points.length >= FIELD_LINE_MIN_RENDER_POINTS && trace.stopReason === "opposite-charge";
+  }
+  return (
+    trace.points.length >= FIELD_LINE_MIN_RENDER_POINTS &&
+    (trace.stopReason === "opposite-charge" || trace.stopReason === "view-boundary")
+  );
+}
+
+function traceFieldLine(
+  seed,
+  seedSource,
+  traceDirection,
+  fieldSamples,
+  bounds,
+  acceptedLineIndex,
+  useConflictFilter,
+) {
   const points = [seed];
   let x = seed.x;
   let y = seed.y;
+  let previousDirection = null;
+  let stopReason = "max-steps";
+  let terminalSourceId = "";
+  let stepSize = FIELD_LINE_BASE_STEP_M;
 
   for (let step = 0; step < FIELD_LINE_MAX_STEPS; step += 1) {
-    const field = electricField2dAt(x, y, fieldSamples);
-    const magnitude = Math.hypot(field.x, field.y);
-    if (magnitude < FIELD_LINE_MIN_FIELD) {
+    let next = null;
+    let directionDot = 1;
+    let blockedByReversal = false;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const fullStep = rk4FieldLineStep(x, y, traceDirection, fieldSamples, stepSize);
+      if (!fullStep) {
+        break;
+      }
+      next = fullStep;
+      directionDot = previousDirection
+        ? previousDirection.x * fullStep.direction.x + previousDirection.y * fullStep.direction.y
+        : 1;
+      if (directionDot < FIELD_LINE_REVERSAL_DOT_LIMIT) {
+        blockedByReversal = true;
+        break;
+      }
+      if (stepSize > FIELD_LINE_MIN_STEP_M) {
+        const halfStepSize = stepSize / 2;
+        const halfStep = rk4FieldLineStep(x, y, traceDirection, fieldSamples, halfStepSize);
+        const secondHalfStep = halfStep
+          ? rk4FieldLineStep(halfStep.x, halfStep.y, traceDirection, fieldSamples, halfStepSize)
+          : null;
+        if (!secondHalfStep) {
+          stepSize = Math.max(FIELD_LINE_MIN_STEP_M, stepSize * 0.5);
+          continue;
+        }
+        const stepError = Math.hypot(fullStep.x - secondHalfStep.x, fullStep.y - secondHalfStep.y);
+        const allowedError = Math.max(FIELD_LINE_ADAPT_ERROR_MIN_M, stepSize * FIELD_LINE_ADAPT_ERROR_FRACTION);
+        if (stepError > allowedError) {
+          stepSize = Math.max(FIELD_LINE_MIN_STEP_M, stepSize * 0.5);
+          continue;
+        }
+        next = {
+          ...secondHalfStep,
+          direction: fullStep.direction,
+          stepSize,
+        };
+      }
+      if (directionDot < FIELD_LINE_ADAPT_RETRY_DOT && stepSize > FIELD_LINE_MIN_STEP_M) {
+        stepSize = Math.max(FIELD_LINE_MIN_STEP_M, stepSize * 0.5);
+        continue;
+      }
+      break;
+    }
+    if (!next) {
+      stopReason = "field-null";
+      break;
+    }
+    if (blockedByReversal) {
+      stopReason = "direction-reversal";
       break;
     }
 
-    x += (field.x / magnitude) * FIELD_LINE_STEP_M * traceDirection;
-    y += (field.y / magnitude) * FIELD_LINE_STEP_M * traceDirection;
+    if (isNearExistingFieldLinePoint(next.x, next.y, points)) {
+      stopReason = "self-approach";
+      break;
+    }
+    if (
+      useConflictFilter &&
+      acceptedLineIndex &&
+      fieldLineConflictsWithAccepted([{ x, y }, { x: next.x, y: next.y }], acceptedLineIndex)
+    ) {
+      stopReason = "line-conflict";
+      break;
+    }
+
+    x = next.x;
+    y = next.y;
     points.push({ x, y });
+    previousDirection = next.direction;
+
+    if (points.length >= FIELD_LINE_MAX_POINTS) {
+      stopReason = "point-budget";
+      break;
+    }
+    if (directionDot > FIELD_LINE_ADAPT_GROW_DOT) {
+      stepSize = Math.min(FIELD_LINE_MAX_STEP_M, stepSize * 1.35);
+    } else if (directionDot < FIELD_LINE_ADAPT_SHRINK_DOT) {
+      stepSize = Math.max(FIELD_LINE_MIN_STEP_M, stepSize * 0.7);
+    }
 
     if (!isInsideFieldLineBounds(x, y, bounds)) {
+      stopReason = "view-boundary";
       break;
     }
-    if (traceDirection > 0 && isNearNegativeTerminal(x, y, seedSource)) {
+    const terminal = fieldLineTerminalAt(x, y, seedSource);
+    if (terminal) {
+      const terminalSign = traceDirection > 0 ? -1 : 1;
+      const sourceSign = sourceChargeValue(terminal.source) >= 0 ? 1 : -1;
+      stopReason = sourceSign === terminalSign ? "opposite-charge" : "same-charge";
+      terminalSourceId = terminal.source.id;
       break;
     }
   }
 
-  return points;
+  return { points, stopReason, terminalSourceId };
 }
 
 function fieldLinePath(points) {
-  return points
-    .map((point, index) => {
-      const viewportPoint = mapToViewport(point.x, point.y);
-      return `${index === 0 ? "M" : "L"} ${viewportPoint.x.toFixed(3)} ${viewportPoint.y.toFixed(3)}`;
-    })
-    .join(" ");
+  const viewportPoints = points.map((point) => mapToViewport(point.x, point.y));
+  if (viewportPoints.length <= 2) {
+    return viewportPoints
+      .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(3)} ${point.y.toFixed(3)}`)
+      .join(" ");
+  }
+
+  const tangents = viewportPoints.map((point, index) => {
+    const previous = viewportPoints[Math.max(0, index - 1)];
+    const next = viewportPoints[Math.min(viewportPoints.length - 1, index + 1)];
+    const previousDistance = Math.hypot(point.x - previous.x, point.y - previous.y);
+    const nextDistance = Math.hypot(next.x - point.x, next.y - point.y);
+    const tangentX = next.x - previous.x;
+    const tangentY = next.y - previous.y;
+    const tangentLength = Math.hypot(tangentX, tangentY);
+    if (tangentLength <= 1e-9) {
+      return { x: 0, y: 0 };
+    }
+    const controlLength = Math.min(previousDistance || nextDistance, nextDistance || previousDistance) *
+      FIELD_LINE_CURVE_CONTROL_FACTOR;
+    return {
+      x: (tangentX / tangentLength) * controlLength,
+      y: (tangentY / tangentLength) * controlLength,
+    };
+  });
+  const commands = [`M ${viewportPoints[0].x.toFixed(3)} ${viewportPoints[0].y.toFixed(3)}`];
+  for (let index = 0; index < viewportPoints.length - 1; index += 1) {
+    const start = viewportPoints[index];
+    const end = viewportPoints[index + 1];
+    const controlStart = {
+      x: start.x + tangents[index].x,
+      y: start.y + tangents[index].y,
+    };
+    const controlEnd = {
+      x: end.x - tangents[index + 1].x,
+      y: end.y - tangents[index + 1].y,
+    };
+    commands.push(
+      `C ${controlStart.x.toFixed(3)} ${controlStart.y.toFixed(3)} ` +
+      `${controlEnd.x.toFixed(3)} ${controlEnd.y.toFixed(3)} ` +
+      `${end.x.toFixed(3)} ${end.y.toFixed(3)}`,
+    );
+  }
+  return commands.join(" ");
 }
 
-function fieldLineArrowPoint(points, source) {
+function fieldLinePointTangent(points, index) {
+  const previous = points[Math.max(0, index - 1)];
+  const next = points[Math.min(points.length - 1, index + 1)];
+  const directionX = next.x - previous.x;
+  const directionY = next.y - previous.y;
+  const directionLength = Math.hypot(directionX, directionY);
+  if (directionLength <= 1e-12) {
+    return null;
+  }
+  return {
+    x: directionX / directionLength,
+    y: directionY / directionLength,
+  };
+}
+
+function fieldLineArrowPoint(points) {
+  const anchorIndex = points.findIndex((point) => point.fieldLineArrowAnchor === true);
+  if (anchorIndex >= 0) {
+    const tangent = fieldLinePointTangent(points, anchorIndex);
+    if (tangent) {
+      return {
+        point: points[anchorIndex],
+        directionX: tangent.x,
+        directionY: tangent.y,
+      };
+    }
+  }
+
+  const fallbackIndex = Math.max(1, Math.min(points.length - 2, Math.floor(points.length / 2)));
+  const tangent = fieldLinePointTangent(points, fallbackIndex);
+  return tangent
+    ? {
+        point: points[fallbackIndex],
+        directionX: tangent.x,
+        directionY: tangent.y,
+      }
+    : null;
+}
+
+function fieldLineArrowFraction(entry) {
+  const sourceOffset = (((entry.seedIndex || 0) % 7) - 3) * 0.03;
+  const topologyOffset = entry.topology === "infinity-to-charge"
+    ? 0.16
+    : entry.topology === "charge-to-infinity"
+      ? -0.08
+      : 0;
+  const rawFraction = FIELD_LINE_ARROW_FRACTION_BASE + topologyOffset +
+    sourceOffset * FIELD_LINE_ARROW_FRACTION_SPREAD / 0.18;
+  return Math.max(
+    FIELD_LINE_ARROW_FRACTION_MIN,
+    Math.min(FIELD_LINE_ARROW_FRACTION_MAX, rawFraction),
+  );
+}
+
+function fieldLinePointsWithArrowAnchor(points, entry) {
+  if (points.length < 2) {
+    return points;
+  }
+  let totalLength = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    totalLength += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+  }
+  if (totalLength <= 1e-12) {
+    return points;
+  }
+  const targetDistance = totalLength * fieldLineArrowFraction(entry);
+  let traveled = 0;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const segmentLength = Math.hypot(dx, dy);
+    if (segmentLength <= 1e-12) {
+      continue;
+    }
+    if (traveled + segmentLength >= targetDistance) {
+      const t = Math.max(0, Math.min(1, (targetDistance - traveled) / segmentLength));
+      const anchor = {
+        x: start.x + dx * t,
+        y: start.y + dy * t,
+        fieldLineArrowAnchor: true,
+      };
+      const anchoredPoints = [...points];
+      anchoredPoints.splice(index, 0, anchor);
+      return anchoredPoints;
+    }
+    traveled += segmentLength;
+  }
+  return points;
+}
+
+function smoothFieldLineDisplayPoints(points, source) {
+  if (points.length < 5 || FIELD_LINE_DISPLAY_SMOOTHING_ITERATIONS <= 0) {
+    return points;
+  }
+  let smoothedPoints = points.map((point) => ({ ...point }));
   const sourceX = source.position.x;
   const sourceY = source.position.y;
-  let fallback = null;
+  let arrowAnchorIndex = smoothedPoints.findIndex((point) => point.fieldLineArrowAnchor === true);
+  let closestArrowDistance = Infinity;
+  if (arrowAnchorIndex < 0) {
+    arrowAnchorIndex = 0;
+    for (let index = 0; index < smoothedPoints.length; index += 1) {
+      const distance = Math.hypot(smoothedPoints[index].x - sourceX, smoothedPoints[index].y - sourceY);
+      if (distance < closestArrowDistance) {
+        closestArrowDistance = distance;
+        arrowAnchorIndex = index;
+      }
+    }
+  }
 
+  for (let iteration = 0; iteration < FIELD_LINE_DISPLAY_SMOOTHING_ITERATIONS; iteration += 1) {
+    smoothedPoints = smoothedPoints.map((point, index) => {
+      if (
+        index === 0 ||
+        index === smoothedPoints.length - 1 ||
+        index === arrowAnchorIndex ||
+        isNearFieldLineCharge(point.x, point.y)
+      ) {
+        return point;
+      }
+      const previous = smoothedPoints[index - 1];
+      const next = smoothedPoints[index + 1];
+      return {
+        x:
+          previous.x * FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT +
+          point.x * (1 - FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT * 2) +
+          next.x * FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT,
+        y:
+          previous.y * FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT +
+          point.y * (1 - FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT * 2) +
+          next.y * FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT,
+      };
+    });
+  }
+  return smoothedPoints;
+}
+
+function fieldLineSourceById(sourceId) {
+  if (!sourceId || sourceId === "infinity") {
+    return null;
+  }
+  return state.scene.sources.find((source) => source.id === sourceId) || null;
+}
+
+function fieldLineDisplayRadiusMeters(source) {
+  if (!source) {
+    return 0;
+  }
+  return source.kind === "point"
+    ? FIELD_LINE_START_RADIUS_M
+    : Math.max(FIELD_LINE_START_RADIUS_M, sourceWorldRadius(source));
+}
+
+function fieldLinePointOnSourceSurface(source, adjacentPoint) {
+  const radius = fieldLineDisplayRadiusMeters(source);
+  const dx = adjacentPoint.x - source.position.x;
+  const dy = adjacentPoint.y - source.position.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 1e-12) {
+    return {
+      x: source.position.x + radius,
+      y: source.position.y,
+    };
+  }
+  return {
+    x: source.position.x + (dx / distance) * radius,
+    y: source.position.y + (dy / distance) * radius,
+  };
+}
+
+function snapFieldLineEndpointsToSources(points, entry) {
+  if (points.length < 2) {
+    return points;
+  }
+  const snappedPoints = points.map((point) => ({ ...point }));
+  const startSource = fieldLineSourceById(entry.fieldStartId);
+  const endSource = fieldLineSourceById(entry.fieldEndId);
+  if (startSource) {
+    snappedPoints[0] = fieldLinePointOnSourceSurface(startSource, snappedPoints[1]);
+  }
+  if (endSource) {
+    const lastIndex = snappedPoints.length - 1;
+    snappedPoints[lastIndex] = fieldLinePointOnSourceSurface(endSource, snappedPoints[lastIndex - 1]);
+  }
+  return snappedPoints;
+}
+
+function fieldLineArrowSource(entry) {
+  return fieldLineSourceById(entry.fieldStartId) ||
+    fieldLineSourceById(entry.fieldEndId) ||
+    fieldLineSourceById(entry.source.id);
+}
+
+function fieldLineDirectionQuality(points, fieldSamples) {
+  if (points.length < 2) {
+    return { valid: false, score: -Infinity, minDot: -1 };
+  }
+  let minDot = 1;
+  let totalDot = 0;
+  let sampleCount = 0;
   for (let index = 1; index < points.length; index += 1) {
     const previous = points[index - 1];
     const current = points[index];
-    const previousDistance = Math.hypot(previous.x - sourceX, previous.y - sourceY);
-    const currentDistance = Math.hypot(current.x - sourceX, current.y - sourceY);
-    const crossesTarget =
-      (FIELD_LINE_ARROW_DISTANCE_M - previousDistance) *
-      (FIELD_LINE_ARROW_DISTANCE_M - currentDistance) <= 0;
-    const directionX = current.x - previous.x;
-    const directionY = current.y - previous.y;
-    const directionMagnitude = Math.hypot(directionX, directionY);
-    if (directionMagnitude <= 1e-12) {
+    const segmentX = current.x - previous.x;
+    const segmentY = current.y - previous.y;
+    const segmentLength = Math.hypot(segmentX, segmentY);
+    if (segmentLength <= 1e-12) {
       continue;
     }
-
-    const closestDistance = Math.min(
-      Math.abs(previousDistance - FIELD_LINE_ARROW_DISTANCE_M),
-      Math.abs(currentDistance - FIELD_LINE_ARROW_DISTANCE_M),
-    );
-    if (!fallback || closestDistance < fallback.closestDistance) {
-      fallback = {
-        point: current,
-        directionX: directionX / directionMagnitude,
-        directionY: directionY / directionMagnitude,
-        closestDistance,
-      };
-    }
-
-    if (!crossesTarget) {
+    const midX = (previous.x + current.x) / 2;
+    const midY = (previous.y + current.y) / 2;
+    if (isNearFieldLineCharge(midX, midY)) {
       continue;
     }
-
-    const span = currentDistance - previousDistance;
-    const t = Math.abs(span) > 1e-12
-      ? (FIELD_LINE_ARROW_DISTANCE_M - previousDistance) / span
-      : 0;
-    return {
-      point: {
-        x: previous.x + directionX * Math.max(0, Math.min(1, t)),
-        y: previous.y + directionY * Math.max(0, Math.min(1, t)),
-      },
-      directionX: directionX / directionMagnitude,
-      directionY: directionY / directionMagnitude,
-    };
+    const field = electricField2dAt(midX, midY, fieldSamples);
+    const fieldMagnitude = Math.hypot(field.x, field.y);
+    if (fieldMagnitude <= FIELD_LINE_MIN_FIELD) {
+      return { valid: false, score: -Infinity, minDot: -1 };
+    }
+    const dot = (segmentX / segmentLength) * (field.x / fieldMagnitude) +
+      (segmentY / segmentLength) * (field.y / fieldMagnitude);
+    minDot = Math.min(minDot, dot);
+    totalDot += dot;
+    sampleCount += 1;
   }
-
-  return fallback;
+  if (sampleCount === 0) {
+    return { valid: true, score: 1, minDot: 1 };
+  }
+  const averageDot = totalDot / sampleCount;
+  return {
+    valid: minDot >= FIELD_LINE_DIRECTION_DOT_MIN,
+    score: averageDot,
+    minDot,
+  };
 }
 
-function fieldLineArrowMarkup(points, source) {
-  const arrow = fieldLineArrowPoint(points, source);
+function prepareDisplayFieldLineEntry(entry, fieldSamples) {
+  const arrowSource = fieldLineArrowSource(entry);
+  if (!arrowSource || !arrowSource.position || entry.topology === "infinity-to-infinity") {
+    return null;
+  }
+  const snappedPoints = snapFieldLineEndpointsToSources(entry.renderPoints, entry);
+  const arrowFraction = fieldLineArrowFraction(entry);
+  const anchoredPoints = fieldLinePointsWithArrowAnchor(snappedPoints, entry);
+  const displayPoints = smoothFieldLineDisplayPoints(anchoredPoints, arrowSource);
+  const directionQuality = fieldLineDirectionQuality(displayPoints, fieldSamples);
+  if (!directionQuality.valid) {
+    return null;
+  }
+  return {
+    ...entry,
+    arrowSource,
+    displayPoints,
+    qualityScore: directionQuality.score,
+    minDirectionDot: directionQuality.minDot,
+    arrowFraction,
+  };
+}
+
+function fieldLineArrowMarkup(points, entry, fieldSamples, scale) {
+  const arrow = fieldLineArrowPoint(points);
   if (!arrow) {
     return "";
   }
-  const start = {
-    x: arrow.point.x - arrow.directionX * FIELD_LINE_ARROW_STEM_M,
-    y: arrow.point.y - arrow.directionY * FIELD_LINE_ARROW_STEM_M,
+  const field = electricField2dAt(arrow.point.x, arrow.point.y, fieldSamples);
+  const fieldMagnitude = Math.hypot(field.x, field.y);
+  let worldDirection = fieldMagnitude > FIELD_LINE_MIN_FIELD
+    ? { x: field.x / fieldMagnitude, y: field.y / fieldMagnitude }
+    : { x: arrow.directionX, y: arrow.directionY };
+  const tangentDot = worldDirection.x * arrow.directionX + worldDirection.y * arrow.directionY;
+  if (tangentDot < 0) {
+    worldDirection = { x: arrow.directionX, y: arrow.directionY };
+  }
+  const viewportDirection = {
+    x: worldDirection.x,
+    y: -worldDirection.y,
   };
-  const startViewport = mapToViewport(start.x, start.y);
-  const endViewport = mapToViewport(arrow.point.x, arrow.point.y);
+  const directionMagnitude = Math.hypot(viewportDirection.x, viewportDirection.y);
+  if (directionMagnitude <= 1e-12) {
+    return "";
+  }
+  const unit = {
+    x: viewportDirection.x / directionMagnitude,
+    y: viewportDirection.y / directionMagnitude,
+  };
+  const normal = { x: -unit.y, y: unit.x };
+  const tip = mapToViewport(arrow.point.x, arrow.point.y);
+  const averageUnitsPerPx = (scale.xUnitsPerPx + scale.yUnitsPerPx) / 2;
+  const arrowLength = FIELD_LINE_ARROW_LENGTH_PX * averageUnitsPerPx;
+  const arrowWidth = FIELD_LINE_ARROW_WIDTH_PX * averageUnitsPerPx;
+  const baseCenter = {
+    x: tip.x - unit.x * arrowLength,
+    y: tip.y - unit.y * arrowLength,
+  };
+  const left = {
+    x: baseCenter.x + normal.x * arrowWidth * 0.5,
+    y: baseCenter.y + normal.y * arrowWidth * 0.5,
+  };
+  const right = {
+    x: baseCenter.x - normal.x * arrowWidth * 0.5,
+    y: baseCenter.y - normal.y * arrowWidth * 0.5,
+  };
   return `
-    <line
-      class="field-line-arrow-stem"
+    <path
+      class="field-line-arrow"
       data-testid="field-line-arrow-2d"
-      data-arrow-distance-cm="${FIELD_LINE_ARROW_DISTANCE_M * 100}"
-      x1="${startViewport.x.toFixed(3)}"
-      y1="${startViewport.y.toFixed(3)}"
-      x2="${endViewport.x.toFixed(3)}"
-      y2="${endViewport.y.toFixed(3)}"
-      marker-end="url(#field-line-arrow)"
-    ></line>
+      data-arrow-on-line="true"
+      data-arrow-size-px="${FIELD_LINE_ARROW_LENGTH_PX}"
+      data-arrow-direction="field"
+      data-arrow-placement="arc-fraction"
+      data-arrow-fraction="${entry.arrowFraction.toFixed(3)}"
+      d="M ${tip.x.toFixed(3)} ${tip.y.toFixed(3)} L ${left.x.toFixed(3)} ${left.y.toFixed(3)} L ${right.x.toFixed(3)} ${right.y.toFixed(3)} Z"
+    ></path>
   `;
 }
 
-function renderFieldLines2d() {
+function fieldLineCacheKey(seedSources) {
+  return JSON.stringify({
+    sources: state.scene.sources,
+    seedSourceIds: seedSources.map((source) => source.id),
+    displayStrategy: FIELD_LINE_DISPLAY_STRATEGY,
+    targetTotalChargeRays: FIELD_LINE_TARGET_TOTAL_CHARGE_RAYS,
+    minChargeRays: FIELD_LINE_MIN_CHARGE_RAYS,
+    maxChargeRays: FIELD_LINE_MAX_CHARGE_RAYS,
+    displayMaxCount: FIELD_LINE_DISPLAY_MAX_COUNT,
+    baseStep: FIELD_LINE_BASE_STEP_M,
+    minStep: FIELD_LINE_MIN_STEP_M,
+    maxStep: FIELD_LINE_MAX_STEP_M,
+    maxPoints: FIELD_LINE_MAX_POINTS,
+  });
+}
+
+function fieldLineOppositePairKey(entry) {
+  return entry.topology === "charge-to-charge"
+    ? `${entry.fieldStartId}->${entry.fieldEndId}`
+    : "";
+}
+
+function fieldLineDisplayPointOrder(candidate, trace, endpoints) {
+  if (candidate.seedKind === "boundary") {
+    return endpoints.startId === "infinity" ? trace.points : [...trace.points].reverse();
+  }
+  return candidate.charge >= 0 ? trace.points : [...trace.points].reverse();
+}
+
+function tryAcceptDisplayFieldLine(entry, acceptedLineIndex) {
+  if (fieldLineConflictsWithAccepted(entry.displayPoints, acceptedLineIndex)) {
+    return false;
+  }
+  addAcceptedFieldLine(acceptedLineIndex, entry.displayPoints);
+  return true;
+}
+
+function sortFieldLineEntriesByUniformAngle(entries) {
+  return [...entries].sort((a, b) => {
+    if (a.seedAttempt !== b.seedAttempt) {
+      return a.seedAttempt - b.seedAttempt;
+    }
+    if (a.seedIndex !== b.seedIndex) {
+      return a.seedIndex - b.seedIndex;
+    }
+    if (a.sourceOrder !== b.sourceOrder) {
+      return a.sourceOrder - b.sourceOrder;
+    }
+    if (Math.abs(b.qualityScore - a.qualityScore) > 1e-6) {
+      return b.qualityScore - a.qualityScore;
+    }
+    return a.source.id.localeCompare(b.source.id);
+  });
+}
+
+function selectDisplayFieldLineEntries(rawEntries, fieldSamples) {
+  const acceptedLineIndex = createFieldLineSpatialIndex();
+  const selectedEntries = [];
+  const preparedEntries = [];
+  const pairCounts = new Map();
+  let lowQualityLineCount = 0;
+  let dedupedLineCount = 0;
+  let conflictRejectedLineCount = 0;
+
+  for (const entry of rawEntries) {
+    const displayEntry = prepareDisplayFieldLineEntry(entry, fieldSamples);
+    if (!displayEntry) {
+      lowQualityLineCount += 1;
+      continue;
+    }
+    preparedEntries.push(displayEntry);
+  }
+
+  const candidateEntries = sortFieldLineEntriesByUniformAngle(preparedEntries);
+  for (const entry of candidateEntries) {
+    if (selectedEntries.length >= FIELD_LINE_DISPLAY_MAX_COUNT) {
+      break;
+    }
+    const pairKey = fieldLineOppositePairKey(entry);
+    if (
+      pairKey &&
+      (pairCounts.get(pairKey) || 0) >= FIELD_LINE_MAX_PAIR_DISPLAY_COUNT
+    ) {
+      dedupedLineCount += 1;
+      continue;
+    }
+    if (tryAcceptDisplayFieldLine(entry, acceptedLineIndex)) {
+      selectedEntries.push(entry);
+      if (pairKey) {
+        pairCounts.set(pairKey, (pairCounts.get(pairKey) || 0) + 1);
+      }
+    } else {
+      conflictRejectedLineCount += 1;
+    }
+  }
+
+  return {
+    entries: selectedEntries,
+    dedupedLineCount,
+    conflictRejectedLineCount,
+    lowQualityLineCount,
+    pairedLineCount: selectedEntries.filter((entry) => entry.topology === "charge-to-charge").length,
+  };
+}
+
+function computeFieldLineTraceResult(fieldSamples, seedSources) {
+  const bounds = compute2dWorldBounds();
+  const rawEntries = [];
+  const { candidates, rayCount } = fieldLineTraceCandidates(seedSources, bounds);
+  let rejectedLineCount = 0;
+  for (const candidate of candidates) {
+    const trace = traceFieldLine(
+      candidate.seed,
+      candidate.source,
+      candidate.traceDirection,
+      fieldSamples,
+      bounds,
+      null,
+      false,
+    );
+    if (!isRenderableFieldLine(trace, candidate)) {
+      rejectedLineCount += 1;
+      continue;
+    }
+    const endpoints = fieldLineDisplayEndpoints(candidate, trace);
+    const renderPoints = fieldLineDisplayPointOrder(candidate, trace, endpoints);
+    rawEntries.push({
+      source: candidate.source,
+      charge: candidate.charge,
+      endpointClass: fieldLineEndpointClass(trace.stopReason),
+      fieldStartId: endpoints.startId,
+      fieldEndId: endpoints.endId,
+      topology: endpoints.topology,
+      renderPoints,
+      seedAttempt: candidate.seedAttempt,
+      seedIndex: candidate.seedIndex,
+      seedCount: candidate.seedCount,
+      sourceOrder: candidate.sourceOrder,
+      seedKind: candidate.seedKind,
+      stopReason: trace.stopReason,
+      terminalSourceId: trace.terminalSourceId,
+    });
+  }
+  const displayResult = selectDisplayFieldLineEntries(rawEntries, fieldSamples);
+  return {
+    entries: displayResult.entries,
+    rawLineCount: rawEntries.length,
+    candidateLineCount: candidates.length,
+    chargeRayCount: rayCount,
+    rejectedLineCount,
+    dedupedLineCount: displayResult.dedupedLineCount,
+    displayConflictRejectedLineCount: displayResult.conflictRejectedLineCount,
+    lowQualityLineCount: displayResult.lowQualityLineCount,
+    pairedLineCount: displayResult.pairedLineCount,
+    useConflictFilter: rawEntries.length > 1,
+  };
+}
+
+function getFieldLineTraceResult(fieldSamples, seedSources) {
+  const key = fieldLineCacheKey(seedSources);
+  if (fieldLineTraceCache.key === key && fieldLineTraceCache.result) {
+    return fieldLineTraceCache.result;
+  }
+  const result = computeFieldLineTraceResult(fieldSamples, seedSources);
+  fieldLineTraceCache = { key, result };
+  return result;
+}
+
+function renderFieldLines2d(scale) {
   if (!state.showFieldLines) {
     return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="false"></g>';
   }
@@ -1072,36 +2111,37 @@ function renderFieldLines2d() {
     return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="true"></g>';
   }
 
-  const bounds = compute2dWorldBounds();
+  const traceResult = getFieldLineTraceResult(fieldSamples, seedSources);
   const paths = [];
   const arrows = [];
-  const baseLineCount = Math.floor(FIELD_LINE_TOTAL_COUNT / seedSources.length);
-  const remainder = FIELD_LINE_TOTAL_COUNT % seedSources.length;
-  for (const [sourceIndex, source] of seedSources.entries()) {
-    const charge = sourceChargeValue(source);
-    const startRadius = fieldLineStartRadiusMeters(source);
-    const traceDirection = charge >= 0 ? 1 : -1;
-    const lineCount = baseLineCount + (sourceIndex < remainder ? 1 : 0);
-    for (let index = 0; index < lineCount; index += 1) {
-      const angle = (Math.PI * 2 * index) / lineCount;
-      const seed = {
-        x: source.position.x + Math.cos(angle) * startRadius,
-        y: source.position.y + Math.sin(angle) * startRadius,
-      };
-      const tracedPoints = traceFieldLine(seed, source, traceDirection, fieldSamples, bounds);
-      const renderPoints = charge >= 0 ? tracedPoints : [...tracedPoints].reverse();
-      if (renderPoints.length < 2) {
-        continue;
-      }
-      paths.push(`
+  for (const entry of traceResult.entries) {
+    const charge = entry.charge;
+    const renderPoints = entry.displayPoints;
+    const sourceSign = charge > 0 ? "positive" : charge < 0 ? "negative" : "boundary";
+    paths.push(`
         <path
           class="field-line"
           data-testid="field-line-2d"
+          data-source-id="${entry.source.id}"
+          data-source-sign="${sourceSign}"
+          data-field-start-id="${entry.fieldStartId}"
+          data-field-end-id="${entry.fieldEndId}"
+          data-field-topology="${entry.topology}"
+          data-seed-kind="${entry.seedKind}"
+          data-trace-method="adaptive-rk4"
+          data-path-model="adaptive-rk4-spline"
+          data-display-smoothing="weighted"
+          data-endpoint-class="${entry.endpointClass}"
+          data-terminal-source-id="${entry.terminalSourceId}"
+          data-seed-attempt="${entry.seedAttempt}"
+          data-seed-index="${entry.seedIndex}"
+          data-stop-reason="${entry.stopReason}"
+          data-point-count="${renderPoints.length}"
+          data-direction-min-dot="${entry.minDirectionDot.toFixed(3)}"
           d="${fieldLinePath(renderPoints)}"
         ></path>
       `);
-      arrows.push(fieldLineArrowMarkup(renderPoints, source));
-    }
+    arrows.push(fieldLineArrowMarkup(renderPoints, entry, fieldSamples, scale));
   }
 
   return `
@@ -1109,8 +2149,25 @@ function renderFieldLines2d() {
       class="field-line-layer"
       data-testid="field-line-layer"
       data-field-line-count="${paths.length}"
-      data-target-line-count="${FIELD_LINE_TOTAL_COUNT}"
-      data-arrow-distance-cm="${FIELD_LINE_ARROW_DISTANCE_M * 100}"
+      data-display-strategy="${FIELD_LINE_DISPLAY_STRATEGY}"
+      data-candidates-per-point-charge="${traceResult.chargeRayCount}"
+      data-target-total-charge-rays="${FIELD_LINE_TARGET_TOTAL_CHARGE_RAYS}"
+      data-min-charge-rays="${FIELD_LINE_MIN_CHARGE_RAYS}"
+      data-max-charge-rays="${FIELD_LINE_MAX_CHARGE_RAYS}"
+      data-boundary-candidates-per-direction="0"
+      data-boundary-candidate-count="0"
+      data-display-max-line-count="${FIELD_LINE_DISPLAY_MAX_COUNT}"
+      data-target-line-count="${FIELD_LINE_DISPLAY_MAX_COUNT}"
+      data-candidate-line-count="${traceResult.candidateLineCount}"
+      data-raw-line-count="${traceResult.rawLineCount}"
+      data-rejected-line-count="${traceResult.rejectedLineCount}"
+      data-display-deduped-line-count="${traceResult.dedupedLineCount}"
+      data-display-conflict-rejected-line-count="${traceResult.displayConflictRejectedLineCount}"
+      data-display-low-quality-line-count="${traceResult.lowQualityLineCount}"
+      data-paired-line-count="${traceResult.pairedLineCount}"
+      data-arrow-placement="arc-fraction"
+      data-arrow-fraction-base="${FIELD_LINE_ARROW_FRACTION_BASE}"
+      data-conflict-filter="${traceResult.useConflictFilter ? "display-spatial" : "off"}"
       data-enabled="true"
     >
       ${paths.join("")}
@@ -1119,10 +2176,10 @@ function renderFieldLines2d() {
   `;
 }
 
-function renderOverlay2d() {
+function renderOverlay2d(scale) {
   return `
     <g data-testid="overlay-vector-layer" data-vector-count="0"></g>
-    ${renderFieldLines2d()}
+    ${renderFieldLines2d(scale)}
   `;
 }
 
@@ -1370,9 +2427,6 @@ function render2d() {
           <stop offset="62%" stop-color="${NEGATIVE_SOURCE_COLOR}" stop-opacity="1"></stop>
           <stop offset="100%" stop-color="#003f8c" stop-opacity="1"></stop>
         </radialGradient>
-        <marker id="field-line-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
-          <path d="M 0 0 L 7 3 L 0 6 Z" class="field-line-arrow"></path>
-        </marker>
         <pattern id="grid" width="${VIEWPORT_GRID_STEP_UNITS}" height="${VIEWPORT_GRID_STEP_UNITS}" patternUnits="userSpaceOnUse">
           <path d="M ${VIEWPORT_GRID_STEP_UNITS} 0 L 0 0 0 ${VIEWPORT_GRID_STEP_UNITS}" fill="none"></path>
         </pattern>
@@ -1386,7 +2440,7 @@ function render2d() {
       ></rect>
       ${render2dAxes(viewBox, axisOrigin, scale)}
       ${renderHeatmap2d()}
-      ${renderOverlay2d()}
+      ${renderOverlay2d(scale)}
       ${sourceMarkup}
     </svg>
   `;
@@ -1517,6 +2571,7 @@ function renderOverlaySummary() {
 }
 
 function renderAll(options = {}) {
+  renderPointSourceForm();
   renderSourceList();
   render2d();
   renderProbe();
@@ -1572,16 +2627,22 @@ async function evaluateProbe(requestId) {
 
 function measureProbeFromInputs(event) {
   event.preventDefault();
+  if (evaluationTimer) {
+    window.clearTimeout(evaluationTimer);
+    evaluationTimer = null;
+  }
   setProbeFromInputs();
   requestSerial += 1;
   latestProbeRequestId = `ui-probe-${requestSerial}`;
+  latestOverlayRequestId = `ui-overlay-manual-${requestSerial}`;
+  const probeRequestId = latestProbeRequestId;
   const validationMessage = sceneValidationMessage();
   if (validationMessage) {
     solverStatus.textContent = validationMessage;
     return;
   }
-  evaluateProbe(latestProbeRequestId).catch((error) => {
-    if (latestProbeRequestId) {
+  evaluateProbe(probeRequestId).catch((error) => {
+    if (probeRequestId === latestProbeRequestId) {
       solverStatus.textContent = error.message;
     }
   });
@@ -1692,7 +2753,7 @@ async function initialiseShell() {
     "二维与三维交互已启用。";
 }
 
-document.querySelector("#add-point").addEventListener("click", () => addSource("point"));
+pointSourceForm.addEventListener("submit", addPointSourceFromForm);
 document
   .querySelector("#add-line-segment")
   .addEventListener("click", () => addSource("line_segment"));

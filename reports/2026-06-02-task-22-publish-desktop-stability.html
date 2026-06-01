@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 22: Publish desktop stability fixes</title>
+    <style>
+      body {
+        color: #18202a;
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+        margin: 2rem auto;
+        max-width: 1100px;
+        padding: 0 1rem;
+      }
+      h1, h2 { color: #12355b; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td {
+        border: 1px solid #b8c2cc;
+        padding: 0.55rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: #eef4f8; }
+      code {
+        background: #f3f5f7;
+        border-radius: 3px;
+        padding: 0.1rem 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 22: Publish desktop stability fixes</h1>
+      <p><strong>Completed:</strong> 2026-06-02 00:32:11 +08:00</p>
+
+      <h2>Scope delivered</h2>
+      <ul>
+        <li>Published the validated flicker, motion-playback, and desktop-startup stability changes.</li>
+        <li>Updated <code>codex/integrate-test-charge-motion</code> with commit <code>5993eb5</code>.</li>
+        <li>Fast-forwarded the public default branch <code>feature/em-workbench-foundation</code> from <code>d2dc38a</code> to <code>5993eb5</code>.</li>
+        <li>Verified that the public GitHub commit page exposes the published stability commit.</li>
+      </ul>
+
+      <h2>Scope deferred</h2>
+      <p>No additional source changes were made during publication. Long-running manual soak testing remains a follow-up activity.</p>
+
+      <h2>Published files</h2>
+      <table>
+        <thead>
+          <tr><th>File group</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>src/em_workbench/desktop.py</code></td>
+            <td>Retain Qt bridge objects and throttle desktop bridge bootstrap retries.</td>
+          </tr>
+          <tr>
+            <td><code>web/app.js</code>, <code>web/styles.css</code></td>
+            <td>Reduce desktop rendering churn and disable expensive desktop compositing effects.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_app.py</code>, <code>tests/test_browser_smoke.py</code>, <code>tests/test_desktop_bridge.py</code></td>
+            <td>Cover desktop visual stability, motion playback, and bridge initialization behavior.</td>
+          </tr>
+          <tr>
+            <td><code>reports/2026-06-01-task-19-desktop-flicker-stability.html</code>, <code>reports/2026-06-02-task-20-desktop-motion-playback.html</code>, <code>reports/2026-06-02-task-21-desktop-startup-stability.html</code></td>
+            <td>Record the implementation and verification tasks.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Commands and outcomes</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Outcome</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests -q -p no:cacheprovider --ignore=tests\test_browser_smoke.py --ignore=tests\test_bootstrap_uv.py --ignore=tests\test_vendor_manifest.py</code></td>
+            <td>Passed: 62 tests.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py -q</code></td>
+            <td>Passed: 11 browser interaction tests.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run ruff check --no-cache src tests</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --extra desktop python -m em_workbench.desktop --check</code></td>
+            <td>Passed: <code>desktop runtime ok</code>.</td>
+          </tr>
+          <tr>
+            <td><code>node --check web\app.js</code> and <code>node --check web\api-client.js</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>git -c http.proxy=http://127.0.0.1:7890 push origin HEAD:codex/integrate-test-charge-motion</code></td>
+            <td>Passed. Used the existing local Windows proxy for this command only.</td>
+          </tr>
+          <tr>
+            <td><code>git -c http.proxy=http://127.0.0.1:7890 push origin 5993eb5:refs/heads/feature/em-workbench-foundation</code></td>
+            <td>Passed. Public default branch fast-forwarded without conflict.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Verification evidence</h2>
+      <ul>
+        <li>Remote <code>HEAD</code>, <code>feature/em-workbench-foundation</code>, and <code>codex/integrate-test-charge-motion</code> all resolved to <code>5993eb5</code> after publication.</li>
+        <li>The GitHub commit page returned HTTP 200 and displayed the published commit title.</li>
+        <li>The fast-forward ancestry check succeeded before the public branch update.</li>
+      </ul>
+
+      <h2>Known risks and limitations</h2>
+      <ul>
+        <li>The GitHub app connector was temporarily unavailable during publication.</li>
+        <li>The Codex Chrome extension was not installed in the selected Chrome profile, so the merge was completed through Git fast-forward rather than the GitHub web interface.</li>
+        <li>No global Git proxy configuration was changed.</li>
+      </ul>
+
+      <h2>Next scheduled task</h2>
+      <p>Collect manual confirmation after using multiple point charges and trajectory playback in the published desktop build.</p>
+    </main>
+  </body>
+</html>

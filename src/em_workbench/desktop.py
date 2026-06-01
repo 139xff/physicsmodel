@@ -49,6 +49,10 @@ def main(argv: list[str] | None = None) -> int:
         def evaluateField(self, payload: str) -> str:
             return self._bridge.evaluate_field(payload)
 
+        @Slot(str, result=str)
+        def evaluateTrajectory(self, payload: str) -> str:
+            return self._bridge.evaluate_trajectory(payload)
+
     app = QApplication(args)
     view = QWebEngineView()
     view.setWindowTitle("EM Workbench - 电磁工作台")

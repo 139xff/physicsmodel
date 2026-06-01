@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from em_workbench.app import app
+from em_workbench.presets import get_preset
 
 client = TestClient(app)
 
@@ -105,3 +106,30 @@ def test_three_entry_relative_dependency_is_served_locally():
     three_core = client.get("/vendor/three.core.js")
     assert three_core.status_code == 200
     assert "javascript" in three_core.headers["content-type"]
+
+
+def test_trajectory_endpoint_simulates_test_charge_motion():
+    scene = get_preset("electric-dipole").scene.model_dump(mode="json")
+    response = client.post(
+        "/api/field/trajectory",
+        json={
+            "request_id": "trajectory-api-test",
+            "scene": scene,
+            "particle": {
+                "charge_c": -1e-9,
+                "mass_kg": 6e-6,
+                "position": {"x": -0.08, "y": 0.04, "z": 0.0, "unit": "m"},
+                "velocity": {"x": 0.06, "y": 0.0, "z": 0.0, "unit": "m"},
+            },
+            "dt_s": 0.005,
+            "steps": 8,
+            "quality": "preview",
+        },
+    )
+
+    assert response.status_code == 200
+    trajectory = response.json()
+    assert trajectory["request_id"] == "trajectory-api-test"
+    assert trajectory["step_count"] == 8
+    assert len(trajectory["samples"]) == 9
+    assert trajectory["samples"][0]["position"] != trajectory["samples"][-1]["position"]

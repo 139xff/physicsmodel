@@ -45,3 +45,32 @@ def test_desktop_bridge_evaluates_field_without_http_server() -> None:
     assert result["request_id"] == "desktop-test"
     assert result["sample_count"] == 1
     assert result["samples"][0]["field_magnitude_v_per_m"] > 0
+
+
+def test_desktop_bridge_simulates_trajectory_without_http_server() -> None:
+    bridge = WorkbenchDesktopBridge()
+    preset = json.loads(bridge.get_preset(json.dumps({"preset_id": "electric-dipole"})))
+
+    result = json.loads(
+        bridge.evaluate_trajectory(
+            json.dumps(
+                {
+                    "request_id": "desktop-trajectory-test",
+                    "scene": preset["scene"],
+                    "particle": {
+                        "charge_c": -1e-9,
+                        "mass_kg": 6e-6,
+                        "position": {"x": -0.08, "y": 0.04, "z": 0.0, "unit": "m"},
+                        "velocity": {"x": 0.06, "y": 0.0, "z": 0.0, "unit": "m"},
+                    },
+                    "dt_s": 0.005,
+                    "steps": 8,
+                    "quality": "preview",
+                }
+            )
+        )
+    )
+
+    assert result["request_id"] == "desktop-trajectory-test"
+    assert result["step_count"] == 8
+    assert len(result["samples"]) == 9

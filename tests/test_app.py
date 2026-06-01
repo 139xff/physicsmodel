@@ -63,7 +63,7 @@ def test_root_serves_the_explicitly_scoped_workbench_shell():
     assert '<script type="importmap">' in html
     assert '"three": "./vendor/three.module.js"' in html
     assert 'href="./styles.css?v=20260601-point-form-field-focus"' in html
-    assert 'src="./app.js?v=20260601-uniform-charge-rays"' in html
+    assert 'src="./app.js?v=20260601-field-tangent-lines"' in html
 
 
 def test_static_assets_and_vendor_modules_are_served_locally():

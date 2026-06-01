@@ -568,7 +568,10 @@ def test_browser_field_lines_use_global_display_cap_for_same_sign_charges(page: 
 
     page.locator("#toggle-field-lines").click()
     field_line_layer = page.get_by_test_id("field-line-layer")
-    expect(field_line_layer).to_have_attribute("data-display-strategy", "uniform-charge-angle")
+    expect(field_line_layer).to_have_attribute(
+        "data-display-strategy",
+        "uniform-charge-angle-field-tangent",
+    )
     expect(field_line_layer).to_have_attribute("data-candidates-per-point-charge", "48")
     expect(field_line_layer).to_have_attribute("data-target-total-charge-rays", "96")
     expect(field_line_layer).to_have_attribute("data-display-max-line-count", "120")
@@ -603,7 +606,10 @@ def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: P
 
     page.locator("#toggle-field-lines").click()
     field_line_layer = page.get_by_test_id("field-line-layer")
-    expect(field_line_layer).to_have_attribute("data-display-strategy", "uniform-charge-angle")
+    expect(field_line_layer).to_have_attribute(
+        "data-display-strategy",
+        "uniform-charge-angle-field-tangent",
+    )
     expect(field_line_layer).to_have_attribute("data-candidates-per-point-charge", "48")
     expect(field_line_layer).to_have_attribute("data-target-total-charge-rays", "96")
     expect(field_line_layer).to_have_attribute("data-boundary-candidate-count", "0")
@@ -654,7 +660,7 @@ def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: P
         """
     )
     assert all(item["method"] == "adaptive-rk4" for item in rendered_metadata)
-    assert all(item["pathModel"] == "adaptive-rk4-spline" for item in rendered_metadata)
+    assert all(item["pathModel"] == "field-tangent-cubic" for item in rendered_metadata)
     assert all(
         item["endpointClass"] in {"opposite-charge", "infinity"}
         for item in rendered_metadata
@@ -687,12 +693,16 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     field_line_layer = page.get_by_test_id("field-line-layer")
     field_line_count = int(field_line_layer.get_attribute("data-field-line-count") or "0")
     assert 0 < field_line_count <= 120
-    expect(field_line_layer).to_have_attribute("data-display-strategy", "uniform-charge-angle")
+    expect(field_line_layer).to_have_attribute(
+        "data-display-strategy",
+        "uniform-charge-angle-field-tangent",
+    )
     expect(field_line_layer).to_have_attribute("data-candidates-per-point-charge", "64")
     expect(field_line_layer).to_have_attribute("data-target-total-charge-rays", "96")
     expect(field_line_layer).to_have_attribute("data-display-max-line-count", "120")
     expect(field_line_layer).to_have_attribute("data-target-line-count", "120")
-    expect(field_line_layer).to_have_attribute("data-raw-line-count", "64")
+    raw_field_line_count = int(field_line_layer.get_attribute("data-raw-line-count") or "0")
+    assert 0 < raw_field_line_count <= 64
     expect(field_line_layer).to_have_attribute("data-arrow-placement", "arc-fraction")
     expect(field_line_layer).to_have_attribute("data-arrow-fraction-base", "0.42")
     expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(field_line_count)
@@ -711,7 +721,7 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
         """
     )
     assert all(item["method"] == "adaptive-rk4" for item in line_trace_metadata)
-    assert all(item["pathModel"] == "adaptive-rk4-spline" for item in line_trace_metadata)
+    assert all(item["pathModel"] == "field-tangent-cubic" for item in line_trace_metadata)
     assert all(item["endpointClass"] != "numerical-artifact" for item in line_trace_metadata)
     assert all(
         item["stopReason"] not in {"direction-reversal", "self-approach"}

@@ -71,11 +71,11 @@ const FIELD_LINE_DISPLAY_MAX_COUNT = 120;
 const FIELD_LINE_MAX_PAIR_DISPLAY_COUNT = 72;
 const FIELD_LINE_START_RADIUS_M = POINT_VISUAL_RADIUS_CM / 100;
 const FIELD_LINE_ENDPOINT_MARGIN_M = 0.0015;
-const FIELD_LINE_BASE_STEP_M = 0.025;
-const FIELD_LINE_MIN_STEP_M = 0.004;
-const FIELD_LINE_MAX_STEP_M = 0.06;
-const FIELD_LINE_MAX_STEPS = 700;
-const FIELD_LINE_MAX_POINTS = 420;
+const FIELD_LINE_BASE_STEP_M = 0.01;
+const FIELD_LINE_MIN_STEP_M = 0.0012;
+const FIELD_LINE_MAX_STEP_M = 0.025;
+const FIELD_LINE_MAX_STEPS = 1600;
+const FIELD_LINE_MAX_POINTS = 1000;
 const FIELD_LINE_MIN_FIELD = 1e-15;
 const FIELD_LINE_SINGULARITY_RADIUS_M = 1e-6;
 const FIELD_LINE_REVERSAL_DOT_LIMIT = -0.2;
@@ -87,14 +87,20 @@ const FIELD_LINE_ADAPT_ERROR_FRACTION = 0.035;
 const FIELD_LINE_SELF_APPROACH_M = 0.006;
 const FIELD_LINE_SEED_ATTEMPTS = 1;
 const FIELD_LINE_MIN_RENDER_POINTS = 4;
-const FIELD_LINE_ACCEPTED_CLEARANCE_M = 0.001;
-const FIELD_LINE_CHARGE_CLEARANCE_RADIUS_M = 0.025;
-const FIELD_LINE_SPATIAL_CELL_M = 0.025;
-const FIELD_LINE_CURVE_CONTROL_FACTOR = 0.42;
+const FIELD_LINE_ACCEPTED_CLEARANCE_M = 0.00035;
+const FIELD_LINE_CHARGE_CLEARANCE_RADIUS_M = FIELD_LINE_START_RADIUS_M + 0.003;
+const FIELD_LINE_SPATIAL_CELL_M = 0.015;
+const FIELD_LINE_CURVE_CONTROL_FACTOR = 0.34;
 const FIELD_LINE_DISPLAY_SMOOTHING_ITERATIONS = 0;
 const FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT = 0.18;
-const FIELD_LINE_DIRECTION_DOT_MIN = -0.05;
-const FIELD_LINE_DISPLAY_STRATEGY = "uniform-charge-angle";
+const FIELD_LINE_DIRECTION_DOT_MIN = 0.2;
+const FIELD_LINE_DISPLAY_STRATEGY = "uniform-charge-angle-field-tangent";
+const FIELD_LINE_TRACE_TARGET_STEP_PX = 5;
+const FIELD_LINE_CURVE_SAMPLE_SPACING_PX = 4;
+const FIELD_LINE_CURVE_MIN_SAMPLE_SPACING_M = 0.001;
+const FIELD_LINE_CURVE_MAX_SAMPLE_SPACING_M = 0.02;
+const FIELD_LINE_MIN_VISIBLE_LENGTH_PX = 18;
+const FIELD_LINE_BOUNDS_PADDING_PX = 56;
 const FIELD_LINE_ARROW_FRACTION_BASE = 0.42;
 const FIELD_LINE_ARROW_FRACTION_SPREAD = 0.18;
 const FIELD_LINE_ARROW_FRACTION_MIN = 0.22;
@@ -780,6 +786,50 @@ function compute2dWorldBounds() {
   };
 }
 
+function fieldLineAverageMetersPerPx(scale) {
+  if (!scale) {
+    return FIELD_LINE_BASE_STEP_M / FIELD_LINE_TRACE_TARGET_STEP_PX;
+  }
+  const averageUnitsPerPx = (scale.xUnitsPerPx + scale.yUnitsPerPx) / 2;
+  return Math.max(1e-6, averageUnitsPerPx / VIEWPORT_METERS_TO_UNITS);
+}
+
+function fieldLineStepMetrics(scale) {
+  const metersPerPx = fieldLineAverageMetersPerPx(scale);
+  const targetStep = Math.max(
+    FIELD_LINE_MIN_STEP_M,
+    Math.min(FIELD_LINE_MAX_STEP_M, metersPerPx * FIELD_LINE_TRACE_TARGET_STEP_PX),
+  );
+  return {
+    metersPerPx,
+    baseStep: targetStep,
+    minStep: Math.max(FIELD_LINE_MIN_STEP_M, targetStep * 0.35),
+    maxStep: Math.min(FIELD_LINE_MAX_STEP_M, Math.max(targetStep * 1.8, targetStep + FIELD_LINE_MIN_STEP_M)),
+    sampleSpacing: Math.max(
+      FIELD_LINE_CURVE_MIN_SAMPLE_SPACING_M,
+      Math.min(FIELD_LINE_CURVE_MAX_SAMPLE_SPACING_M, metersPerPx * FIELD_LINE_CURVE_SAMPLE_SPACING_PX),
+    ),
+  };
+}
+
+function compute2dFieldLineBounds(scale) {
+  const viewBox = compute2dViewBox();
+  const worldBounds = compute2dWorldBounds();
+  const paddingX = ((scale?.xUnitsPerPx || 1) * FIELD_LINE_BOUNDS_PADDING_PX) / VIEWPORT_METERS_TO_UNITS;
+  const paddingY = ((scale?.yUnitsPerPx || 1) * FIELD_LINE_BOUNDS_PADDING_PX) / VIEWPORT_METERS_TO_UNITS;
+  const minX = viewBox.minX / VIEWPORT_METERS_TO_UNITS;
+  const maxX = (viewBox.minX + viewBox.width) / VIEWPORT_METERS_TO_UNITS;
+  const minY = -(viewBox.minY + viewBox.height) / VIEWPORT_METERS_TO_UNITS;
+  const maxY = -viewBox.minY / VIEWPORT_METERS_TO_UNITS;
+
+  return {
+    minX: Math.max(worldBounds.minX, minX - paddingX),
+    maxX: Math.min(worldBounds.maxX, maxX + paddingX),
+    minY: Math.max(worldBounds.minY, minY - paddingY),
+    maxY: Math.min(worldBounds.maxY, maxY + paddingY),
+  };
+}
+
 function overlayCellSizeMeters() {
   const bounds = compute2dWorldBounds();
   return Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) / 5;
@@ -1456,8 +1506,7 @@ function traceFieldLine(
   traceDirection,
   fieldSamples,
   bounds,
-  acceptedLineIndex,
-  useConflictFilter,
+  stepMetrics,
 ) {
   const points = [seed];
   let x = seed.x;
@@ -1465,7 +1514,7 @@ function traceFieldLine(
   let previousDirection = null;
   let stopReason = "max-steps";
   let terminalSourceId = "";
-  let stepSize = FIELD_LINE_BASE_STEP_M;
+  let stepSize = stepMetrics.baseStep;
 
   for (let step = 0; step < FIELD_LINE_MAX_STEPS; step += 1) {
     let next = null;
@@ -1484,20 +1533,20 @@ function traceFieldLine(
         blockedByReversal = true;
         break;
       }
-      if (stepSize > FIELD_LINE_MIN_STEP_M) {
+      if (stepSize > stepMetrics.minStep) {
         const halfStepSize = stepSize / 2;
         const halfStep = rk4FieldLineStep(x, y, traceDirection, fieldSamples, halfStepSize);
         const secondHalfStep = halfStep
           ? rk4FieldLineStep(halfStep.x, halfStep.y, traceDirection, fieldSamples, halfStepSize)
           : null;
         if (!secondHalfStep) {
-          stepSize = Math.max(FIELD_LINE_MIN_STEP_M, stepSize * 0.5);
+          stepSize = Math.max(stepMetrics.minStep, stepSize * 0.5);
           continue;
         }
         const stepError = Math.hypot(fullStep.x - secondHalfStep.x, fullStep.y - secondHalfStep.y);
         const allowedError = Math.max(FIELD_LINE_ADAPT_ERROR_MIN_M, stepSize * FIELD_LINE_ADAPT_ERROR_FRACTION);
         if (stepError > allowedError) {
-          stepSize = Math.max(FIELD_LINE_MIN_STEP_M, stepSize * 0.5);
+          stepSize = Math.max(stepMetrics.minStep, stepSize * 0.5);
           continue;
         }
         next = {
@@ -1506,8 +1555,8 @@ function traceFieldLine(
           stepSize,
         };
       }
-      if (directionDot < FIELD_LINE_ADAPT_RETRY_DOT && stepSize > FIELD_LINE_MIN_STEP_M) {
-        stepSize = Math.max(FIELD_LINE_MIN_STEP_M, stepSize * 0.5);
+      if (directionDot < FIELD_LINE_ADAPT_RETRY_DOT && stepSize > stepMetrics.minStep) {
+        stepSize = Math.max(stepMetrics.minStep, stepSize * 0.5);
         continue;
       }
       break;
@@ -1525,15 +1574,6 @@ function traceFieldLine(
       stopReason = "self-approach";
       break;
     }
-    if (
-      useConflictFilter &&
-      acceptedLineIndex &&
-      fieldLineConflictsWithAccepted([{ x, y }, { x: next.x, y: next.y }], acceptedLineIndex)
-    ) {
-      stopReason = "line-conflict";
-      break;
-    }
-
     x = next.x;
     y = next.y;
     points.push({ x, y });
@@ -1544,9 +1584,9 @@ function traceFieldLine(
       break;
     }
     if (directionDot > FIELD_LINE_ADAPT_GROW_DOT) {
-      stepSize = Math.min(FIELD_LINE_MAX_STEP_M, stepSize * 1.35);
+      stepSize = Math.min(stepMetrics.maxStep, stepSize * 1.35);
     } else if (directionDot < FIELD_LINE_ADAPT_SHRINK_DOT) {
-      stepSize = Math.max(FIELD_LINE_MIN_STEP_M, stepSize * 0.7);
+      stepSize = Math.max(stepMetrics.minStep, stepSize * 0.7);
     }
 
     if (!isInsideFieldLineBounds(x, y, bounds)) {
@@ -1566,44 +1606,141 @@ function traceFieldLine(
   return { points, stopReason, terminalSourceId };
 }
 
-function fieldLinePath(points) {
-  const viewportPoints = points.map((point) => mapToViewport(point.x, point.y));
-  if (viewportPoints.length <= 2) {
+function fieldLineNormalizeVector(x, y) {
+  const length = Math.hypot(x, y);
+  return length <= 1e-12 ? null : { x: x / length, y: y / length };
+}
+
+function fieldLineFallbackDirection(points, index) {
+  const previous = points[Math.max(0, index - 1)];
+  const next = points[Math.min(points.length - 1, index + 1)];
+  return fieldLineNormalizeVector(next.x - previous.x, next.y - previous.y) || { x: 1, y: 0 };
+}
+
+function fieldLineDisplayDirectionAtPoint(point, fallback, fieldSamples) {
+  const field = electricField2dAt(point.x, point.y, fieldSamples);
+  const fieldMagnitude = Math.hypot(field.x, field.y);
+  const direction = fieldMagnitude > FIELD_LINE_MIN_FIELD
+    ? { x: field.x / fieldMagnitude, y: field.y / fieldMagnitude }
+    : { ...fallback };
+  return direction.x * fallback.x + direction.y * fallback.y < 0
+    ? { x: -direction.x, y: -direction.y }
+    : direction;
+}
+
+function fieldLineCurveTangents(points, fieldSamples) {
+  return points.map((point, index) => {
+    const fallback = fieldLineFallbackDirection(points, index);
+    return fieldLineDisplayDirectionAtPoint(point, fallback, fieldSamples);
+  });
+}
+
+function fieldLineCurveSegments(points, fieldSamples) {
+  if (points.length < 2) {
+    return [];
+  }
+  const tangents = fieldLineCurveTangents(points, fieldSamples);
+  const segments = [];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    const segmentLength = Math.hypot(end.x - start.x, end.y - start.y);
+    if (segmentLength <= 1e-12) {
+      continue;
+    }
+    const previousLength = index > 0
+      ? Math.hypot(start.x - points[index - 1].x, start.y - points[index - 1].y)
+      : segmentLength;
+    const nextLength = index + 2 < points.length
+      ? Math.hypot(points[index + 2].x - end.x, points[index + 2].y - end.y)
+      : segmentLength;
+    const startControlLength = Math.min(
+      segmentLength * 0.45,
+      Math.max(segmentLength, previousLength) * FIELD_LINE_CURVE_CONTROL_FACTOR,
+    );
+    const endControlLength = Math.min(
+      segmentLength * 0.45,
+      Math.max(segmentLength, nextLength) * FIELD_LINE_CURVE_CONTROL_FACTOR,
+    );
+    segments.push({
+      start,
+      controlStart: {
+        x: start.x + tangents[index].x * startControlLength,
+        y: start.y + tangents[index].y * startControlLength,
+      },
+      controlEnd: {
+        x: end.x - tangents[index + 1].x * endControlLength,
+        y: end.y - tangents[index + 1].y * endControlLength,
+      },
+      end,
+    });
+  }
+  return segments;
+}
+
+function fieldLineCubicPoint(segment, t) {
+  const u = 1 - t;
+  const uu = u * u;
+  const tt = t * t;
+  return {
+    x:
+      uu * u * segment.start.x +
+      3 * uu * t * segment.controlStart.x +
+      3 * u * tt * segment.controlEnd.x +
+      tt * t * segment.end.x,
+    y:
+      uu * u * segment.start.y +
+      3 * uu * t * segment.controlStart.y +
+      3 * u * tt * segment.controlEnd.y +
+      tt * t * segment.end.y,
+  };
+}
+
+function fieldLineCubicApproxLength(segment) {
+  return (
+    Math.hypot(segment.controlStart.x - segment.start.x, segment.controlStart.y - segment.start.y) +
+    Math.hypot(segment.controlEnd.x - segment.controlStart.x, segment.controlEnd.y - segment.controlStart.y) +
+    Math.hypot(segment.end.x - segment.controlEnd.x, segment.end.y - segment.controlEnd.y)
+  );
+}
+
+function fieldLineCurveSamplePoints(points, fieldSamples, sampleSpacing) {
+  const segments = fieldLineCurveSegments(points, fieldSamples);
+  if (segments.length === 0) {
+    return points;
+  }
+  const samples = [{ ...segments[0].start }];
+  for (const segment of segments) {
+    const sampleCount = Math.max(2, Math.ceil(fieldLineCubicApproxLength(segment) / sampleSpacing));
+    for (let sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex += 1) {
+      samples.push(fieldLineCubicPoint(segment, sampleIndex / sampleCount));
+    }
+  }
+  return samples;
+}
+
+function fieldLinePolylineLength(points) {
+  let length = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    length += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+  }
+  return length;
+}
+
+function fieldLinePath(points, fieldSamples) {
+  const segments = fieldLineCurveSegments(points, fieldSamples);
+  if (segments.length === 0) {
+    const viewportPoints = points.map((point) => mapToViewport(point.x, point.y));
     return viewportPoints
       .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(3)} ${point.y.toFixed(3)}`)
       .join(" ");
   }
-
-  const tangents = viewportPoints.map((point, index) => {
-    const previous = viewportPoints[Math.max(0, index - 1)];
-    const next = viewportPoints[Math.min(viewportPoints.length - 1, index + 1)];
-    const previousDistance = Math.hypot(point.x - previous.x, point.y - previous.y);
-    const nextDistance = Math.hypot(next.x - point.x, next.y - point.y);
-    const tangentX = next.x - previous.x;
-    const tangentY = next.y - previous.y;
-    const tangentLength = Math.hypot(tangentX, tangentY);
-    if (tangentLength <= 1e-9) {
-      return { x: 0, y: 0 };
-    }
-    const controlLength = Math.min(previousDistance || nextDistance, nextDistance || previousDistance) *
-      FIELD_LINE_CURVE_CONTROL_FACTOR;
-    return {
-      x: (tangentX / tangentLength) * controlLength,
-      y: (tangentY / tangentLength) * controlLength,
-    };
-  });
-  const commands = [`M ${viewportPoints[0].x.toFixed(3)} ${viewportPoints[0].y.toFixed(3)}`];
-  for (let index = 0; index < viewportPoints.length - 1; index += 1) {
-    const start = viewportPoints[index];
-    const end = viewportPoints[index + 1];
-    const controlStart = {
-      x: start.x + tangents[index].x,
-      y: start.y + tangents[index].y,
-    };
-    const controlEnd = {
-      x: end.x - tangents[index + 1].x,
-      y: end.y - tangents[index + 1].y,
-    };
+  const first = mapToViewport(segments[0].start.x, segments[0].start.y);
+  const commands = [`M ${first.x.toFixed(3)} ${first.y.toFixed(3)}`];
+  for (const segment of segments) {
+    const controlStart = mapToViewport(segment.controlStart.x, segment.controlStart.y);
+    const controlEnd = mapToViewport(segment.controlEnd.x, segment.controlEnd.y);
+    const end = mapToViewport(segment.end.x, segment.end.y);
     commands.push(
       `C ${controlStart.x.toFixed(3)} ${controlStart.y.toFixed(3)} ` +
       `${controlEnd.x.toFixed(3)} ${controlEnd.y.toFixed(3)} ` +
@@ -1852,7 +1989,7 @@ function fieldLineDirectionQuality(points, fieldSamples) {
   };
 }
 
-function prepareDisplayFieldLineEntry(entry, fieldSamples) {
+function prepareDisplayFieldLineEntry(entry, fieldSamples, stepMetrics) {
   const arrowSource = fieldLineArrowSource(entry);
   if (!arrowSource || !arrowSource.position || entry.topology === "infinity-to-infinity") {
     return null;
@@ -1861,7 +1998,11 @@ function prepareDisplayFieldLineEntry(entry, fieldSamples) {
   const arrowFraction = fieldLineArrowFraction(entry);
   const anchoredPoints = fieldLinePointsWithArrowAnchor(snappedPoints, entry);
   const displayPoints = smoothFieldLineDisplayPoints(anchoredPoints, arrowSource);
-  const directionQuality = fieldLineDirectionQuality(displayPoints, fieldSamples);
+  const curvePoints = fieldLineCurveSamplePoints(displayPoints, fieldSamples, stepMetrics.sampleSpacing);
+  if (fieldLinePolylineLength(curvePoints) / stepMetrics.metersPerPx < FIELD_LINE_MIN_VISIBLE_LENGTH_PX) {
+    return null;
+  }
+  const directionQuality = fieldLineDirectionQuality(curvePoints, fieldSamples);
   if (!directionQuality.valid) {
     return null;
   }
@@ -1869,6 +2010,8 @@ function prepareDisplayFieldLineEntry(entry, fieldSamples) {
     ...entry,
     arrowSource,
     displayPoints,
+    curvePoints,
+    arrowPoints: fieldLinePointsWithArrowAnchor(curvePoints, entry),
     qualityScore: directionQuality.score,
     minDirectionDot: directionQuality.minDot,
     arrowFraction,
@@ -1932,18 +2075,27 @@ function fieldLineArrowMarkup(points, entry, fieldSamples, scale) {
   `;
 }
 
-function fieldLineCacheKey(seedSources) {
+function fieldLineCacheKey(seedSources, bounds, stepMetrics) {
   return JSON.stringify({
     sources: state.scene.sources,
     seedSourceIds: seedSources.map((source) => source.id),
+    bounds: {
+      minX: Number(bounds.minX.toFixed(4)),
+      maxX: Number(bounds.maxX.toFixed(4)),
+      minY: Number(bounds.minY.toFixed(4)),
+      maxY: Number(bounds.maxY.toFixed(4)),
+    },
+    stepMetrics: {
+      baseStep: Number(stepMetrics.baseStep.toFixed(5)),
+      minStep: Number(stepMetrics.minStep.toFixed(5)),
+      maxStep: Number(stepMetrics.maxStep.toFixed(5)),
+      sampleSpacing: Number(stepMetrics.sampleSpacing.toFixed(5)),
+    },
     displayStrategy: FIELD_LINE_DISPLAY_STRATEGY,
     targetTotalChargeRays: FIELD_LINE_TARGET_TOTAL_CHARGE_RAYS,
     minChargeRays: FIELD_LINE_MIN_CHARGE_RAYS,
     maxChargeRays: FIELD_LINE_MAX_CHARGE_RAYS,
     displayMaxCount: FIELD_LINE_DISPLAY_MAX_COUNT,
-    baseStep: FIELD_LINE_BASE_STEP_M,
-    minStep: FIELD_LINE_MIN_STEP_M,
-    maxStep: FIELD_LINE_MAX_STEP_M,
     maxPoints: FIELD_LINE_MAX_POINTS,
   });
 }
@@ -1962,10 +2114,10 @@ function fieldLineDisplayPointOrder(candidate, trace, endpoints) {
 }
 
 function tryAcceptDisplayFieldLine(entry, acceptedLineIndex) {
-  if (fieldLineConflictsWithAccepted(entry.displayPoints, acceptedLineIndex)) {
+  if (fieldLineConflictsWithAccepted(entry.curvePoints, acceptedLineIndex)) {
     return false;
   }
-  addAcceptedFieldLine(acceptedLineIndex, entry.displayPoints);
+  addAcceptedFieldLine(acceptedLineIndex, entry.curvePoints);
   return true;
 }
 
@@ -1987,7 +2139,7 @@ function sortFieldLineEntriesByUniformAngle(entries) {
   });
 }
 
-function selectDisplayFieldLineEntries(rawEntries, fieldSamples) {
+function selectDisplayFieldLineEntries(rawEntries, fieldSamples, stepMetrics) {
   const acceptedLineIndex = createFieldLineSpatialIndex();
   const selectedEntries = [];
   const preparedEntries = [];
@@ -1997,7 +2149,7 @@ function selectDisplayFieldLineEntries(rawEntries, fieldSamples) {
   let conflictRejectedLineCount = 0;
 
   for (const entry of rawEntries) {
-    const displayEntry = prepareDisplayFieldLineEntry(entry, fieldSamples);
+    const displayEntry = prepareDisplayFieldLineEntry(entry, fieldSamples, stepMetrics);
     if (!displayEntry) {
       lowQualityLineCount += 1;
       continue;
@@ -2037,8 +2189,7 @@ function selectDisplayFieldLineEntries(rawEntries, fieldSamples) {
   };
 }
 
-function computeFieldLineTraceResult(fieldSamples, seedSources) {
-  const bounds = compute2dWorldBounds();
+function computeFieldLineTraceResult(fieldSamples, seedSources, bounds, stepMetrics) {
   const rawEntries = [];
   const { candidates, rayCount } = fieldLineTraceCandidates(seedSources, bounds);
   let rejectedLineCount = 0;
@@ -2049,8 +2200,7 @@ function computeFieldLineTraceResult(fieldSamples, seedSources) {
       candidate.traceDirection,
       fieldSamples,
       bounds,
-      null,
-      false,
+      stepMetrics,
     );
     if (!isRenderableFieldLine(trace, candidate)) {
       rejectedLineCount += 1;
@@ -2075,7 +2225,7 @@ function computeFieldLineTraceResult(fieldSamples, seedSources) {
       terminalSourceId: trace.terminalSourceId,
     });
   }
-  const displayResult = selectDisplayFieldLineEntries(rawEntries, fieldSamples);
+  const displayResult = selectDisplayFieldLineEntries(rawEntries, fieldSamples, stepMetrics);
   return {
     entries: displayResult.entries,
     rawLineCount: rawEntries.length,
@@ -2087,15 +2237,17 @@ function computeFieldLineTraceResult(fieldSamples, seedSources) {
     lowQualityLineCount: displayResult.lowQualityLineCount,
     pairedLineCount: displayResult.pairedLineCount,
     useConflictFilter: rawEntries.length > 1,
+    stepMeters: stepMetrics.baseStep,
+    sampleSpacingMeters: stepMetrics.sampleSpacing,
   };
 }
 
-function getFieldLineTraceResult(fieldSamples, seedSources) {
-  const key = fieldLineCacheKey(seedSources);
+function getFieldLineTraceResult(fieldSamples, seedSources, bounds, stepMetrics) {
+  const key = fieldLineCacheKey(seedSources, bounds, stepMetrics);
   if (fieldLineTraceCache.key === key && fieldLineTraceCache.result) {
     return fieldLineTraceCache.result;
   }
-  const result = computeFieldLineTraceResult(fieldSamples, seedSources);
+  const result = computeFieldLineTraceResult(fieldSamples, seedSources, bounds, stepMetrics);
   fieldLineTraceCache = { key, result };
   return result;
 }
@@ -2111,7 +2263,9 @@ function renderFieldLines2d(scale) {
     return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="true"></g>';
   }
 
-  const traceResult = getFieldLineTraceResult(fieldSamples, seedSources);
+  const stepMetrics = fieldLineStepMetrics(scale);
+  const bounds = compute2dFieldLineBounds(scale);
+  const traceResult = getFieldLineTraceResult(fieldSamples, seedSources, bounds, stepMetrics);
   const paths = [];
   const arrows = [];
   for (const entry of traceResult.entries) {
@@ -2129,19 +2283,20 @@ function renderFieldLines2d(scale) {
           data-field-topology="${entry.topology}"
           data-seed-kind="${entry.seedKind}"
           data-trace-method="adaptive-rk4"
-          data-path-model="adaptive-rk4-spline"
-          data-display-smoothing="weighted"
+          data-path-model="field-tangent-cubic"
+          data-display-smoothing="field-tangent"
           data-endpoint-class="${entry.endpointClass}"
           data-terminal-source-id="${entry.terminalSourceId}"
           data-seed-attempt="${entry.seedAttempt}"
           data-seed-index="${entry.seedIndex}"
           data-stop-reason="${entry.stopReason}"
           data-point-count="${renderPoints.length}"
+          data-curve-sample-count="${entry.curvePoints.length}"
           data-direction-min-dot="${entry.minDirectionDot.toFixed(3)}"
-          d="${fieldLinePath(renderPoints)}"
+          d="${fieldLinePath(renderPoints, fieldSamples)}"
         ></path>
       `);
-    arrows.push(fieldLineArrowMarkup(renderPoints, entry, fieldSamples, scale));
+    arrows.push(fieldLineArrowMarkup(entry.arrowPoints, entry, fieldSamples, scale));
   }
 
   return `
@@ -2165,6 +2320,8 @@ function renderFieldLines2d(scale) {
       data-display-conflict-rejected-line-count="${traceResult.displayConflictRejectedLineCount}"
       data-display-low-quality-line-count="${traceResult.lowQualityLineCount}"
       data-paired-line-count="${traceResult.pairedLineCount}"
+      data-trace-step-m="${traceResult.stepMeters.toFixed(5)}"
+      data-curve-sample-spacing-m="${traceResult.sampleSpacingMeters.toFixed(5)}"
       data-arrow-placement="arc-fraction"
       data-arrow-fraction-base="${FIELD_LINE_ARROW_FRACTION_BASE}"
       data-conflict-filter="${traceResult.useConflictFilter ? "display-spatial" : "off"}"

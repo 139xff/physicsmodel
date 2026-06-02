@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 25 - Packed scene cache</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 25 - Packed scene cache</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T09:35:58+08:00">2026-06-02T09:35:58+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Added an immutable packed-scene representation for accelerated compute backends.</li>
+      <li>Compiled point charges, line-segment midpoint elements, ring midpoint elements, and disk midpoint patches into contiguous NumPy arrays.</li>
+      <li>Preserved infinite-plane and spherical-shell analytic parameters in dedicated arrays.</li>
+      <li>Used <code>float32</code> for preview mode and <code>float64</code> for refined mode.</li>
+      <li>Added a SHA-256 keyed, thread-safe, bounded LRU cache.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>This task prepares immutable arrays only. Numba CPU evaluation, CUDA device copies, dispatch,
+      warm-up, API metadata, and field-line acceleration remain scheduled in later tasks.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/em_workbench/physics/compute/packed_scene.py</code></td><td>Packed-scene compiler and bounded cache.</td></tr>
+        <tr><td><code>tests/test_packed_scene.py</code></td><td>Precision, ownership, read-only, analytic-array, cache-hit, and LRU-eviction coverage.</td></tr>
+        <tr><td><code>reports/2026-06-02-task-25-packed-scene-cache.html</code></td><td>This engineering record.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_packed_scene.py -q</code></td><td class="expected">Expected RED: <code>ModuleNotFoundError: No module named 'em_workbench.physics.compute.packed_scene'</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_packed_scene.py tests/test_solver.py -q</code></td><td class="pass">PASS: 16 tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td class="pass">PASS: 88 tests, 2 dependency deprecation warnings.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Implementation notes</h2>
+    <ul>
+      <li>The compiler reuses the scalar solver's charge conversion helpers so both paths retain identical source semantics.</li>
+      <li>All published arrays have <code>writeable=false</code> to keep cache entries safe for concurrent readers.</li>
+      <li>Source indexes remain aligned with the original Pydantic scene ordering for later contribution aggregation.</li>
+    </ul>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>The cache is not yet connected to the runtime status API.</li>
+      <li>Concurrent first access may compile the same scene more than once before one result is retained; correctness is unaffected.</li>
+      <li>The suite still reports two upstream WebSockets deprecation warnings.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 3: add Numba CPU batch field kernels and compare them against the authoritative scalar solver.</p>
+  </main>
+</body>
+</html>

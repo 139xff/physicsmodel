@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 20: CPU/CUDA implementation plan</title>
+    <style>
+      body { color: #1f2937; font-family: Arial, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1080px; padding: 0 1rem; }
+      h1, h2 { color: #111827; }
+      table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+      th, td { border: 1px solid #d1d5db; padding: 0.55rem; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; }
+      code { background: #f3f4f6; padding: 0.1rem 0.25rem; }
+      .pass { color: #166534; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 20: CPU/CUDA implementation plan</h1>
+      <p><strong>Completed:</strong> 2026-06-02 09:01:25 +08:00</p>
+
+      <h2>Scope delivered</h2>
+      <ul>
+        <li>Converted the approved CPU/CUDA design into an executable red-green-refactor implementation plan.</li>
+        <li>Mapped focused compute modules, test files, API changes, browser changes, reports, verification commands, and commit boundaries.</li>
+        <li>Included the interrupted desktop bridge bootstrap bug as an explicit prerequisite task.</li>
+      </ul>
+
+      <h2>Scope deferred</h2>
+      <ul>
+        <li>Runtime implementation of CPU JIT and CUDA kernels.</li>
+        <li>Dependency lock updates and CUDA installation.</li>
+        <li>Execution of the interrupted desktop bridge bootstrap fix.</li>
+      </ul>
+
+      <h2>Changed files</h2>
+      <table>
+        <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>docs/superpowers/plans/2026-06-02-cpu-cuda-performance.md</code></td><td>Task-by-task implementation plan.</td></tr>
+          <tr><td><code>reports/2026-06-02-task-20-cpu-cuda-performance-plan.html</code></td><td>This engineering record.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Verification evidence</h2>
+      <ul>
+        <li><span class="pass">Spec coverage:</span> dependency strategy, packed scene compiler, CPU JIT, CUDA, trajectory, field lines, browser migration, warm-up, concurrency, benchmarks, and packaging all map to plan tasks.</li>
+        <li><span class="pass">Scope isolation:</span> existing unstaged browser regression test remains excluded from the planning commit.</li>
+        <li><strong>Lint, tests, and browser verification:</strong> not run because this task changes documentation only.</li>
+      </ul>
+
+      <h2>Known risks or limitations</h2>
+      <ul>
+        <li>CUDA dependency versions must be resolved by project-local uv during Task 1.</li>
+        <li>Field-line visual parity remains the highest-risk implementation stage.</li>
+        <li>The implementation workers must retain the scalar oracle until all parity tests pass.</li>
+      </ul>
+
+      <h2>Next scheduled task</h2>
+      <p>Choose subagent-driven or inline execution, then begin Task 0 with the existing red desktop bridge bootstrap test.</p>
+    </main>
+  </body>
+</html>

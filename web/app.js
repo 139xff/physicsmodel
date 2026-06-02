@@ -1,4 +1,4 @@
-import { evaluateField, evaluateTrajectory, getConfig, getPreset, listPresets } from "./api-client.js";
+import { evaluateField, evaluateFieldLines, evaluateTrajectory, getConfig, getPreset, listPresets } from "./api-client.js";
 import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-axis-labels-pan-preserve";
 
 document.documentElement.classList.toggle("desktop-runtime", Boolean(window.emWorkbenchBridgeReady));
@@ -121,6 +121,7 @@ const FIELD_LINE_ARROW_FRACTION_MIN = 0.22;
 const FIELD_LINE_ARROW_FRACTION_MAX = 0.72;
 const FIELD_LINE_ARROW_LENGTH_PX = 9;
 const FIELD_LINE_ARROW_WIDTH_PX = 7;
+const ENABLE_LEGACY_FIELD_LINE_DEBUG_COMPARISON = false;
 
 const state = {
   mode: "2D",
@@ -144,6 +145,8 @@ const state = {
   panMode: false,
   showHeatmap: false,
   showFieldLines: false,
+  fieldLineResult: null,
+  fieldLineRequestId: "",
   lastResult: null,
   overlayResult: null,
   overlaySamples: [],
@@ -169,6 +172,8 @@ const modeStates = {
     overlayResult: state.overlayResult,
     overlaySamples: state.overlaySamples,
     showFieldLines: state.showFieldLines,
+    fieldLineResult: state.fieldLineResult,
+    fieldLineRequestId: state.fieldLineRequestId,
   },
   "3D": {
     sourceIndex: {
@@ -190,6 +195,8 @@ const modeStates = {
     overlayResult: null,
     overlaySamples: [],
     showFieldLines: false,
+    fieldLineResult: null,
+    fieldLineRequestId: "",
   },
 };
 
@@ -205,6 +212,8 @@ const KIND_LABELS = {
 let latestProbeRequestId = "";
 let latestOverlayRequestId = "";
 let requestSerial = 0;
+let fieldLineRequestSerial = 0;
+let fieldLineEvaluationTimer = null;
 let active2dPan = null;
 
 function saveModeState(mode = state.mode) {
@@ -216,6 +225,8 @@ function saveModeState(mode = state.mode) {
     overlayResult: state.overlayResult,
     overlaySamples: state.overlaySamples,
     showFieldLines: state.showFieldLines,
+    fieldLineResult: state.fieldLineResult,
+    fieldLineRequestId: state.fieldLineRequestId,
   };
 }
 
@@ -228,6 +239,8 @@ function loadModeState(mode) {
   state.overlayResult = modeState.overlayResult;
   state.overlaySamples = modeState.overlaySamples;
   state.showFieldLines = Boolean(modeState.showFieldLines);
+  state.fieldLineResult = modeState.fieldLineResult || null;
+  state.fieldLineRequestId = modeState.fieldLineRequestId || "";
 }
 function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) {
@@ -351,6 +364,7 @@ function addSource(kind, overrides = {}) {
   clearMotionTrajectory();
   state.scene.sources.push(sourceDefaults(kind, overrides));
   fieldLineTraceCache = { key: "", result: null };
+  state.fieldLineResult = null;
   renderAll();
   scheduleEvaluation();
 }
@@ -394,6 +408,7 @@ function removeSource(sourceId) {
   clearMotionTrajectory();
   state.scene.sources = state.scene.sources.filter((source) => source.id !== sourceId);
   fieldLineTraceCache = { key: "", result: null };
+  state.fieldLineResult = null;
   if (state.scene.sources.length === 0) {
     setEmptyComputationState();
   }
@@ -418,6 +433,7 @@ function updateSource(sourceId, field, value) {
   }
 
   fieldLineTraceCache = { key: "", result: null };
+  state.fieldLineResult = null;
   renderAll();
   scheduleEvaluation();
 }
@@ -447,6 +463,9 @@ function setMode(mode) {
     stopAnimLoop();
   }
   renderAll({ reset3dView: mode === "3D" });
+  if (mode === "2D") {
+    scheduleFieldLineEvaluation();
+  }
 }
 
 function renderPanTool() {
@@ -516,6 +535,16 @@ function toggleHeatmap() {
 function toggleFieldLines() {
   state.showFieldLines = !state.showFieldLines;
   render2d();
+  if (state.showFieldLines) {
+    scheduleFieldLineEvaluation();
+  } else {
+    fieldLineRequestSerial += 1;
+    state.fieldLineRequestId = "";
+    if (fieldLineEvaluationTimer) {
+      window.clearTimeout(fieldLineEvaluationTimer);
+      fieldLineEvaluationTimer = null;
+    }
+  }
   renderOverlaySummary();
 }
 
@@ -2275,6 +2304,74 @@ function getFieldLineTraceResult(fieldSamples, seedSources, bounds, stepMetrics)
   return result;
 }
 
+function backendFieldLineEntry(line) {
+  const source = fieldLineSourceById(line.source_id);
+  if (!source) {
+    return null;
+  }
+  const charge = sourceChargeValue(source);
+  let fieldStartId = source.id;
+  let fieldEndId = "infinity";
+  let topology = "charge-to-infinity";
+  if (line.topology === "source-to-source") {
+    topology = "charge-to-charge";
+    if (charge >= 0) {
+      fieldEndId = line.terminal_source_id;
+    } else {
+      fieldStartId = line.terminal_source_id;
+      fieldEndId = source.id;
+    }
+  } else if (line.topology === "infinity-to-source") {
+    fieldStartId = "infinity";
+    fieldEndId = source.id;
+    topology = "infinity-to-charge";
+  }
+  return {
+    source,
+    charge,
+    endpointClass: line.stop_reason === "opposite-charge" ? "opposite-charge" : "infinity",
+    fieldStartId,
+    fieldEndId,
+    topology,
+    renderPoints: line.points,
+    seedAttempt: 0,
+    seedIndex: line.seed_index,
+    seedCount: 0,
+    sourceOrder: state.scene.sources.indexOf(source),
+    seedKind: "charge",
+    stopReason: line.stop_reason,
+    terminalSourceId: line.terminal_source_id || "",
+  };
+}
+
+function backendFieldLineTraceResult(result, fieldSamples, seedSources, stepMetrics) {
+  const rawEntries = result.lines
+    .map((line) => backendFieldLineEntry(line))
+    .filter((entry) => entry !== null);
+  const displayStepMetrics = {
+    ...stepMetrics,
+    sampleSpacing: stepMetrics.sampleSpacing * 0.5,
+  };
+  const displayResult = selectDisplayFieldLineEntries(rawEntries, fieldSamples, displayStepMetrics);
+  return {
+    entries: displayResult.entries,
+    rawLineCount: rawEntries.length,
+    candidateLineCount: result.candidate_line_count,
+    chargeRayCount: Math.round(result.candidate_line_count / Math.max(1, seedSources.length)),
+    rejectedLineCount: result.rejected_line_count,
+    dedupedLineCount: displayResult.dedupedLineCount,
+    displayConflictRejectedLineCount:
+      result.conflict_rejected_line_count + displayResult.conflictRejectedLineCount,
+    lowQualityLineCount: displayResult.lowQualityLineCount,
+    pairedLineCount: displayResult.pairedLineCount,
+    useConflictFilter: rawEntries.length > 1,
+    stepMeters: FIELD_LINE_BASE_STEP_M,
+    sampleSpacingMeters: displayStepMetrics.sampleSpacing,
+    requestId: result.request_id,
+    execution: result.execution,
+  };
+}
+
 function renderFieldLines2d(scale) {
   if (!state.showFieldLines) {
     return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="false"></g>';
@@ -2283,12 +2380,23 @@ function renderFieldLines2d(scale) {
   const fieldSamples = state.scene.sources.flatMap((source) => sourceChargeSamples2d(source));
   const seedSources = fieldLineSeedSources2d();
   if (fieldSamples.length === 0 || seedSources.length === 0) {
-    return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="true"></g>';
+    return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="true" data-compute-source="backend"></g>';
   }
 
   const stepMetrics = fieldLineStepMetrics(scale);
   const bounds = compute2dFieldLineBounds(scale);
-  const traceResult = getFieldLineTraceResult(fieldSamples, seedSources, bounds, stepMetrics);
+  if (!state.fieldLineResult) {
+    return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="true" data-compute-source="backend" data-request-current="false"></g>';
+  }
+  if (ENABLE_LEGACY_FIELD_LINE_DEBUG_COMPARISON) {
+    getFieldLineTraceResult(fieldSamples, seedSources, bounds, stepMetrics);
+  }
+  const traceResult = backendFieldLineTraceResult(
+    state.fieldLineResult,
+    fieldSamples,
+    seedSources,
+    stepMetrics,
+  );
   const paths = [];
   const arrows = [];
   for (const entry of traceResult.entries) {
@@ -2348,6 +2456,11 @@ function renderFieldLines2d(scale) {
       data-arrow-placement="arc-fraction"
       data-arrow-fraction-base="${FIELD_LINE_ARROW_FRACTION_BASE}"
       data-conflict-filter="${traceResult.useConflictFilter ? "display-spatial" : "off"}"
+      data-compute-source="backend"
+      data-rendered-request-id="${traceResult.requestId}"
+      data-request-current="${traceResult.requestId === state.fieldLineRequestId ? "true" : "false"}"
+      data-effective-backend="${traceResult.execution.backend_effective}"
+      data-precision="${traceResult.execution.precision}"
       data-enabled="true"
     >
       ${paths.join("")}
@@ -2770,6 +2883,7 @@ function zoom2d(deltaY) {
   state.view2d.zoom = nextZoom;
   clamp2dView();
   render2d();
+  scheduleFieldLineEvaluation();
 }
 
 function start2dPan(event) {
@@ -2804,6 +2918,7 @@ function move2dPan(event) {
   state.view2d.centerY = active2dPan.centerY - deltaY;
   clamp2dView();
   render2d();
+  scheduleFieldLineEvaluation();
 }
 
 function end2dPan(event) {
@@ -2907,6 +3022,7 @@ function renderAll(options = {}) {
 function setEmptyComputationState() {
   state.lastResult = null;
   state.overlayResult = null;
+  state.fieldLineResult = null;
   solverStatus.textContent = "等待源";
   overlayStatus.textContent = "等待源";
   if (potentialValue) {
@@ -3002,9 +3118,66 @@ async function evaluateOverlay(requestId) {
   renderOverlaySummary();
 }
 
+async function evaluateFieldLinesForView(requestId) {
+  const viewBox = compute2dViewBox();
+  const scale = screenScaleForViewBox(viewBox);
+  const bounds = compute2dFieldLineBounds(scale);
+  const result = await evaluateFieldLines({
+    request_id: requestId,
+    scene: state.scene,
+    bounds: {
+      min_x: bounds.minX,
+      max_x: bounds.maxX,
+      min_y: bounds.minY,
+      max_y: bounds.maxY,
+    },
+    quality: state.quality,
+    density: 1,
+    display_max_count: FIELD_LINE_DISPLAY_MAX_COUNT,
+    backend: "auto",
+  });
+  if (result.request_id !== state.fieldLineRequestId) {
+    return;
+  }
+  state.fieldLineResult = result;
+  render2d();
+  renderOverlaySummary();
+}
+
+function scheduleFieldLineEvaluation() {
+  fieldLineRequestSerial += 1;
+  state.fieldLineRequestId = `ui-field-lines-${fieldLineRequestSerial}`;
+  const requestId = state.fieldLineRequestId;
+  if (fieldLineEvaluationTimer) {
+    window.clearTimeout(fieldLineEvaluationTimer);
+    fieldLineEvaluationTimer = null;
+  }
+  if (state.mode !== "2D" || !state.showFieldLines || state.scene.sources.length === 0) {
+    if (state.scene.sources.length === 0) {
+      state.fieldLineResult = null;
+    }
+    return;
+  }
+  const validationMessage = sceneValidationMessage();
+  if (validationMessage) {
+    overlayStatus.textContent = validationMessage;
+    return;
+  }
+  render2d();
+  fieldLineEvaluationTimer = window.setTimeout(() => {
+    fieldLineEvaluationTimer = null;
+    evaluateFieldLinesForView(requestId).catch((error) => {
+      if (requestId === state.fieldLineRequestId) {
+        overlayStatus.textContent = error.message;
+      }
+    });
+  }, 120);
+}
+
 let evaluationTimer = null;
 
 function scheduleEvaluation() {
+  scheduleFieldLineEvaluation();
   requestSerial += 1;
   latestProbeRequestId = `ui-probe-${requestSerial}`;
   latestOverlayRequestId = `ui-overlay-${requestSerial}`;
@@ -3059,6 +3232,7 @@ async function loadSelectedPreset() {
   state.scene = preset.scene;
   state.lastResult = null;
   state.overlayResult = null;
+  state.fieldLineResult = null;
   refreshSourceIndexes();
   presetStatus.textContent = `已加载：${preset.title}。`;
   renderAll();
@@ -3144,6 +3318,7 @@ sourceList.addEventListener("change", handleSourceInput);
 window.addEventListener("resize", () => {
   if (state.mode === "2D") {
     render2d();
+    scheduleFieldLineEvaluation();
   } else if (state.mode === "3D") {
     resize3d(view3d, state);
   }

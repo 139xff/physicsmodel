@@ -68,6 +68,20 @@ export async function evaluateField(request) {
   return parseJsonResponse(response, "Field evaluation failed");
 }
 
+export async function evaluateFieldLines(request) {
+  const bridgeResult = await callDesktopBridge("evaluateFieldLines", request);
+  if (bridgeResult !== null) {
+    return bridgeResult;
+  }
+
+  const response = await fetch("/api/field/lines", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJsonResponse(response, "Field-line evaluation failed");
+}
+
 export async function evaluateTrajectory(request) {
   const bridgeResult = await callDesktopBridge("evaluateTrajectory", request);
   if (bridgeResult !== null) {

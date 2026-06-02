@@ -689,6 +689,62 @@ def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: P
     assert all(" C " in item["path"] for item in rendered_metadata)
 
 
+def test_browser_field_lines_are_loaded_from_backend(page: Page) -> None:
+    requests: list[str] = []
+    page.on("request", lambda request: requests.append(request.url))
+
+    _add_point_charge(page)
+    page.locator("#toggle-field-lines").click()
+    expect(page.get_by_test_id("field-line-layer")).to_have_attribute(
+        "data-compute-source",
+        "backend",
+    )
+    expect(page.get_by_test_id("field-line-layer")).to_have_attribute(
+        "data-request-current",
+        "true",
+    )
+
+    assert any(url.endswith("/api/field/lines") for url in requests)
+
+
+def test_browser_discards_stale_field_line_response_after_zoom(page: Page) -> None:
+    page.add_init_script(
+        """
+        (() => {
+          const originalFetch = window.fetch.bind(window);
+          window.__fieldLineDelayedRequestIds = [];
+          window.fetch = async (...args) => {
+            const [input, init] = args;
+            if (String(input).endsWith("/api/field/lines")) {
+              const request = JSON.parse(init.body);
+              const requestIndex = window.__fieldLineDelayedRequestIds.length;
+              window.__fieldLineDelayedRequestIds.push(request.request_id);
+              const response = await originalFetch(...args);
+              await new Promise((resolve) => {
+                window.setTimeout(resolve, requestIndex === 0 ? 500 : 10);
+              });
+              return response;
+            }
+            return originalFetch(...args);
+          };
+        })();
+        """
+    )
+    page.reload(wait_until="networkidle")
+    _add_point_charge(page)
+    page.locator("#toggle-field-lines").click()
+    page.wait_for_function("() => window.__fieldLineDelayedRequestIds.length >= 1")
+    page.get_by_test_id("view-2d").hover()
+    page.mouse.wheel(0, -240)
+    page.wait_for_function("() => window.__fieldLineDelayedRequestIds.length >= 2")
+    page.wait_for_timeout(700)
+
+    request_ids = page.evaluate("() => window.__fieldLineDelayedRequestIds")
+    field_line_layer = page.get_by_test_id("field-line-layer")
+    expect(field_line_layer).to_have_attribute("data-request-current", "true")
+    expect(field_line_layer).to_have_attribute("data-rendered-request-id", request_ids[1])
+
+
 def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) -> None:
     _add_point_charge(page, x_cm="-11", y_cm="0", charge_c="1e-9")
     _add_point_charge(page, x_cm="11", y_cm="0", charge_c="-1e-9")
@@ -742,6 +798,7 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     page.locator("#toggle-field-lines").click()
     expect(page.get_by_test_id("field-line-layer")).to_have_attribute("data-enabled", "true")
     field_line_layer = page.get_by_test_id("field-line-layer")
+    expect(field_line_layer).to_have_attribute("data-request-current", "true")
     field_line_count = int(field_line_layer.get_attribute("data-field-line-count") or "0")
     assert 0 < field_line_count <= 120
     expect(field_line_layer).to_have_attribute(

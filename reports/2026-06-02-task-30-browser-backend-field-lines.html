@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 30 - Async browser backend field lines</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 30 - Async browser backend field lines</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T14:34:17+08:00">2026-06-02T14:34:17+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Added browser transport for <code>POST /api/field/lines</code> with desktop-bridge probing and HTTP fallback.</li>
+      <li>Replaced synchronous JavaScript trace execution with debounced backend requests after source edits, zoom, pan, resize, quality changes, presets, and field-line toggles.</li>
+      <li>Applied responses only when their request ID matches the latest requested view, preventing stale response overwrite.</li>
+      <li>Adapted backend polylines into the established cubic SVG path and arrow rendering layer, preserving existing visual behavior and metadata.</li>
+      <li>Kept the previous JavaScript tracer behind a disabled debug-comparison flag.</li>
+      <li>Added backend execution metadata to the rendered SVG layer.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>The standalone desktop bridge does not yet expose <code>evaluateFieldLines</code>; the browser
+      transport intentionally falls back to HTTP where available. Task 8 adds desktop compute
+      queueing, warm-up, and status UI.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>web/api-client.js</code></td><td>Async field-line bridge and HTTP transport.</td></tr>
+        <tr><td><code>web/app.js</code></td><td>Debounced scheduling, stale-response rejection, backend adaptation, and SVG metadata.</td></tr>
+        <tr><td><code>tests/test_browser_smoke.py</code></td><td>Backend request, delayed stale-response, and async visual readiness coverage.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py::test_browser_field_lines_are_loaded_from_backend tests/test_browser_smoke.py::test_browser_discards_stale_field_line_response_after_zoom -q</code></td><td class="expected">Expected RED: SVG metadata and backend requests did not exist while the browser still traced synchronously.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py::test_browser_field_lines_are_loaded_from_backend tests/test_browser_smoke.py::test_browser_discards_stale_field_line_response_after_zoom -q</code></td><td class="pass">PASS: backend network request observed and a delayed first response could not overwrite the zoom-triggered second response.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets -q</code></td><td class="expected">Diagnostic RED: backend polyline spacing placed one arrow tip <code>0.0131</code> viewport unit from its cubic path, above the existing <code>0.01</code> visual bound.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets -q</code></td><td class="pass">PASS after halving backend display sampling spacing.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py -q</code></td><td class="pass">PASS: 14 Playwright browser tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider -q</code></td><td class="pass">CPU-only PASS: 109 tests, 4 guarded CUDA skips, 2 upstream dependency deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS.</td></tr>
+        <tr><td><code>git diff --check</code></td><td class="pass">PASS.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>The browser still carries the legacy JavaScript tracer for disabled debug comparison. It is not part of normal rendering.</li>
+      <li>Backend field-line requests are debounced by <code>120 ms</code>; rapid view changes intentionally retain the prior SVG layer until the current response arrives.</li>
+      <li>Desktop bridge support is deferred to the queue implementation in Task 8.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 8: add warm-up, compute status UI, and async desktop compute queueing.</p>
+  </main>
+</body>
+</html>

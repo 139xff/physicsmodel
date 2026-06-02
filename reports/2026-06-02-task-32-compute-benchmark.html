@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 32 - Reproducible compute benchmarks</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 32 - Reproducible compute benchmarks</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T15:39:48+08:00">2026-06-02T15:39:48+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Added a reproducible JSON benchmark CLI for scalar, CPU JIT, explicit CUDA, and automatic dispatch policies.</li>
+      <li>Measured 25- and 400-point field batches, 100- and 400-step trajectories, and representative 2D field lines.</li>
+      <li>Recorded machine details, requested and effective backends, fallback reasons, cold timings, warm runs, medians, targets, and scalar-reference correctness summaries.</li>
+      <li>Generated CPU-only and RTX 5060 Ti benchmark artifacts.</li>
+      <li>Tuned automatic field-line dispatch after measurement: normal interactive traces remain on CPU JIT below 2048 candidates while explicit CUDA remains available.</li>
+    </ul>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>scripts/benchmark_compute.py</code></td><td>Benchmark library function and JSON CLI.</td></tr>
+        <tr><td><code>tests/test_benchmark_compute.py</code></td><td>Benchmark schema and workload smoke coverage.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/dispatcher.py</code></td><td>Measured field-line CUDA crossover threshold.</td></tr>
+        <tr><td><code>tests/test_field_lines.py</code></td><td>Interactive auto field-line CPU policy coverage.</td></tr>
+        <tr><td><code>reports/2026-06-02-compute-benchmark-cpu-only.json</code></td><td>Default portable CPU-only measurements and CUDA fallback evidence.</td></tr>
+        <tr><td><code>reports/2026-06-02-compute-benchmark.json</code></td><td>RTX 5060 Ti CUDA-extra measurements.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_benchmark_compute.py -q</code></td><td class="expected">Expected RED: benchmark module did not exist.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_benchmark_compute.py -q</code></td><td class="pass">PASS after implementation.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts/benchmark_compute.py --backend scalar --backend cpu --backend cuda --backend auto --warm-runs 5 --output reports/2026-06-02-compute-benchmark-cpu-only.json</code></td><td class="pass">CPU-only PASS: correctness passed, all auto targets passed, and CUDA policies recorded readable CPU fallback reasons.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra cuda</code></td><td class="expected">CUDA packages installed, but the original sync process exceeded the 30-minute tool timeout before exiting. Probe verification and process inspection confirmed a usable environment with no residual <code>uv</code> process.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -c "from em_workbench.physics.compute.runtime import probe_runtime; print(probe_runtime().cuda.model_dump_json(indent=2))"</code></td><td class="pass">PASS: RTX 5060 Ti, compute capability 12.0.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts/benchmark_compute.py --backend scalar --backend cpu --backend cuda --backend auto --warm-runs 5 --output reports/2026-06-02-compute-benchmark.json</code></td><td class="expected">Initial RTX diagnostic: explicit and automatic CUDA field lines measured about 1282 ms and missed the 250 ms interactive target.</td></tr>
+        <tr><td><code>@' ... candidate crossover benchmark ... '@ | .\.tools\uv\uv.exe run --locked --no-sync python -</code></td><td class="pass">Measured CPU faster than CUDA from 96 through 768 simple-source candidates.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_field_lines.py::test_auto_field_lines_keep_small_interactive_workloads_on_cpu -q</code></td><td class="expected">Expected RED before threshold tuning: auto selected CUDA.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_field_lines.py -q</code></td><td class="pass">CUDA-extra PASS: 5 tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts/benchmark_compute.py --backend scalar --backend cpu --backend cuda --backend auto --warm-runs 5 --output reports/2026-06-02-compute-benchmark.json</code></td><td class="pass">Final RTX PASS: correctness passed and all auto targets passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS.</td></tr>
+        <tr><td><code>git diff --check</code></td><td class="pass">PASS.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Warm automatic-dispatch results</h2>
+    <table>
+      <thead><tr><th>Workload</th><th>Effective backend</th><th>Median</th><th>Target</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>field-preview-400</code></td><td>CUDA</td><td>1.710 ms</td><td>100 ms</td><td class="pass">PASS</td></tr>
+        <tr><td><code>trajectory-preview-400</code></td><td>CPU JIT</td><td>10.781 ms</td><td>300 ms</td><td class="pass">PASS</td></tr>
+        <tr><td><code>field-lines-preview</code></td><td>CPU JIT</td><td>16.434 ms</td><td>250 ms</td><td class="pass">PASS</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Diagnostic notes</h2>
+    <ul>
+      <li>The first trajectory benchmark started too close to a point charge, making 400-step float32 preview integration sensitive to tiny perturbations. The stable benchmark trajectory now starts at <code>(0, 0.20, 0) m</code>; its 400-step position deviation is about <code>9.1e-8 m</code>.</li>
+      <li>Explicit CUDA field-line timing remains visible in the JSON artifact: about 1271 ms for the representative workload. Automatic dispatch correctly chooses CPU JIT for this interactive workload.</li>
+    </ul>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>The 2048-candidate field-line CUDA threshold is intentionally conservative because tested interactive workloads favored CPU. Explicit CUDA can be benchmarked for larger custom scenes.</li>
+      <li>CUDA package synchronization is unusually slow on this workstation even when package files eventually install correctly.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 10: run full CPU/CUDA release verification, rebuild portable desktop packages, and document optional CUDA usage.</p>
+  </main>
+</body>
+</html>

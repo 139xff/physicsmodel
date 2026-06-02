@@ -49,7 +49,7 @@ from em_workbench.physics.vectors import Vector3
 
 MIN_SOURCE_DISTANCE_SQ = MIN_SOURCE_DISTANCE_M**2
 CUDA_BATCH_SAMPLE_THRESHOLD = 128
-CUDA_FIELD_LINE_THRESHOLD = 24
+CUDA_FIELD_LINE_THRESHOLD = 2048
 
 
 @dataclass(frozen=True)
@@ -609,7 +609,13 @@ class ComputeService:
             return "cuda", None, cuda_status
         if operation == "trajectory":
             return "cpu-jit", None, cuda_status
-        if operation == "field-lines" or sample_count >= CUDA_BATCH_SAMPLE_THRESHOLD:
+        if operation == "field-lines":
+            return (
+                ("cuda", None, cuda_status)
+                if sample_count >= CUDA_FIELD_LINE_THRESHOLD
+                else ("cpu-jit", None, cuda_status)
+            )
+        if sample_count >= CUDA_BATCH_SAMPLE_THRESHOLD:
             return "cuda", None, cuda_status
         return "cpu-jit", None, cuda_status
 

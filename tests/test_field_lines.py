@@ -76,6 +76,27 @@ def test_explicit_cuda_field_lines_fall_back_to_cpu_when_runtime_is_unavailable(
     assert response.execution.fallback_reason == "CUDA runtime unavailable."
 
 
+def test_auto_field_lines_keep_small_interactive_workloads_on_cpu(
+    representative_scene: Scene,
+) -> None:
+    service = ComputeService(
+        cuda_probe=lambda: CudaRuntimeStatus(
+            installed=True,
+            available=True,
+            device_name="test-gpu",
+        )
+    )
+
+    response = service.trace_field_lines(
+        representative_scene,
+        BOUNDS,
+        quality="preview",
+        backend="auto",
+    )
+
+    assert response.execution.backend_effective == "cpu-jit"
+
+
 @CUDA_REQUIRED
 def test_cuda_field_lines_match_cpu_render_contract(representative_scene: Scene) -> None:
     service = ComputeService()

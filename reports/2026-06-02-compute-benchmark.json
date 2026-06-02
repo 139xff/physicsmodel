@@ -1,0 +1,519 @@
+{
+  "generated_at": "2026-06-02T15:39:22.924942+08:00",
+  "machine": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.12",
+    "cpu": {
+      "description": "Intel64 Family 6 Model 191 Stepping 2, GenuineIntel",
+      "physical_cores": null,
+      "logical_processors": 16
+    },
+    "cuda": {
+      "installed": true,
+      "available": true,
+      "device_name": "NVIDIA GeForce RTX 5060 Ti",
+      "compute_capability": "12.0",
+      "fallback_reason": null
+    }
+  },
+  "config": {
+    "backends": [
+      "scalar",
+      "cpu",
+      "cuda",
+      "auto"
+    ],
+    "warm_runs": 5,
+    "include_refined": false
+  },
+  "records": [
+    {
+      "name": "field-preview-25",
+      "backend_requested": "scalar",
+      "backend_effective": "scalar",
+      "precision": "float64",
+      "fallback_reason": null,
+      "cold_ms": 99.46500000660308,
+      "warm_ms": [
+        101.23839997686446,
+        100.27399999671616,
+        100.43590000714175,
+        98.4403999755159,
+        99.12769999937154
+      ],
+      "warm_median_ms": 100.27399999671616,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 0.0,
+        "field_max_abs_error": 0.0
+      }
+    },
+    {
+      "name": "field-preview-400",
+      "backend_requested": "scalar",
+      "backend_effective": "scalar",
+      "precision": "float64",
+      "fallback_reason": null,
+      "cold_ms": 1635.8217000088189,
+      "warm_ms": [
+        1665.1662999938708,
+        1636.2229000078514,
+        1650.489199993899,
+        1616.0406999988481,
+        1619.3886000255588
+      ],
+      "warm_median_ms": 1636.2229000078514,
+      "target_ms": 100.0,
+      "target_met": false,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 0.0,
+        "field_max_abs_error": 0.0
+      }
+    },
+    {
+      "name": "trajectory-preview-100",
+      "backend_requested": "scalar",
+      "backend_effective": "scalar",
+      "precision": "float64",
+      "fallback_reason": null,
+      "cold_ms": 2061.3597000192385,
+      "warm_ms": [
+        2043.553499999689,
+        2038.1421000056434,
+        2022.58509999956,
+        1985.9010999789461,
+        2000.1160000101663
+      ],
+      "warm_median_ms": 2022.58509999956,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 0.0,
+        "velocity_max_abs_error": 0.0
+      }
+    },
+    {
+      "name": "trajectory-preview-400",
+      "backend_requested": "scalar",
+      "backend_effective": "scalar",
+      "precision": "float64",
+      "fallback_reason": null,
+      "cold_ms": 8047.4829000013415,
+      "warm_ms": [
+        8318.908000015654,
+        8030.763999995543,
+        8020.496999990428,
+        8043.061899981694,
+        8106.923200015444
+      ],
+      "warm_median_ms": 8043.061899981694,
+      "target_ms": 300.0,
+      "target_met": false,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 0.0,
+        "velocity_max_abs_error": 0.0
+      }
+    },
+    {
+      "name": "field-lines-preview",
+      "backend_requested": "scalar",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": "Scalar field-line backend unavailable; using CPU JIT.",
+      "cold_ms": 312.53519997699186,
+      "warm_ms": [
+        16.065999981947243,
+        16.725399997085333,
+        15.72579998173751,
+        16.212399990763515,
+        16.642000002320856
+      ],
+      "warm_median_ms": 16.212399990763515,
+      "target_ms": 250.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "candidate_line_count": 96,
+        "display_line_count": 54,
+        "reference_display_line_count": 54,
+        "topology": [
+          "infinity-to-source",
+          "source-to-infinity",
+          "source-to-source"
+        ]
+      }
+    },
+    {
+      "name": "field-preview-25",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 23.963900021044537,
+      "warm_ms": [
+        0.1807000080589205,
+        0.10829998063854873,
+        0.09799998952075839,
+        0.09590000263415277,
+        0.10000000474974513
+      ],
+      "warm_median_ms": 0.10000000474974513,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 2.087034832243262e-05,
+        "field_max_abs_error": 0.005677246541381464
+      }
+    },
+    {
+      "name": "field-preview-400",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 0.7324999896809459,
+      "warm_ms": [
+        0.843599991640076,
+        0.8028000011108816,
+        0.6782999844290316,
+        0.6507000070996583,
+        0.7937999907881021
+      ],
+      "warm_median_ms": 0.7937999907881021,
+      "target_ms": 100.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 2.5420445808777004e-05,
+        "field_max_abs_error": 0.006098564987041755
+      }
+    },
+    {
+      "name": "trajectory-preview-100",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 28.13109999988228,
+      "warm_ms": [
+        2.90389999281615,
+        2.677499986020848,
+        2.6863999955821782,
+        2.7083999884780496,
+        2.664200001163408
+      ],
+      "warm_median_ms": 2.6863999955821782,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 1.2135502214238869e-08,
+        "velocity_max_abs_error": 8.330781507345786e-09
+      }
+    },
+    {
+      "name": "trajectory-preview-400",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 10.941299988189712,
+      "warm_ms": [
+        40.87050000089221,
+        9.04949998948723,
+        8.687499997904524,
+        8.9266000140924,
+        9.347100014565513
+      ],
+      "warm_median_ms": 9.04949998948723,
+      "target_ms": 300.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 9.111899682001656e-08,
+        "velocity_max_abs_error": 7.888965926350355e-08
+      }
+    },
+    {
+      "name": "field-lines-preview",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 17.51079998211935,
+      "warm_ms": [
+        16.24150000861846,
+        15.817100007552654,
+        19.150700012687594,
+        17.12760000373237,
+        17.41349999792874
+      ],
+      "warm_median_ms": 17.12760000373237,
+      "target_ms": 250.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "candidate_line_count": 96,
+        "display_line_count": 54,
+        "reference_display_line_count": 54,
+        "topology": [
+          "infinity-to-source",
+          "source-to-infinity",
+          "source-to-source"
+        ]
+      }
+    },
+    {
+      "name": "field-preview-25",
+      "backend_requested": "cuda",
+      "backend_effective": "cuda",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 655.8259000012185,
+      "warm_ms": [
+        1.2174999865237623,
+        1.2123999767936766,
+        1.1399000068195164,
+        1.0511000000406057,
+        0.9958000155165792
+      ],
+      "warm_median_ms": 1.1399000068195164,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 0.0002907755292085312,
+        "field_max_abs_error": 0.005677246541381464
+      }
+    },
+    {
+      "name": "field-preview-400",
+      "backend_requested": "cuda",
+      "backend_effective": "cuda",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 1.94679998094216,
+      "warm_ms": [
+        1.4659999869763851,
+        1.357000001007691,
+        1.9366000196896493,
+        1.3767000054940581,
+        1.7023000109475106
+      ],
+      "warm_median_ms": 1.4659999869763851,
+      "target_ms": 100.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 0.00028466805116522664,
+        "field_max_abs_error": 0.006098564987041755
+      }
+    },
+    {
+      "name": "trajectory-preview-100",
+      "backend_requested": "cuda",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": "CUDA trajectory backend unavailable; using CPU JIT.",
+      "cold_ms": 2.332500007469207,
+      "warm_ms": [
+        2.4769000010564923,
+        2.306000009411946,
+        2.227599994512275,
+        2.52169999293983,
+        2.3148999898694456
+      ],
+      "warm_median_ms": 2.3148999898694456,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 1.2135502214238869e-08,
+        "velocity_max_abs_error": 8.330781507345786e-09
+      }
+    },
+    {
+      "name": "trajectory-preview-400",
+      "backend_requested": "cuda",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": "CUDA trajectory backend unavailable; using CPU JIT.",
+      "cold_ms": 8.99040000513196,
+      "warm_ms": [
+        9.693600004538894,
+        8.92379999277182,
+        8.92520000343211,
+        8.961899991845712,
+        9.002999984659255
+      ],
+      "warm_median_ms": 8.961899991845712,
+      "target_ms": 300.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 9.111899682001656e-08,
+        "velocity_max_abs_error": 7.888965926350355e-08
+      }
+    },
+    {
+      "name": "field-lines-preview",
+      "backend_requested": "cuda",
+      "backend_effective": "cuda",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 3008.8775000185706,
+      "warm_ms": [
+        1277.6563999941573,
+        1270.4637999995612,
+        1270.9187000000384,
+        1278.7543000013102,
+        1270.7166000036523
+      ],
+      "warm_median_ms": 1270.9187000000384,
+      "target_ms": 250.0,
+      "target_met": false,
+      "correctness": {
+        "passed": true,
+        "candidate_line_count": 96,
+        "display_line_count": 54,
+        "reference_display_line_count": 54,
+        "topology": [
+          "infinity-to-source",
+          "source-to-infinity",
+          "source-to-source"
+        ]
+      }
+    },
+    {
+      "name": "field-preview-25",
+      "backend_requested": "auto",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 1.4331999991554767,
+      "warm_ms": [
+        0.2510999911464751,
+        0.16029999824240804,
+        0.12299997615627944,
+        0.11449999874457717,
+        0.11069999891333282
+      ],
+      "warm_median_ms": 0.12299997615627944,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 2.087034832243262e-05,
+        "field_max_abs_error": 0.005677246541381464
+      }
+    },
+    {
+      "name": "field-preview-400",
+      "backend_requested": "auto",
+      "backend_effective": "cuda",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 2.7218000032007694,
+      "warm_ms": [
+        1.7104999860748649,
+        1.7488999874331057,
+        1.6833000117912889,
+        1.6429999959655106,
+        1.9474999862723053
+      ],
+      "warm_median_ms": 1.7104999860748649,
+      "target_ms": 100.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 0.00028466805116522664,
+        "field_max_abs_error": 0.006098564987041755
+      }
+    },
+    {
+      "name": "trajectory-preview-100",
+      "backend_requested": "auto",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 2.916799974627793,
+      "warm_ms": [
+        2.7636000013444573,
+        2.756700007012114,
+        2.7698999911081046,
+        2.8292000060901046,
+        2.7185000071767718
+      ],
+      "warm_median_ms": 2.7636000013444573,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 1.2135502214238869e-08,
+        "velocity_max_abs_error": 8.330781507345786e-09
+      }
+    },
+    {
+      "name": "trajectory-preview-400",
+      "backend_requested": "auto",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 11.010999995050952,
+      "warm_ms": [
+        11.380899988580495,
+        10.780800017528236,
+        10.78750001033768,
+        10.576800006674603,
+        10.68080001277849
+      ],
+      "warm_median_ms": 10.780800017528236,
+      "target_ms": 300.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 9.111899682001656e-08,
+        "velocity_max_abs_error": 7.888965926350355e-08
+      }
+    },
+    {
+      "name": "field-lines-preview",
+      "backend_requested": "auto",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 17.406600003596395,
+      "warm_ms": [
+        15.83400001982227,
+        14.659500011475757,
+        17.453000007662922,
+        16.584500001044944,
+        16.43400001921691
+      ],
+      "warm_median_ms": 16.43400001921691,
+      "target_ms": 250.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "candidate_line_count": 96,
+        "display_line_count": 54,
+        "reference_display_line_count": 54,
+        "topology": [
+          "infinity-to-source",
+          "source-to-infinity",
+          "source-to-source"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "correctness_passed": true,
+    "auto_targets_met": true
+  }
+}

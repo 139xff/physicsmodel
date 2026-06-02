@@ -10,6 +10,7 @@ import numpy as np
 from em_workbench.models import Position, Scene
 from em_workbench.physics.compute.contracts import (
     BackendPolicy,
+    CacheStatus,
     CudaRuntimeStatus,
     ExecutionMetadata,
 )
@@ -26,6 +27,7 @@ from em_workbench.physics.compute.cuda_backend import (
 )
 from em_workbench.physics.compute.packed_scene import PackedScene, PackedSceneCache
 from em_workbench.physics.compute.runtime import _cpu_status, _cuda_status
+from em_workbench.physics.compute.warmup import ComputeWarmup
 from em_workbench.physics.solver import (
     COULOMB_CONSTANT,
     EPSILON_0,
@@ -73,6 +75,7 @@ class ComputeService:
         self._field_lines_warm = False
         self._cuda_field_lines_warm = False
         self._trajectory_warm = False
+        self.last_fallback_reason: str | None = None
 
     def evaluate_totals(
         self,
@@ -453,6 +456,90 @@ class ComputeService:
             display_max_count=display_max_count,
         )
 
+    def cache_status(self) -> CacheStatus:
+        return CacheStatus(
+            packed_scenes=len(self.packed_scene_cache),
+            packed_scene_limit=self.packed_scene_cache.limit,
+            device_scenes=len(self.device_scene_cache),
+            device_scene_limit=self.device_scene_cache.limit,
+        )
+
+    def warm_cpu(self) -> None:
+        from em_workbench.physics.compute.field_lines import ViewportBounds
+        from em_workbench.physics.dynamics import TestCharge
+
+        scene = self._warmup_scene()
+        self.evaluate_totals(
+            scene,
+            [Position(x=0.0, y=0.03, z=0.0)],
+            quality="preview",
+            backend="cpu",
+        )
+        self.simulate_trajectory(
+            scene,
+            TestCharge.model_validate(
+                {
+                    "charge_c": 1e-9,
+                    "mass_kg": 1e-6,
+                    "position": {"x": 0.0, "y": 0.03, "z": 0.0},
+                    "velocity": {"x": 0.0, "y": 0.0, "z": 0.0},
+                }
+            ),
+            dt_s=0.001,
+            steps=1,
+            backend="cpu",
+        )
+        self.trace_field_lines(
+            scene,
+            ViewportBounds(min_x=-0.1, max_x=0.1, min_y=-0.1, max_y=0.1),
+            quality="preview",
+            backend="cpu",
+        )
+
+    def warm_cuda(self) -> None:
+        from em_workbench.physics.compute.field_lines import ViewportBounds
+
+        if not self.cuda_probe().available:
+            return
+        scene = self._warmup_scene()
+        self.evaluate_totals(
+            scene,
+            [Position(x=0.0, y=0.03, z=0.0)],
+            quality="preview",
+            backend="cuda",
+        )
+        self.trace_field_lines(
+            scene,
+            ViewportBounds(min_x=-0.1, max_x=0.1, min_y=-0.1, max_y=0.1),
+            quality="preview",
+            backend="cuda",
+        )
+
+    @staticmethod
+    def _warmup_scene() -> Scene:
+        return Scene.model_validate(
+            {
+                "id": "compute-warmup",
+                "title": "Compute warmup",
+                "sources": [
+                    {
+                        "id": "warm-positive",
+                        "kind": "point",
+                        "label": "warm positive",
+                        "position": {"x": -0.03, "y": 0.0, "z": 0.0},
+                        "charge_c": 1e-9,
+                    },
+                    {
+                        "id": "warm-negative",
+                        "kind": "point",
+                        "label": "warm negative",
+                        "position": {"x": 0.03, "y": 0.0, "z": 0.0},
+                        "charge_c": -1e-9,
+                    },
+                ],
+            }
+        )
+
     @staticmethod
     def _points_array(vectors: list[Vector3], packed: PackedScene) -> np.ndarray:
         return np.asarray(
@@ -696,3 +783,7 @@ class ComputeService:
 
 
 DEFAULT_COMPUTE_SERVICE = ComputeService()
+DEFAULT_COMPUTE_WARMUP = ComputeWarmup(
+    run_cpu=DEFAULT_COMPUTE_SERVICE.warm_cpu,
+    run_cuda=DEFAULT_COMPUTE_SERVICE.warm_cuda,
+)

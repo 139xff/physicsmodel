@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from em_workbench.desktop import _bridge_bootstrap_script, _retain_desktop_objects
-from em_workbench.desktop_bridge import WorkbenchDesktopBridge
+from em_workbench.desktop_bridge import DesktopComputeQueue, WorkbenchDesktopBridge
 from em_workbench.presets import get_preset
 
 
@@ -75,6 +75,37 @@ def test_desktop_bridge_simulates_trajectory_without_http_server() -> None:
     assert result["request_id"] == "desktop-trajectory-test"
     assert result["step_count"] == 8
     assert len(result["samples"]) == 9
+
+
+def test_desktop_bridge_evaluates_field_lines_without_http_server() -> None:
+    bridge = WorkbenchDesktopBridge()
+    preset = json.loads(bridge.get_preset(json.dumps({"preset_id": "electric-dipole"})))
+
+    result = json.loads(
+        bridge.evaluate_field_lines(
+            json.dumps(
+                {
+                    "request_id": "desktop-field-lines-test",
+                    "scene": preset["scene"],
+                    "bounds": {"min_x": -0.2, "max_x": 0.2, "min_y": -0.2, "max_y": 0.2},
+                    "quality": "preview",
+                    "backend": "cpu",
+                }
+            )
+        )
+    )
+
+    assert result["request_id"] == "desktop-field-lines-test"
+    assert result["lines"]
+
+
+def test_desktop_queue_returns_ticket_then_result() -> None:
+    queue = DesktopComputeQueue()
+
+    ticket = queue.submit("status", "")
+    result = queue.wait(ticket, timeout_s=5)
+
+    assert json.loads(result)["cpu"]["logical_processors"] >= 1
 
 
 def test_desktop_bridge_bootstrap_waits_for_document_root() -> None:

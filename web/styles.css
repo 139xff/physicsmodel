@@ -872,6 +872,15 @@ summary:focus-visible {
   margin: 0;
 }
 
+.compute-block {
+  display: grid;
+  gap: 6px;
+}
+
+.compute-block p {
+  font-variant-numeric: tabular-nums;
+}
+
 .status-value {
   color: var(--highlight) !important;
   font-size: 0.96rem !important;

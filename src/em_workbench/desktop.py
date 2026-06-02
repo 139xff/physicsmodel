@@ -59,6 +59,22 @@ def main(argv: list[str] | None = None) -> int:
         def evaluateTrajectory(self, payload: str) -> str:
             return self._bridge.evaluate_trajectory(payload)
 
+        @Slot(str, result=str)
+        def evaluateFieldLines(self, payload: str) -> str:
+            return self._bridge.evaluate_field_lines(payload)
+
+        @Slot(str, result=str)
+        def computeStatus(self, payload: str = "") -> str:
+            return self._bridge.compute_status(payload)
+
+        @Slot(str, result=str)
+        def submitCompute(self, payload: str) -> str:
+            return self._bridge.submit_compute(payload)
+
+        @Slot(str, result=str)
+        def pollCompute(self, ticket: str) -> str:
+            return self._bridge.poll_compute(ticket)
+
     app = QApplication(args)
     view = QWebEngineView()
     view.setWindowTitle("EM Workbench - 电磁工作台")

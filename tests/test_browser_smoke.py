@@ -150,6 +150,8 @@ def test_desktop_bridge_bootstrap_waits_for_document_root(page: Page) -> None:
 def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -> None:
     expect(page.get_by_role("heading", name="电磁工作台")).to_be_visible()
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
+    expect(page.get_by_test_id("compute-backend")).to_contain_text("CPU")
+    expect(page.get_by_test_id("compute-warmup")).to_contain_text("预热状态")
     expect(page.locator("#point-source-z-field")).to_be_hidden()
 
     _add_point_charge(page)

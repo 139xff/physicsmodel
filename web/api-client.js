@@ -6,16 +6,43 @@ async function parseJsonResponse(response, fallbackMessage) {
   return response.json();
 }
 
-async function callDesktopBridge(method, payload = null) {
-  const bridge = window.emWorkbenchBridgeReady
+async function desktopBridge() {
+  return window.emWorkbenchBridgeReady
     ? await window.emWorkbenchBridgeReady
     : window.emWorkbenchBridge;
+}
+
+async function callDesktopBridge(method, payload = null) {
+  const bridge = await desktopBridge();
   if (!bridge || typeof bridge[method] !== "function") {
     return null;
   }
 
   const rawResult = await bridge[method](payload === null ? "" : JSON.stringify(payload));
   return typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+}
+
+async function callDesktopCompute(method, payload = null) {
+  const bridge = await desktopBridge();
+  if (!bridge) {
+    return null;
+  }
+  if (typeof bridge.submitCompute !== "function" || typeof bridge.pollCompute !== "function") {
+    const directMethod = method === "status" ? "computeStatus" : method;
+    return callDesktopBridge(directMethod, payload);
+  }
+  const ticket = await bridge.submitCompute(JSON.stringify({ method, payload }));
+  while (true) {
+    const rawPoll = await bridge.pollCompute(ticket);
+    const poll = typeof rawPoll === "string" ? JSON.parse(rawPoll) : rawPoll;
+    if (poll.state === "ready") {
+      return typeof poll.result === "string" ? JSON.parse(poll.result) : poll.result;
+    }
+    if (poll.state === "failed" || poll.state === "missing") {
+      throw new Error(poll.error || `Desktop compute ticket ${poll.state}`);
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 16));
+  }
 }
 
 export async function getConfig() {
@@ -55,7 +82,7 @@ export async function getPreset(presetId) {
 }
 
 export async function evaluateField(request) {
-  const bridgeResult = await callDesktopBridge("evaluateField", request);
+  const bridgeResult = await callDesktopCompute("evaluateField", request);
   if (bridgeResult !== null) {
     return bridgeResult;
   }
@@ -69,7 +96,7 @@ export async function evaluateField(request) {
 }
 
 export async function evaluateFieldLines(request) {
-  const bridgeResult = await callDesktopBridge("evaluateFieldLines", request);
+  const bridgeResult = await callDesktopCompute("evaluateFieldLines", request);
   if (bridgeResult !== null) {
     return bridgeResult;
   }
@@ -83,7 +110,7 @@ export async function evaluateFieldLines(request) {
 }
 
 export async function evaluateTrajectory(request) {
-  const bridgeResult = await callDesktopBridge("evaluateTrajectory", request);
+  const bridgeResult = await callDesktopCompute("evaluateTrajectory", request);
   if (bridgeResult !== null) {
     return bridgeResult;
   }
@@ -94,4 +121,16 @@ export async function evaluateTrajectory(request) {
     body: JSON.stringify(request),
   });
   return parseJsonResponse(response, "Trajectory evaluation failed");
+}
+
+export async function getComputeStatus() {
+  const bridgeResult = await callDesktopCompute("status");
+  if (bridgeResult !== null) {
+    return bridgeResult;
+  }
+
+  const response = await fetch("/api/compute/status", {
+    headers: { Accept: "application/json" },
+  });
+  return parseJsonResponse(response, "Compute-status load failed");
 }

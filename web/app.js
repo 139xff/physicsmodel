@@ -1,9 +1,11 @@
-import { evaluateField, evaluateFieldLines, evaluateTrajectory, getConfig, getPreset, listPresets } from "./api-client.js";
+import { evaluateField, evaluateFieldLines, evaluateTrajectory, getComputeStatus, getConfig, getPreset, listPresets } from "./api-client.js";
 import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-axis-labels-pan-preserve";
 
 document.documentElement.classList.toggle("desktop-runtime", Boolean(window.emWorkbenchBridgeReady));
 
 const runtimeStatus = document.querySelector("#runtime-status");
+const computeBackend = document.querySelector("[data-testid='compute-backend']");
+const computeWarmup = document.querySelector("[data-testid='compute-warmup']");
 const sourceList = document.querySelector("#source-list");
 const sourceCount = document.querySelector("[data-testid='source-count']");
 const modeLabel = document.querySelector("[data-testid='mode-label']");
@@ -214,6 +216,7 @@ let latestOverlayRequestId = "";
 let requestSerial = 0;
 let fieldLineRequestSerial = 0;
 let fieldLineEvaluationTimer = null;
+let computeStatusRefreshTimer = null;
 let active2dPan = null;
 
 function saveModeState(mode = state.mode) {
@@ -251,6 +254,40 @@ function formatNumber(value, digits = 3) {
 
 function formatFixed(value) {
   return Number(value).toFixed(3);
+}
+
+function renderComputeStatus(status) {
+  const cuda = status.cuda;
+  computeBackend.textContent = cuda.available
+    ? `CPU 可用；CUDA ${cuda.device_name} 可用`
+    : `CPU 可用；CUDA 未启用`;
+  computeWarmup.textContent = `预热状态：${status.warmup.state}`;
+  if (status.warmup.failure_reason) {
+    computeWarmup.textContent += ` (${status.warmup.failure_reason})`;
+  }
+}
+
+function renderExecutionStatus(execution) {
+  if (!execution) {
+    return;
+  }
+  computeBackend.textContent =
+    `${execution.backend_effective} · ${execution.device} · ${execution.precision}`;
+}
+
+async function refreshComputeStatus() {
+  const status = await getComputeStatus();
+  renderComputeStatus(status);
+  if (status.warmup.state === "warming") {
+    if (computeStatusRefreshTimer) {
+      window.clearTimeout(computeStatusRefreshTimer);
+    }
+    computeStatusRefreshTimer = window.setTimeout(() => {
+      refreshComputeStatus().catch((error) => {
+        computeWarmup.textContent = error.message;
+      });
+    }, 250);
+  }
 }
 
 function metersToCentimeters(value) {
@@ -2872,6 +2909,7 @@ async function runMotionSimulation() {
     quality: state.quality,
     record_every: 1,
   });
+  renderExecutionStatus(result.execution);
   state.motion.samples = result.samples;
   state.motion.frameIndex = 0;
   motionState.textContent = `已计算 ${result.samples.length} 帧`;
@@ -3057,6 +3095,7 @@ async function evaluateProbe(requestId) {
     return;
   }
   state.lastResult = result;
+  renderExecutionStatus(result.execution);
   renderResult();
 }
 
@@ -3114,6 +3153,7 @@ async function evaluateOverlay(requestId) {
   }
   state.overlaySamples = samples;
   state.overlayResult = result;
+  renderExecutionStatus(result.execution);
   render2d();
   renderOverlaySummary();
 }
@@ -3140,6 +3180,7 @@ async function evaluateFieldLinesForView(requestId) {
     return;
   }
   state.fieldLineResult = result;
+  renderExecutionStatus(result.execution);
   render2d();
   renderOverlaySummary();
 }
@@ -3241,6 +3282,7 @@ async function loadSelectedPreset() {
 
 async function initialiseShell() {
   const config = await getConfig();
+  await refreshComputeStatus();
   document.title = "电磁工作台 | 静电场";
   runtimeStatus.textContent =
     `本地 Three.js ${config.runtime.three.version} 已就绪。` +

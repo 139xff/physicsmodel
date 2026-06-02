@@ -154,6 +154,6 @@ def test_compute_status_reports_cpu_and_optional_cuda_runtime() -> None:
     assert response.status_code == 200
     status = response.json()
     assert status["cpu"]["logical_processors"] >= 1
-    assert status["warmup"]["state"] == "idle"
+    assert status["warmup"]["state"] in {"warming", "ready"}
     assert isinstance(status["cuda"]["installed"], bool)
     assert isinstance(status["cuda"]["available"], bool)

@@ -55,10 +55,16 @@ def _cuda_status() -> CudaRuntimeStatus:
         )
 
 
-def probe_runtime() -> ComputeStatus:
+def probe_runtime(
+    *,
+    warmup: WarmupStatus | None = None,
+    cache: CacheStatus | None = None,
+    last_fallback_reason: str | None = None,
+) -> ComputeStatus:
     return ComputeStatus(
         cpu=_cpu_status(),
         cuda=_cuda_status(),
-        warmup=WarmupStatus(),
-        cache=CacheStatus(),
+        warmup=warmup or WarmupStatus(),
+        cache=cache or CacheStatus(),
+        last_fallback_reason=last_fallback_reason,
     )

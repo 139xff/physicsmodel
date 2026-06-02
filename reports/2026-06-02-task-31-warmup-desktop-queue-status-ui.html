@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 31 - Warm-up, desktop queue, and compute status UI</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 31 - Warm-up, desktop queue, and compute status UI</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T14:51:00+08:00">2026-06-02T14:51:00+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Added a lock-protected daemon warm-up state machine with <code>idle</code>, <code>warming</code>, <code>ready</code>, and <code>failed</code> states.</li>
+      <li>Added one-time background warming for CPU field, trajectory, and field-line kernels plus conditional CUDA field and field-line kernels.</li>
+      <li>Extended compute status with shared warm-up state and packed/device cache counts.</li>
+      <li>Added a single-worker desktop compute queue with ticket submission, polling, waiting, and strict method dispatch.</li>
+      <li>Added desktop queue methods for status, field evaluation, trajectory simulation, and field-line tracing, plus matching Qt slots.</li>
+      <li>Added browser desktop polling transport and a compact status block that reports runtime backend execution and warm-up state.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>Formal benchmark workloads and automatic crossover tuning remain scheduled for Task 9.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/em_workbench/physics/compute/warmup.py</code></td><td>Threaded warm-up state machine.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/dispatcher.py</code></td><td>Warm-up workloads and cache status.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/runtime.py</code></td><td>Shared warm-up, cache, and fallback status payload.</td></tr>
+        <tr><td><code>src/em_workbench/app.py</code></td><td>Start warm-up and expose shared compute status.</td></tr>
+        <tr><td><code>src/em_workbench/desktop_bridge.py</code></td><td>Desktop compute queue and queued method handlers.</td></tr>
+        <tr><td><code>src/em_workbench/desktop.py</code></td><td>Qt queue, status, and field-line slots.</td></tr>
+        <tr><td><code>web/api-client.js</code></td><td>Desktop ticket polling and HTTP compute-status fallback.</td></tr>
+        <tr><td><code>web/index.html</code>, <code>web/styles.css</code>, <code>web/app.js</code></td><td>Compute status block, refresh loop, and execution updates.</td></tr>
+        <tr><td><code>tests/test_compute_runtime.py</code>, <code>tests/test_desktop_bridge.py</code>, <code>tests/test_app.py</code>, <code>tests/test_browser_smoke.py</code></td><td>Warm-up, queue, desktop field-line, HTTP state, and browser status coverage.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_compute_runtime.py tests/test_desktop_bridge.py -q</code></td><td class="expected">Expected RED: <code>ComputeWarmup</code> and <code>DesktopComputeQueue</code> did not exist.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_compute_runtime.py tests/test_desktop_bridge.py -q</code></td><td class="pass">PASS: 11 tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync --extra desktop em-workbench-desktop --check</code></td><td class="expected">Expected initial failure: desktop optional packages were not installed in the default environment.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra desktop</code></td><td class="pass">PASS: installed locked PySide6 desktop packages.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync --extra desktop em-workbench-desktop --check</code></td><td class="pass">PASS: <code>desktop runtime ok</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_compute_runtime.py tests/test_desktop_bridge.py tests/test_app.py tests/test_browser_smoke.py -q</code></td><td class="pass">PASS: 34 focused runtime, HTTP, desktop, and Playwright tests.</td></tr>
+        <tr><td><code>@' ... DEFAULT_COMPUTE_WARMUP.start(); join(); print status and cache ... '@ | .\.tools\uv\uv.exe run --locked --no-sync python -</code></td><td class="pass">PASS: real default warm-up reached <code>ready</code>; packed scene cache count was 1 and device scene count was 0.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td class="pass">PASS: restored default installation without optional desktop packages.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider -q</code></td><td class="pass">CPU-only PASS: 112 tests, 4 guarded CUDA skips, 2 upstream dependency deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS.</td></tr>
+        <tr><td><code>git diff --check</code></td><td class="pass">PASS.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>Warm-up is process-local and starts once when compute status is first requested. It does not persist compiled state across Python process restarts.</li>
+      <li>The desktop queue intentionally serializes compute work on one worker so Qt UI event handling remains responsive and result ordering stays predictable.</li>
+      <li>Desktop and CUDA packages remain optional extras; the default installation continues to run CPU-only without them.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 9: add reproducible CPU, CUDA, and automatic-dispatch benchmarks.</p>
+  </main>
+</body>
+</html>

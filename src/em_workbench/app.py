@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from em_workbench.models import Position, Preset, PresetSummary, Scene, SceneValidationResponse
 from em_workbench.physics.compute.contracts import BackendPolicy, ComputeStatus
+from em_workbench.physics.compute.dispatcher import DEFAULT_COMPUTE_SERVICE, DEFAULT_COMPUTE_WARMUP
 from em_workbench.physics.compute.field_lines import (
     FieldLineResponse,
     ViewportBounds,
@@ -161,7 +162,12 @@ def presets() -> list[PresetSummary]:
 @app.get("/api/compute/status", response_model=ComputeStatus)
 def compute_status() -> ComputeStatus:
     """Return CPU availability and optional CUDA runtime details."""
-    return probe_runtime()
+    DEFAULT_COMPUTE_WARMUP.start()
+    return probe_runtime(
+        warmup=DEFAULT_COMPUTE_WARMUP.status(),
+        cache=DEFAULT_COMPUTE_SERVICE.cache_status(),
+        last_fallback_reason=DEFAULT_COMPUTE_SERVICE.last_fallback_reason,
+    )
 
 
 @app.get("/api/presets/{preset_id}", response_model=Preset)

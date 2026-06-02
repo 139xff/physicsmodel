@@ -87,6 +87,18 @@ def test_static_assets_and_vendor_modules_are_served_locally():
     assert "https://" not in application_module.text
 
 
+def test_desktop_runtime_disables_blurred_panel_compositing():
+    stylesheet = client.get("/styles.css")
+    application_module = client.get("/app.js")
+
+    assert 'classList.toggle("desktop-runtime"' in application_module.text
+    assert ".desktop-runtime .topbar" in stylesheet.text
+    assert ".desktop-runtime .panel" in stylesheet.text
+    assert ".desktop-runtime .source-point" in stylesheet.text
+    assert "backdrop-filter: none" in stylesheet.text
+    assert "filter: none" in stylesheet.text
+
+
 def test_import_map_standard_orbit_controls_specifier_resolves_to_served_vendor_path():
     response = client.get("/")
 

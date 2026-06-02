@@ -95,6 +95,19 @@ summary:focus-visible {
   padding: 18px 22px;
 }
 
+.desktop-runtime .topbar,
+.desktop-runtime .panel {
+  backdrop-filter: none;
+}
+
+.desktop-runtime body::before {
+  display: none;
+}
+
+.desktop-runtime .source-point {
+  filter: none;
+}
+
 .identity h1 {
   font-size: clamp(1.5rem, 2.4vw, 2.25rem);
   font-weight: 720;
@@ -832,6 +845,8 @@ summary:focus-visible {
 }
 
 .analysis {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
   padding: 20px;
 }
 
@@ -968,6 +983,8 @@ summary:focus-visible {
 
   .analysis {
     grid-column: 1 / -1;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .runtime-block {

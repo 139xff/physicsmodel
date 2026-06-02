@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 20 - Desktop Motion Playback</title>
+    <style>
+      body { color: #1f2937; font-family: Arial, sans-serif; line-height: 1.6; margin: 2rem auto; max-width: 980px; padding: 0 1rem; }
+      h1, h2 { color: #0f4c5c; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #d1d5db; padding: 0.55rem; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; }
+      code { background: #f3f4f6; padding: 0.1rem 0.25rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 20: 桌面运动模块桥接与播放流畅度修复</h1>
+      <p><strong>完成时间：</strong>2026-06-02 00:00:11 +08:00</p>
+
+      <h2>交付范围</h2>
+      <ul>
+        <li>修复 Qt 页面创建早期 <code>document.documentElement</code> 尚未准备好时执行 <code>appendChild</code> 的桌面桥接错误。</li>
+        <li>桌面桥接脚本现在等待页面根节点可用，再挂载 <code>qwebchannel.js</code>。</li>
+        <li>运动播放每帧只替换轨迹 SVG 层，不再重建二维坐标轴、电荷源和复杂电场线路径。</li>
+        <li>新增多个点电荷开启场线后播放轨迹的浏览器回归测试。</li>
+      </ul>
+
+      <h2>变更文件</h2>
+      <table>
+        <thead><tr><th>文件</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>src/em_workbench/desktop.py</code></td><td>桌面桥接脚本等待 DOM 根节点后再注入。</td></tr>
+          <tr><td><code>web/app.js</code></td><td>增加轻量轨迹层帧更新，避免整图重绘。</td></tr>
+          <tr><td><code>tests/test_desktop_bridge.py</code></td><td>桥接脚本根节点等待回归测试。</td></tr>
+          <tr><td><code>tests/test_browser_smoke.py</code></td><td>复杂场线下运动播放保持场线节点稳定的回归测试。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>执行命令与结果</h2>
+      <table>
+        <thead><tr><th>命令</th><th>结果</th></tr></thead>
+        <tbody>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests\test_desktop_bridge.py -q</code></td><td>通过：5 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py -q</code></td><td>通过：11 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests -q -p no:cacheprovider --ignore=tests\test_browser_smoke.py --ignore=tests\test_bootstrap_uv.py --ignore=tests\test_vendor_manifest.py</code></td><td>通过：61 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run ruff check --no-cache src tests</code></td><td>通过。</td></tr>
+          <tr><td><code>node --check web\app.js</code> 和 <code>node --check web\api-client.js</code></td><td>通过。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>已知风险与限制</h2>
+      <ul>
+        <li>桌面 Qt 窗口中的最终体感仍需用户目视确认。</li>
+        <li>轨迹计算完成前会有一次后台等待，播放阶段已改为轻量帧更新。</li>
+      </ul>
+
+      <h2>下一任务</h2>
+      <p>等待用户确认桌面播放表现后，将修复同步到草稿 PR。</p>
+    </main>
+  </body>
+</html>

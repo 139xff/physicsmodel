@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 23 - Merge desktop stability work</title>
+  <style>
+    body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1100px; padding: 0 1rem; color: #182230; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; padding: 0.1rem 0.25rem; overflow-wrap: anywhere; }
+    .pass { color: #067647; font-weight: 700; }
+    .note { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 23 - Merge desktop stability work</h1>
+    <p><strong>Completed:</strong> 2026-06-02T09:12:19+08:00</p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Merged <code>origin/feature/em-workbench-foundation</code> into the local foundation branch.</li>
+      <li>Kept the desktop bootstrap retry logic that waits for <code>document.documentElement</code> before appending the Qt WebChannel script.</li>
+      <li>Kept Qt bridge object retention for the lifetime of the desktop view.</li>
+      <li>Kept motion playback updates scoped to the SVG motion layer so field-line DOM nodes remain stable during playback.</li>
+      <li>Added an executed-browser regression test for the early desktop bootstrap injection path.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>The CPU and optional CUDA performance implementation remains scheduled separately under
+      <code>docs/superpowers/plans/2026-06-02-cpu-cuda-performance.md</code>.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Files</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/em_workbench/desktop.py</code></td><td>Desktop bootstrap retry and Qt object retention.</td></tr>
+        <tr><td><code>web/app.js</code>, <code>web/styles.css</code></td><td>Desktop rendering stability and motion-layer-only playback updates.</td></tr>
+        <tr><td><code>tests/test_app.py</code>, <code>tests/test_browser_smoke.py</code>, <code>tests/test_desktop_bridge.py</code></td><td>Desktop, browser, and playback regression coverage.</td></tr>
+        <tr><td><code>reports/2026-06-01-task-18-unified-field-lines-motion.html</code> through <code>reports/2026-06-02-task-22-publish-desktop-stability.html</code></td><td>Merged remote engineering records.</td></tr>
+        <tr><td><code>reports/2026-06-02-task-23-merge-desktop-stability.html</code></td><td>This merge record.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py::test_desktop_bridge_bootstrap_waits_for_document_root -q</code></td><td>Failed before merge with <code>Cannot read properties of null (reading 'appendChild')</code>, establishing the regression.</td></tr>
+        <tr><td><code>git fetch --prune origin</code></td><td>Fetched remote desktop stability commits through <code>e23bf5d</code>.</td></tr>
+        <tr><td><code>git merge --no-edit origin/feature/em-workbench-foundation</code></td><td>Required manual conflict resolution in <code>tests/test_desktop_bridge.py</code> and <code>web/app.js</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py::test_desktop_bridge_bootstrap_waits_for_document_root tests/test_desktop_bridge.py tests/test_app.py -q</code></td><td class="pass">Passed: 15 tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync --extra desktop em-workbench-desktop --check</code></td><td class="pass">Passed: <code>desktop runtime ok</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">Passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_browser_smoke.py -q</code></td><td class="pass">Passed: 12 browser tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td class="pass">Passed: 81 tests, 2 dependency deprecation warnings.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification notes</h2>
+    <p>A first full-suite run reported one transient SVG computed-style assertion failure. The same
+      interaction test then passed in isolation, after the bootstrap test, across five repeated
+      runs, in the complete browser file, and in the final full suite. Browser diagnostics confirmed
+      that the point-charge node remained connected, its radial gradient existed, and its computed
+      fill resolved correctly. No implementation change was made for an unreproduced symptom.</p>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>The test suite still reports two upstream WebSockets deprecation warnings.</li>
+      <li>The extracted runtime directory under <code>releases/opened-20260601-140453/</code> remains intentionally untracked.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Begin the CPU baseline batching and benchmark harness work from the approved CPU and optional CUDA performance plan.</p>
+  </main>
+</body>
+</html>

@@ -1,6 +1,8 @@
 import { evaluateField, evaluateTrajectory, getConfig, getPreset, listPresets } from "./api-client.js";
 import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-axis-labels-pan-preserve";
 
+document.documentElement.classList.toggle("desktop-runtime", Boolean(window.emWorkbenchBridgeReady));
+
 const runtimeStatus = document.querySelector("#runtime-status");
 const sourceList = document.querySelector("#source-list");
 const sourceCount = document.querySelector("[data-testid='source-count']");
@@ -2654,6 +2656,15 @@ function renderMotionLayer2d() {
   `;
 }
 
+function renderMotionFrame2d() {
+  const layer = view2d.querySelector("[data-testid='motion-layer-2d']");
+  if (!layer) {
+    render2d();
+    return;
+  }
+  layer.outerHTML = renderMotionLayer2d();
+}
+
 function cancelMotionAnimation() {
   if (state.motion.animationId !== null) {
     window.cancelAnimationFrame(state.motion.animationId);
@@ -2699,7 +2710,7 @@ function animateMotionTrajectory() {
     if (previousTime === 0 || timestamp - previousTime >= 28) {
       previousTime = timestamp;
       state.motion.frameIndex += 1;
-      render2d();
+      renderMotionFrame2d();
       updateMotionReadout();
     }
     if (state.motion.frameIndex >= state.motion.samples.length - 1) {
@@ -2710,7 +2721,7 @@ function animateMotionTrajectory() {
     state.motion.animationId = window.requestAnimationFrame(tick);
   }
 
-  render2d();
+  renderMotionFrame2d();
   updateMotionReadout();
   state.motion.animationId = window.requestAnimationFrame(tick);
 }

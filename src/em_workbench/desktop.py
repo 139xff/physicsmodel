@@ -9,6 +9,12 @@ from em_workbench.app import WEB_ROOT
 from em_workbench.desktop_bridge import WorkbenchDesktopBridge
 
 
+def _retain_desktop_objects(view: object, channel: object, bridge: object) -> None:
+    """Keep Qt bridge objects alive for the lifetime of the desktop view."""
+    view._em_workbench_channel = channel
+    view._em_workbench_bridge = bridge
+
+
 def main(argv: list[str] | None = None) -> int:
     """Launch the desktop workbench window."""
     args = list(sys.argv if argv is None else argv)
@@ -59,8 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     view.resize(1440, 920)
 
     channel = QWebChannel(view.page())
-    channel.registerObject("emWorkbenchBridge", QtWorkbenchBridge())
+    bridge = QtWorkbenchBridge()
+    channel.registerObject("emWorkbenchBridge", bridge)
     view.page().setWebChannel(channel)
+    _retain_desktop_objects(view, channel, bridge)
 
     bootstrap = QWebEngineScript()
     bootstrap.setName("em-workbench-bridge-bootstrap")
@@ -78,9 +86,10 @@ def main(argv: list[str] | None = None) -> int:
 def _bridge_bootstrap_script() -> str:
     return """
 window.emWorkbenchBridgeReady = new Promise((resolve) => {
+  const retryDelayMs = 16;
   function attachBridge() {
     if (!window.QWebChannel || !window.qt || !window.qt.webChannelTransport) {
-      window.setTimeout(attachBridge, 0);
+      window.setTimeout(attachBridge, retryDelayMs);
       return;
     }
     new QWebChannel(window.qt.webChannelTransport, (channel) => {
@@ -88,10 +97,17 @@ window.emWorkbenchBridgeReady = new Promise((resolve) => {
       resolve(window.emWorkbenchBridge);
     });
   }
-  const script = document.createElement("script");
-  script.src = "qrc:///qtwebchannel/qwebchannel.js";
-  script.onload = attachBridge;
-  document.documentElement.appendChild(script);
+  function appendBridgeScript() {
+    if (!document.documentElement) {
+      window.setTimeout(appendBridgeScript, retryDelayMs);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "qrc:///qtwebchannel/qwebchannel.js";
+    script.onload = attachBridge;
+    document.documentElement.appendChild(script);
+  }
+  appendBridgeScript();
 });
 """
 

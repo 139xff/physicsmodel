@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 18 - Unified Field Lines and Motion</title>
+    <style>
+      body { color: #1f2937; font-family: Arial, sans-serif; line-height: 1.6; margin: 2rem auto; max-width: 980px; padding: 0 1rem; }
+      h1, h2 { color: #0f4c5c; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #d1d5db; padding: 0.55rem; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; }
+      code { background: #f3f4f6; padding: 0.1rem 0.25rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 18: 统一电场线优化与测试电荷运动</h1>
+      <p><strong>完成时间：</strong>2026-06-01 23:19:55 +08:00</p>
+
+      <h2>交付范围</h2>
+      <ul>
+        <li>以远端默认分支提交 <code>d2dc38a</code> 为基线，保留队友新增的二维电场线曲线优化。</li>
+        <li>重新叠加测试电荷 RK4 轨迹计算、API、桌面桥接、二维轨迹绘制与播放面板。</li>
+        <li>为新增运动面板增加桌面端分析栏内部滚动约束，避免工作台高度溢出导致滚轮缩放失效。</li>
+        <li>安装项目规则允许的 Playwright Chromium，并完成浏览器烟雾验证。</li>
+      </ul>
+
+      <h2>延期范围</h2>
+      <ul>
+        <li>测试电荷轨迹目前仅在二维视图播放。</li>
+        <li>点电荷附近仍需由用户选择足够小的时间步长。</li>
+      </ul>
+
+      <h2>变更文件</h2>
+      <table>
+        <thead><tr><th>文件</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>src/em_workbench/physics/dynamics.py</code></td><td>RK4 测试电荷运动积分。</td></tr>
+          <tr><td><code>src/em_workbench/app.py</code></td><td>轨迹 API。</td></tr>
+          <tr><td><code>src/em_workbench/desktop.py</code></td><td>Qt 轨迹桥接槽。</td></tr>
+          <tr><td><code>src/em_workbench/desktop_bridge.py</code></td><td>本地轨迹计算桥接。</td></tr>
+          <tr><td><code>web/api-client.js</code></td><td>浏览器与桌面轨迹请求。</td></tr>
+          <tr><td><code>web/index.html</code></td><td>运动参数面板。</td></tr>
+          <tr><td><code>web/app.js</code></td><td>轨迹计算、绘制和播放。</td></tr>
+          <tr><td><code>web/styles.css</code></td><td>运动面板、轨迹样式和分析栏高度约束。</td></tr>
+          <tr><td><code>tests/test_app.py</code></td><td>轨迹 API 测试。</td></tr>
+          <tr><td><code>tests/test_desktop_bridge.py</code></td><td>桌面桥接测试。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>执行命令与结果</h2>
+      <table>
+        <thead><tr><th>命令</th><th>结果</th></tr></thead>
+        <tbody>
+          <tr><td><code>.\.tools\uv\uv.exe run python -m playwright install chromium</code></td><td>通过：Chromium、Headless Shell、FFmpeg 与 Winldd 已安装。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests\test_app.py tests\test_desktop_bridge.py -q</code></td><td>通过：11 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests -q -p no:cacheprovider --ignore=tests\test_browser_smoke.py --ignore=tests\test_bootstrap_uv.py --ignore=tests\test_vendor_manifest.py</code></td><td>通过：59 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py -q</code></td><td>通过：10 tests。</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run ruff check --no-cache src tests</code></td><td>通过。</td></tr>
+          <tr><td><code>node --check web\app.js</code> 和 <code>node --check web\api-client.js</code></td><td>通过。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>已知风险与限制</h2>
+      <ul>
+        <li>浏览器测试仍报告第三方 WebSockets 弃用警告，不影响当前行为。</li>
+        <li>三维轨迹播放尚未实现。</li>
+      </ul>
+
+      <h2>下一任务</h2>
+      <p>由团队在草稿 PR 中评审统一版本，并决定是否合并到默认分支。</p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 26 - CPU JIT field kernels</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 26 - CPU JIT field kernels</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T09:43:45+08:00">2026-06-02T09:43:45+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Added Numba multi-core CPU kernels for total-only field evaluation and per-source contribution evaluation.</li>
+      <li>Covered packed Coulomb elements, analytic infinite planes, and analytic spherical shells.</li>
+      <li>Preserved the scalar solver as <code>evaluate_scene_scalar()</code>.</li>
+      <li>Added a compute dispatcher and changed the public <code>evaluate_scene()</code> facade to use CPU JIT by default.</li>
+      <li>Added execution metadata including requested backend, effective backend, CPU device, precision, host cache hit state, warm state, and timings.</li>
+      <li>Reassembled public DTO warnings and per-source metadata outside compiled loops without invoking the scalar hot path.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>CUDA dispatch, CUDA kernels, compiled trajectories, backend field lines, background warm-up,
+      UI compute status, and formal benchmarks remain scheduled in later tasks.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/em_workbench/physics/compute/cpu_backend.py</code></td><td>Numba total-only and contribution kernels.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/dispatcher.py</code></td><td>CPU compute service, DTO assembly, timing, cache, and execution metadata.</td></tr>
+        <tr><td><code>src/em_workbench/physics/solver.py</code></td><td>Scalar oracle export, public dispatcher facade, and optional execution metadata response field.</td></tr>
+        <tr><td><code>tests/conftest.py</code></td><td>Representative scene, samples, and particle fixtures for compute tasks.</td></tr>
+        <tr><td><code>tests/test_cpu_backend.py</code></td><td>CPU parity and contribution-sum verification across every Release 1 source kind.</td></tr>
+        <tr><td><code>tests/test_solver.py</code></td><td>Facade backend and scalar oracle regression coverage.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_cpu_backend.py tests/test_solver.py::test_solver_facade_uses_cpu_jit_and_preserves_scalar_oracle -q</code></td><td class="expected">Expected RED: scalar oracle export and CPU backend were absent.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_cpu_backend.py tests/test_solver.py::test_solver_facade_uses_cpu_jit_and_preserves_scalar_oracle -q</code></td><td class="pass">PASS after correcting nested-array test assertions: 10 tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_cpu_backend.py tests/test_solver.py tests/test_solver_api.py tests/test_app.py -q</code></td><td class="pass">PASS: 35 tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS after mechanical import and line-wrap formatting.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td class="pass">PASS: 98 tests, 2 dependency deprecation warnings.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification notes</h2>
+    <ul>
+      <li>Preview parity uses <code>float32</code> tolerances; refined parity uses <code>float64</code> tolerances.</li>
+      <li>Per-source contribution arrays sum back to total-only results.</li>
+      <li>Point, line segment, ring, disk, infinite plane, and spherical shell results match the scalar oracle.</li>
+      <li>Existing solver, API, app, desktop, and browser tests remain green.</li>
+    </ul>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>Trajectory calls still invoke the field facade once per RK4 sample until the compiled trajectory task.</li>
+      <li>CUDA is detected but not yet selected for field calculations.</li>
+      <li>DTO presentation assembly still performs lightweight Python geometry checks for warnings.</li>
+      <li>The suite still reports two upstream WebSockets deprecation warnings.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 4: add optional CUDA field kernels, bounded device cache, and workload-aware automatic dispatch.</p>
+  </main>
+</body>
+</html>

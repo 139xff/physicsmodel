@@ -3,7 +3,7 @@ import math
 import pytest
 
 from em_workbench.models import Scene
-from em_workbench.physics.solver import COULOMB_CONSTANT, evaluate_scene
+from em_workbench.physics.solver import COULOMB_CONSTANT, evaluate_scene, evaluate_scene_scalar
 
 
 def _scene(sources: list[dict]) -> Scene:
@@ -45,6 +45,30 @@ def test_point_charge_matches_analytic_potential_and_field():
     assert result.field_magnitude_v_per_m == pytest.approx(abs(result.field_v_per_m.x))
     assert [contribution.source_id for contribution in result.contributions] == ["q1"]
     assert result.contributions[0].source_kind == "point"
+
+
+def test_solver_facade_uses_cpu_jit_and_preserves_scalar_oracle():
+    scene = _scene([_point_source("q1", 2.0e-9, (0.0, 0.0, 0.0))])
+    sample = (0.2, 0.0, 0.0)
+
+    evaluation = evaluate_scene(scene, [sample], quality="preview")
+    scalar = evaluate_scene_scalar(scene, [sample], quality="preview")
+
+    assert evaluation.execution is not None
+    assert evaluation.execution.backend_requested == "auto"
+    assert evaluation.execution.backend_effective == "cpu-jit"
+    assert evaluation.samples[0].potential_v == pytest.approx(
+        scalar.samples[0].potential_v,
+        rel=2e-5,
+    )
+    assert evaluation.samples[0].field_v_per_m.x == pytest.approx(
+        scalar.samples[0].field_v_per_m.x,
+        rel=2e-5,
+    )
+    assert evaluation.samples[0].contributions[0].metadata == {
+        "method": "analytic-point",
+    }
+    assert evaluation.samples[0].warnings == scalar.samples[0].warnings
 
 
 def test_multiple_point_charges_superpose_potential_and_field():

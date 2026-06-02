@@ -18,6 +18,7 @@ from em_workbench.models import (
     Scene,
     SphericalShellSource,
 )
+from em_workbench.physics.compute.contracts import BackendPolicy, ExecutionMetadata
 from em_workbench.physics.vectors import ZERO_VECTOR, Vector3, orthonormal_basis_from_normal
 
 EPSILON_0 = 8.854_187_812_8e-12
@@ -80,9 +81,30 @@ class FieldEvaluationResponse(SolverModel):
     samples: list[FieldSampleResult]
     warnings: list[str] = Field(default_factory=list)
     metadata: dict[str, MetadataValue] = Field(default_factory=dict)
+    execution: ExecutionMetadata | None = None
 
 
 def evaluate_scene(
+    scene: Scene,
+    sample_points: Iterable[Position | dict[str, float] | tuple[float, float, float]],
+    *,
+    quality: SolverQuality = "preview",
+    request_id: str | None = None,
+    backend: BackendPolicy = "auto",
+) -> FieldEvaluationResponse:
+    """Evaluate a scene through the selected high-performance backend."""
+    from em_workbench.physics.compute.dispatcher import DEFAULT_COMPUTE_SERVICE
+
+    return DEFAULT_COMPUTE_SERVICE.evaluate_scene(
+        scene,
+        sample_points,
+        quality=quality,
+        request_id=request_id,
+        backend=backend,
+    )
+
+
+def evaluate_scene_scalar(
     scene: Scene,
     sample_points: Iterable[Position | dict[str, float] | tuple[float, float, float]],
     *,

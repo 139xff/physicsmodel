@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 27 - Optional CUDA field kernels</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 27 - Optional CUDA field kernels</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T10:02:27+08:00">2026-06-02T10:02:27+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Added a lazy optional CUDA module that imports <code>numba.cuda</code> only when GPU execution is requested.</li>
+      <li>Added a one-thread-per-sample CUDA total-field kernel for packed Coulomb elements, analytic planes, and analytic spherical shells.</li>
+      <li>Added chunked launches, explicit synchronization, host result copies, and a bounded device-scene LRU cache.</li>
+      <li>Added workload-aware total-field dispatch: explicit scalar and CPU policies, explicit CUDA, and automatic CUDA selection for large batches.</li>
+      <li>Added readable CPU fallback reasons when CUDA probing, allocation, compilation, launch, or synchronization cannot proceed.</li>
+      <li>Verified GPU execution on an NVIDIA GeForce RTX 5060 Ti with compute capability 12.0.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>CUDA contribution arrays, compiled trajectories, field-line tracing, warm-up, UI status, and
+      formal workload benchmarks remain scheduled in later tasks.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/em_workbench/physics/compute/cuda_backend.py</code></td><td>Lazy CUDA loading, field kernel, chunked launch, and bounded device cache.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/dispatcher.py</code></td><td>Workload-aware total-field backend selection and safe CPU fallback.</td></tr>
+        <tr><td><code>tests/test_cuda_backend.py</code></td><td>Hardware-independent fallback coverage plus guarded RTX hardware parity and cache tests.</td></tr>
+        <tr><td><code>tests/test_compute_runtime.py</code></td><td>CUDA device detail contract when a GPU is available.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td class="pass">PASS: removed optional CUDA packages for default-environment fallback validation.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_cuda_backend.py tests/test_compute_runtime.py -q</code></td><td class="expected">Expected RED: two fallback assertions failed before dispatcher integration; hardware tests skipped.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_cuda_backend.py tests/test_compute_runtime.py -q</code></td><td class="pass">CPU-only PASS after implementation: 4 tests, 3 guarded hardware skips.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra cuda</code></td><td class="pass">PASS: installed optional CUDA 12.9 components.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_cuda_backend.py tests/test_cpu_backend.py tests/test_compute_runtime.py -q</code></td><td class="pass">CUDA PASS: 16 tests, including preview and refined hardware parity, device-cache reuse, and auto dispatch.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -c "from em_workbench.physics.compute.runtime import probe_runtime; print(probe_runtime().cuda.model_dump_json(indent=2))"</code></td><td class="pass">PASS: RTX 5060 Ti, compute capability 12.0.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td class="pass">CUDA-extra PASS: 104 tests, 3 warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td class="pass">PASS: restored default CPU-only environment.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td class="pass">CPU-only PASS: 101 tests, 3 guarded skips, 2 dependency deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Diagnostic notes</h2>
+    <ul>
+      <li>An initial combined install-and-test command exceeded its 10-minute command timeout. Split diagnostics showed installation completed, the CUDA probe worked, context synchronization completed in under two seconds, and isolated kernel tests executed normally.</li>
+      <li>Preview CPU/GPU differences came from <code>float32</code> accumulation ordering near zero-valued results. Measured maxima were <code>3.05e-5 V</code> for potential and <code>4.88e-4 V/m</code> for a field component, so preview tests use explicit display-grade absolute tolerances. Refined differences remained near <code>1e-12</code>.</li>
+    </ul>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>A 400-sample launch uses four blocks and triggers a Numba low-occupancy warning. The formal benchmark task will evaluate crossover thresholds across larger workloads.</li>
+      <li>The default environment intentionally reports CPU fallback and does not require CUDA packages.</li>
+      <li>The suite still reports two upstream WebSockets deprecation warnings.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 5: move single-particle RK4 trajectory integration into the compiled CPU backend.</p>
+  </main>
+</body>
+</html>

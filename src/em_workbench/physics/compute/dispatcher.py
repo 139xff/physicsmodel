@@ -17,6 +17,11 @@ from em_workbench.physics.compute.cpu_backend import (
     evaluate_contributions_cpu,
     evaluate_totals_cpu,
 )
+from em_workbench.physics.compute.cuda_backend import (
+    CudaUnavailable,
+    DeviceSceneCache,
+    evaluate_totals_cuda,
+)
 from em_workbench.physics.compute.packed_scene import PackedScene, PackedSceneCache
 from em_workbench.physics.compute.runtime import _cpu_status, _cuda_status
 from em_workbench.physics.solver import (
@@ -39,6 +44,8 @@ from em_workbench.physics.solver import (
 from em_workbench.physics.vectors import Vector3
 
 MIN_SOURCE_DISTANCE_SQ = MIN_SOURCE_DISTANCE_M**2
+CUDA_BATCH_SAMPLE_THRESHOLD = 128
+CUDA_FIELD_LINE_THRESHOLD = 24
 
 
 @dataclass(frozen=True)
@@ -53,11 +60,14 @@ class ComputeService:
         self,
         *,
         packed_scene_cache: PackedSceneCache | None = None,
+        device_scene_cache: DeviceSceneCache | None = None,
         cuda_probe: Callable[[], CudaRuntimeStatus] | None = None,
     ) -> None:
         self.packed_scene_cache = packed_scene_cache or PackedSceneCache()
+        self.device_scene_cache = device_scene_cache or DeviceSceneCache()
         self.cuda_probe = cuda_probe or _cuda_status
         self._cpu_warm = False
+        self._cuda_warm = False
 
     def evaluate_totals(
         self,
@@ -95,6 +105,42 @@ class ComputeService:
 
         packed, cache_hit = self.packed_scene_cache.get_or_compile(scene, quality=quality)
         points = self._points_array(vectors, packed)
+        effective_backend, fallback_reason, cuda_status = self._select_backend(
+            operation="field",
+            sample_count=len(vectors),
+            backend=backend,
+        )
+        if effective_backend == "cuda":
+            warm = self._cuda_warm
+            compute_started = time.perf_counter()
+            try:
+                potential, field, device_cache_hit = evaluate_totals_cuda(
+                    packed,
+                    points,
+                    device_cache=self.device_scene_cache,
+                )
+            except Exception as error:
+                effective_backend = "cpu-jit"
+                fallback_reason = self._cuda_failure_reason(error)
+            else:
+                compute_ms = (time.perf_counter() - compute_started) * 1000.0
+                self._cuda_warm = True
+                return TotalFieldResult(
+                    potential_v=potential,
+                    field_v_per_m=field,
+                    execution=self._execution_metadata(
+                        backend_requested=backend,
+                        backend_effective="cuda",
+                        device=(cuda_status.device_name if cuda_status else None) or "CUDA",
+                        precision=self._precision(packed),
+                        scene_cache_hit=cache_hit,
+                        device_cache_hit=device_cache_hit,
+                        warm=warm,
+                        compute_ms=compute_ms,
+                        total_ms=(time.perf_counter() - started) * 1000.0,
+                    ),
+                )
+
         warm = self._cpu_warm
         compute_started = time.perf_counter()
         potential, field = evaluate_totals_cpu(packed, points)
@@ -111,6 +157,7 @@ class ComputeService:
                 warm=warm,
                 compute_ms=compute_ms,
                 total_ms=(time.perf_counter() - started) * 1000.0,
+                fallback_reason=fallback_reason,
             ),
         )
 
@@ -208,22 +255,55 @@ class ComputeService:
         *,
         backend_requested: BackendPolicy,
         backend_effective: str,
+        device: str | None = None,
         precision: str,
         scene_cache_hit: bool,
+        device_cache_hit: bool = False,
         warm: bool,
         compute_ms: float,
         total_ms: float,
+        fallback_reason: str | None = None,
     ) -> ExecutionMetadata:
         return ExecutionMetadata(
             backend_requested=backend_requested,
             backend_effective=backend_effective,
-            device=_cpu_status().description,
+            device=device or _cpu_status().description,
             precision=precision,
             scene_cache_hit=scene_cache_hit,
+            device_cache_hit=device_cache_hit,
             warm=warm,
             compute_ms=compute_ms,
             total_ms=total_ms,
+            fallback_reason=fallback_reason,
         )
+
+    def _select_backend(
+        self,
+        *,
+        operation: str,
+        sample_count: int,
+        backend: BackendPolicy,
+    ) -> tuple[str, str | None, CudaRuntimeStatus | None]:
+        if backend == "scalar":
+            return "scalar", None, None
+        if backend == "cpu":
+            return "cpu-jit", None, None
+        cuda_status = self.cuda_probe()
+        if not cuda_status.available:
+            return "cpu-jit", cuda_status.fallback_reason, cuda_status
+        if backend == "cuda":
+            return "cuda", None, cuda_status
+        if operation == "trajectory":
+            return "cpu-jit", None, cuda_status
+        if operation == "field-lines" or sample_count >= CUDA_BATCH_SAMPLE_THRESHOLD:
+            return "cuda", None, cuda_status
+        return "cpu-jit", None, cuda_status
+
+    @staticmethod
+    def _cuda_failure_reason(error: Exception) -> str:
+        if isinstance(error, CudaUnavailable):
+            return str(error)
+        return f"CUDA execution failed: {error}"
 
     def _sample_result(
         self,

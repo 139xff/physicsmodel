@@ -11,3 +11,11 @@ def test_runtime_probe_always_reports_cpu_and_cuda_state() -> None:
     if not status.cuda.available:
         assert status.cuda.device_name is None
         assert status.cuda.fallback_reason
+
+
+def test_runtime_probe_cuda_availability_implies_device_details() -> None:
+    status = probe_runtime()
+
+    if status.cuda.available:
+        assert status.cuda.device_name
+        assert status.cuda.compute_capability

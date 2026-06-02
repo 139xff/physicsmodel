@@ -1,4 +1,4 @@
-from scripts.benchmark_compute import run_benchmarks
+from em_workbench.benchmark_compute import run_benchmarks
 
 
 def test_benchmark_script_emits_machine_and_workload_records() -> None:

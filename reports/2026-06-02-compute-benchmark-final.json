@@ -1,0 +1,397 @@
+{
+  "generated_at": "2026-06-02T16:32:02.438848+08:00",
+  "machine": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.12",
+    "cpu": {
+      "description": "Intel64 Family 6 Model 191 Stepping 2, GenuineIntel",
+      "physical_cores": null,
+      "logical_processors": 16
+    },
+    "cuda": {
+      "installed": true,
+      "available": true,
+      "device_name": "NVIDIA GeForce RTX 5060 Ti",
+      "compute_capability": "12.0",
+      "fallback_reason": null
+    }
+  },
+  "config": {
+    "backends": [
+      "cpu",
+      "cuda",
+      "auto"
+    ],
+    "warm_runs": 5,
+    "include_refined": false
+  },
+  "records": [
+    {
+      "name": "field-preview-25",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 305.8972999860998,
+      "warm_ms": [
+        0.39930001366883516,
+        0.21120000747032464,
+        0.28410000959411263,
+        0.32049999572336674,
+        0.1480000209994614
+      ],
+      "warm_median_ms": 0.28410000959411263,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 2.087034832243262e-05,
+        "field_max_abs_error": 0.005677246541381464
+      }
+    },
+    {
+      "name": "field-preview-400",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 0.7121000089682639,
+      "warm_ms": [
+        0.7823999912943691,
+        0.9831000061240047,
+        0.8643000037409365,
+        0.7483999943360686,
+        0.6847000040579587
+      ],
+      "warm_median_ms": 0.7823999912943691,
+      "target_ms": 100.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 2.5420445808777004e-05,
+        "field_max_abs_error": 0.006098564987041755
+      }
+    },
+    {
+      "name": "trajectory-preview-100",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 28.223700006492436,
+      "warm_ms": [
+        2.3967000015545636,
+        2.472199994372204,
+        26.622299978043884,
+        2.5507000100333244,
+        2.282100002048537
+      ],
+      "warm_median_ms": 2.472199994372204,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 1.2135502214238869e-08,
+        "velocity_max_abs_error": 8.330781507345786e-09
+      }
+    },
+    {
+      "name": "trajectory-preview-400",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 8.86879998142831,
+      "warm_ms": [
+        9.791399992536753,
+        9.143400005996227,
+        8.724799990886822,
+        8.342300017829984,
+        8.557100023608655
+      ],
+      "warm_median_ms": 8.724799990886822,
+      "target_ms": 300.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 9.111899682001656e-08,
+        "velocity_max_abs_error": 7.888965926350355e-08
+      }
+    },
+    {
+      "name": "field-lines-preview",
+      "backend_requested": "cpu",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 30.859299993608147,
+      "warm_ms": [
+        18.29459998407401,
+        18.827099993359298,
+        15.402099990751594,
+        15.221400011796504,
+        18.05909999529831
+      ],
+      "warm_median_ms": 18.05909999529831,
+      "target_ms": 250.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "candidate_line_count": 96,
+        "display_line_count": 54,
+        "reference_display_line_count": 54,
+        "topology": [
+          "infinity-to-source",
+          "source-to-infinity",
+          "source-to-source"
+        ]
+      }
+    },
+    {
+      "name": "field-preview-25",
+      "backend_requested": "cuda",
+      "backend_effective": "cuda",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 738.3703999803402,
+      "warm_ms": [
+        1.2835999950766563,
+        1.0586999997030944,
+        1.0658999963197857,
+        0.9885000181384385,
+        1.0049999982584268
+      ],
+      "warm_median_ms": 1.0586999997030944,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 0.0002907755292085312,
+        "field_max_abs_error": 0.005677246541381464
+      }
+    },
+    {
+      "name": "field-preview-400",
+      "backend_requested": "cuda",
+      "backend_effective": "cuda",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 1.8229999986942858,
+      "warm_ms": [
+        1.4137999969534576,
+        1.3507000112440437,
+        1.3249999901745468,
+        1.7720999894663692,
+        1.5455999819096178
+      ],
+      "warm_median_ms": 1.4137999969534576,
+      "target_ms": 100.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 0.00028466805116522664,
+        "field_max_abs_error": 0.006098564987041755
+      }
+    },
+    {
+      "name": "trajectory-preview-100",
+      "backend_requested": "cuda",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": "CUDA trajectory backend unavailable; using CPU JIT.",
+      "cold_ms": 2.3401000071316957,
+      "warm_ms": [
+        2.2795999830123037,
+        2.2154000180307776,
+        2.345799992326647,
+        2.2606000129599124,
+        2.380799996899441
+      ],
+      "warm_median_ms": 2.2795999830123037,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 1.2135502214238869e-08,
+        "velocity_max_abs_error": 8.330781507345786e-09
+      }
+    },
+    {
+      "name": "trajectory-preview-400",
+      "backend_requested": "cuda",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": "CUDA trajectory backend unavailable; using CPU JIT.",
+      "cold_ms": 9.113200008869171,
+      "warm_ms": [
+        9.807300026295707,
+        8.870799996657297,
+        8.71929997811094,
+        9.241399995516986,
+        10.096800018800423
+      ],
+      "warm_median_ms": 9.241399995516986,
+      "target_ms": 300.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 9.111899682001656e-08,
+        "velocity_max_abs_error": 7.888965926350355e-08
+      }
+    },
+    {
+      "name": "field-lines-preview",
+      "backend_requested": "cuda",
+      "backend_effective": "cuda",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 3034.6629999985453,
+      "warm_ms": [
+        1280.2795000025071,
+        1280.2365999959875,
+        1286.6558999812696,
+        1280.680800002301,
+        1279.9310000264086
+      ],
+      "warm_median_ms": 1280.2795000025071,
+      "target_ms": 250.0,
+      "target_met": false,
+      "correctness": {
+        "passed": true,
+        "candidate_line_count": 96,
+        "display_line_count": 54,
+        "reference_display_line_count": 54,
+        "topology": [
+          "infinity-to-source",
+          "source-to-infinity",
+          "source-to-source"
+        ]
+      }
+    },
+    {
+      "name": "field-preview-25",
+      "backend_requested": "auto",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 1.652999984798953,
+      "warm_ms": [
+        0.15959999291226268,
+        0.11749999248422682,
+        0.1312999811489135,
+        0.10420000762678683,
+        0.10519998613744974
+      ],
+      "warm_median_ms": 0.11749999248422682,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 2.087034832243262e-05,
+        "field_max_abs_error": 0.005677246541381464
+      }
+    },
+    {
+      "name": "field-preview-400",
+      "backend_requested": "auto",
+      "backend_effective": "cuda",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 2.4766999995335937,
+      "warm_ms": [
+        1.7072999908123165,
+        1.6183999832719564,
+        1.5884000167716295,
+        1.5964000194799155,
+        1.638100016862154
+      ],
+      "warm_median_ms": 1.6183999832719564,
+      "target_ms": 100.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "potential_max_abs_error": 0.00028466805116522664,
+        "field_max_abs_error": 0.006098564987041755
+      }
+    },
+    {
+      "name": "trajectory-preview-100",
+      "backend_requested": "auto",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 2.7777999930549413,
+      "warm_ms": [
+        2.8221999818924814,
+        2.7951000083703548,
+        2.721400000154972,
+        2.888699993491173,
+        2.8025999781675637
+      ],
+      "warm_median_ms": 2.8025999781675637,
+      "target_ms": null,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 1.2135502214238869e-08,
+        "velocity_max_abs_error": 8.330781507345786e-09
+      }
+    },
+    {
+      "name": "trajectory-preview-400",
+      "backend_requested": "auto",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 10.745600011432543,
+      "warm_ms": [
+        11.424199998145923,
+        10.84980001905933,
+        10.959300008835271,
+        10.796899994602427,
+        10.820499999681488
+      ],
+      "warm_median_ms": 10.84980001905933,
+      "target_ms": 300.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "position_max_abs_error": 9.111899682001656e-08,
+        "velocity_max_abs_error": 7.888965926350355e-08
+      }
+    },
+    {
+      "name": "field-lines-preview",
+      "backend_requested": "auto",
+      "backend_effective": "cpu-jit",
+      "precision": "float32",
+      "fallback_reason": null,
+      "cold_ms": 18.557500006863847,
+      "warm_ms": [
+        16.304599994327873,
+        16.91229999414645,
+        15.253899997333065,
+        16.82779999100603,
+        17.969999986235052
+      ],
+      "warm_median_ms": 16.82779999100603,
+      "target_ms": 250.0,
+      "target_met": true,
+      "correctness": {
+        "passed": true,
+        "candidate_line_count": 96,
+        "display_line_count": 54,
+        "reference_display_line_count": 54,
+        "topology": [
+          "infinity-to-source",
+          "source-to-infinity",
+          "source-to-source"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "correctness_passed": true,
+    "auto_targets_met": true
+  }
+}

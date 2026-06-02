@@ -89,6 +89,19 @@ powershell -ExecutionPolicy Bypass -File scripts\bootstrap_uv.ps1
 .\.tools\uv\uv.exe run --extra desktop em-workbench-desktop
 ```
 
+## 可选 CUDA 加速
+
+默认安装和 Windows 便携包使用 CPU JIT，不要求安装 CUDA。使用源码运行时，如果电脑有受支持
+的 NVIDIA 显卡，可以同时安装桌面与 CUDA 可选依赖：
+
+```powershell
+.\.tools\uv\uv.exe sync --extra desktop --extra cuda
+```
+
+程序会在运行时检测 CUDA。自动调度会让适合并行处理的场采样批次使用 GPU，并把较小或顺序
+计算任务保留在 CPU 上。CUDA 不可用时会自动回退到 CPU JIT。界面中的“计算后端”状态块会
+显示实际使用的后端、精度和预热状态。
+
 ## 打包 Windows 便携版
 
 ```powershell

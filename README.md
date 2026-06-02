@@ -93,6 +93,21 @@ Launch the desktop app:
 .\.tools\uv\uv.exe run --extra desktop em-workbench-desktop
 ```
 
+## Optional CUDA Acceleration
+
+The default installation and portable desktop package run on CPU JIT without requiring CUDA.
+When running from source on a supported NVIDIA system, install the optional CUDA extra together
+with the desktop extra:
+
+```powershell
+.\.tools\uv\uv.exe sync --extra desktop --extra cuda
+```
+
+CUDA is detected at runtime. Automatic dispatch uses the GPU for suitable field batches and keeps
+smaller or sequential workloads on CPU when that is faster. If CUDA is unavailable, computation
+falls back to CPU JIT. The compute backend status block in the app shows the effective backend,
+precision, and warm-up state.
+
 ## Build The Windows Portable Package
 
 ```powershell

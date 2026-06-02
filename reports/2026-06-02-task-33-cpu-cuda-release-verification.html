@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 33 - CPU and CUDA release verification</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 33 - CPU and CUDA release verification</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T16:36:43+08:00">2026-06-02T16:36:43+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Verified the default CPU-only installation, optional RTX CUDA installation, desktop runtime, and portable Windows package.</li>
+      <li>Moved the benchmark implementation into the installed <code>em_workbench</code> package so the standard <code>uv run pytest</code> entry point can import it reliably.</li>
+      <li>Made portable builds deterministic by running PyInstaller with locked, pre-synchronized dependencies.</li>
+      <li>Documented optional CUDA installation and automatic CPU fallback in English, Chinese, and the portable package readme.</li>
+      <li>Exported <code>requirements.txt</code> from the authoritative lock file and generated a final CPU/CUDA/auto benchmark artifact.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <ul>
+      <li>CUDA remains an optional source-install extra. The portable Windows package intentionally ships CPU JIT only.</li>
+      <li>Code signing and external clean-machine installation testing are outside this repository task.</li>
+    </ul>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>README.md</code></td><td>Optional CUDA usage and runtime behavior.</td></tr>
+        <tr><td><code>README-ZH.md</code></td><td>Chinese optional CUDA usage and fallback notes.</td></tr>
+        <tr><td><code>packaging/PORTABLE_README.txt</code></td><td>CPU-only portable package expectation.</td></tr>
+        <tr><td><code>scripts/build_desktop.ps1</code></td><td>Locked, no-sync PyInstaller execution.</td></tr>
+        <tr><td><code>src/em_workbench/benchmark_compute.py</code></td><td>Importable packaged benchmark implementation.</td></tr>
+        <tr><td><code>scripts/benchmark_compute.py</code></td><td>Thin benchmark CLI wrapper.</td></tr>
+        <tr><td><code>tests/test_benchmark_compute.py</code></td><td>Stable import from the application package.</td></tr>
+        <tr><td><code>requirements.txt</code></td><td>Lock-file export refresh.</td></tr>
+        <tr><td><code>reports/2026-06-02-compute-benchmark-final.json</code></td><td>Final RTX CPU/CUDA/auto measurements.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe export --locked --all-groups --no-emit-project --output-file requirements.txt</code></td><td class="pass">PASS: compatibility requirements regenerated from <code>uv.lock</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra desktop</code></td><td class="pass">PASS: CPU-only desktop environment installed and CUDA packages removed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td><td class="pass">PASS after CLI wrapper import formatting.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td><td class="expected">Initial release run exposed the benchmark script import boundary; fixed by moving the implementation into <code>em_workbench</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td><td class="pass">CPU-only PASS: 114 passed, 4 expected CUDA-unavailable skips, 2 upstream deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync --extra desktop em-workbench-desktop --check</code></td><td class="pass">CPU-only desktop runtime PASS.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra desktop --extra cuda</code></td><td class="expected">First install exceeded the 30-minute tool timeout and left <code>cuda-core</code> partially installed. The stalled project-local uv process was stopped after an additional five-minute no-progress check.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra desktop --extra cuda</code></td><td class="pass">Recovery PASS: uv completed in 1.1 seconds and restored <code>cuda-core==1.0.1</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -c "from em_workbench.physics.compute.runtime import probe_runtime; print(probe_runtime().model_dump_json(indent=2))"</code></td><td class="pass">PASS: NVIDIA GeForce RTX 5060 Ti detected, compute capability 12.0.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td><td class="pass">CUDA-extra PASS: 118 passed, including hardware CUDA tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python scripts\benchmark_compute.py --backend cpu --backend cuda --backend auto --warm-runs 5 --output reports\2026-06-02-compute-benchmark-final.json</code></td><td class="pass">PASS: correctness and automatic-dispatch targets passed.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra desktop --extra bundle</code></td><td class="pass">PASS: portable CPU-only build environment installed and CUDA packages removed.</td></tr>
+        <tr><td><code>powershell -ExecutionPolicy Bypass -File scripts\build_desktop.ps1</code></td><td class="pass">PASS: Windows portable package rebuilt.</td></tr>
+        <tr><td><code>Start-Process .\dist\EMWorkbench\EMWorkbench.exe -ArgumentList '--check' -WindowStyle Hidden -Wait -PassThru</code></td><td class="pass">PASS: packaged EXE exited with code 0.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td class="pass">PASS: default CPU-only development environment restored.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Verification evidence</h2>
+    <table>
+      <thead><tr><th>Check</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td>CPU-only suite</td><td class="pass">114 passed, 4 expected CUDA skips.</td></tr>
+        <tr><td>CUDA suite</td><td class="pass">118 passed on NVIDIA GeForce RTX 5060 Ti.</td></tr>
+        <tr><td>Automatic field batch</td><td class="pass"><code>field-preview-400</code>: CUDA, 1.618 ms median, under 100 ms target.</td></tr>
+        <tr><td>Automatic trajectory</td><td class="pass"><code>trajectory-preview-400</code>: CPU JIT, 10.850 ms median, under 300 ms target.</td></tr>
+        <tr><td>Automatic field lines</td><td class="pass"><code>field-lines-preview</code>: CPU JIT, 16.828 ms median, under 250 ms target.</td></tr>
+        <tr><td>Portable archive</td><td><code>EMWorkbench-0.1.0-windows-x64-portable.zip</code>, 280419470 bytes, SHA-256 <code>D226CF316015394569B8A947A9D7136DC859481CE04EB31B70B192DC30E3C399</code>.</td></tr>
+        <tr><td>Portable CUDA contents</td><td class="pass">No optional CUDA package files found in the portable bundle.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>CUDA package installation can be unusually slow on this workstation because uv falls back from hard links to full copies across filesystems.</li>
+      <li>PyInstaller reports a missing optional <code>tbb12.dll</code> dependency for Numba's TBB pool. The packaged EXE self-check passes and Numba retains non-TBB execution paths.</li>
+      <li>PyInstaller also reports an upstream PySide6 QML plugin logging-format issue while collecting optional QML assets. The build and packaged EXE self-check pass.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Land the verified performance branch into the repository integration branch and synchronize it to GitHub.</p>
+  </main>
+</body>
+</html>

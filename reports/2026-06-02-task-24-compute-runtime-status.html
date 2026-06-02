@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 24 - Compute runtime status</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 24 - Compute runtime status</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T09:31:20+08:00">2026-06-02T09:31:20+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Added shared typed contracts for backend policy, runtime status, warm-up status, cache status, execution metadata, and field arrays.</li>
+      <li>Added a lazy runtime probe that always reports CPU details and degrades cleanly when CUDA is unavailable.</li>
+      <li>Added <code>GET /api/compute/status</code>.</li>
+      <li>Locked <code>numba</code> for CPU JIT work and optional <code>numba-cuda[cu12]</code> dependencies for NVIDIA acceleration.</li>
+      <li>Verified both the default CPU fallback path and the optional CUDA path on the local workstation.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>This task does not route solver work through Numba or CUDA. Packed scenes, CPU kernels, CUDA
+      kernels, dispatch policy, warm-up, field lines, UI status, and benchmarks remain scheduled in
+      later tasks.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>pyproject.toml</code>, <code>uv.lock</code>, <code>requirements.txt</code></td><td>Locked CPU and optional CUDA dependencies through project-local uv and exported the compatibility list.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/__init__.py</code></td><td>Introduced the compute package.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/contracts.py</code></td><td>Defined strict serializable compute contracts.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/runtime.py</code></td><td>Implemented CPU and lazy CUDA runtime probing.</td></tr>
+        <tr><td><code>src/em_workbench/app.py</code></td><td>Exposed the runtime status endpoint.</td></tr>
+        <tr><td><code>tests/test_compute_runtime.py</code>, <code>tests/test_app.py</code></td><td>Added probe and HTTP contract tests.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\scripts\bootstrap_uv.ps1</code></td><td class="pass">PASS: installed verified project-local uv 0.11.16 in the isolated worktree.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td class="pass">PASS: created the isolated default environment.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td class="pass">Baseline PASS: 81 tests, 2 dependency deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">Baseline PASS.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_compute_runtime.py tests/test_app.py::test_compute_status_reports_cpu_and_optional_cuda_runtime -q</code></td><td class="expected">Expected RED: <code>ModuleNotFoundError: No module named 'em_workbench.physics.compute'</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe add "numba&gt;=0.61,&lt;1"</code></td><td class="pass">PASS: resolved <code>numba==0.65.1</code> and <code>llvmlite==0.47.0</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe add --optional cuda "numba-cuda[cu12]"</code></td><td class="pass">PASS: resolved <code>numba-cuda==0.30.2</code> and CUDA 12.9 components.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe export --locked --all-groups --no-emit-project --output-file requirements.txt</code></td><td class="pass">PASS: regenerated the compatibility export.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td class="pass">PASS: removed optional CUDA packages for default-path verification.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_compute_runtime.py tests/test_app.py::test_compute_status_reports_cpu_and_optional_cuda_runtime -q</code></td><td class="pass">PASS: 2 tests in the default environment.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra cuda</code></td><td class="pass">PASS: installed optional CUDA packages.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -c "from em_workbench.physics.compute.runtime import probe_runtime; print(probe_runtime().model_dump_json(indent=2))"</code></td><td class="pass">PASS: detected <code>NVIDIA GeForce RTX 5060 Ti</code>, compute capability <code>12.0</code>.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider</code></td><td class="pass">PASS: 83 tests, 2 dependency deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS after splitting one overlong line.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Runtime evidence</h2>
+    <table>
+      <thead><tr><th>Environment</th><th>CPU</th><th>CUDA</th></tr></thead>
+      <tbody>
+        <tr><td>Default dependencies</td><td>16 logical processors</td><td><code>available=false</code>, fallback reason <code>CUDA runtime unavailable.</code></td></tr>
+        <tr><td><code>--extra cuda</code></td><td>16 logical processors</td><td><code>available=true</code>, <code>NVIDIA GeForce RTX 5060 Ti</code>, compute capability <code>12.0</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>The default <code>numba</code> package still permits importing <code>numba.cuda</code>, so the probe reports <code>installed=true</code> and <code>available=false</code> when the optional runtime extra is absent. Dispatch must use <code>available</code>, not <code>installed</code>.</li>
+      <li>The suite still reports two upstream WebSockets deprecation warnings.</li>
+      <li>The runtime status remains uncached until later warm-up and cache-management tasks.</li>
+    </ul>
+
+    <h2>Reference</h2>
+    <p>NVIDIA installation guidance: <a href="https://nvidia.github.io/numba-cuda/user/installation.html">Numba CUDA installation</a>.</p>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 2: compile scene models into immutable packed arrays and add the bounded packed-scene cache.</p>
+  </main>
+</body>
+</html>

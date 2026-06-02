@@ -11,6 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from em_workbench.models import Position, Preset, PresetSummary, Scene, SceneValidationResponse
+from em_workbench.physics.compute.contracts import ComputeStatus
+from em_workbench.physics.compute.runtime import probe_runtime
 from em_workbench.physics.dynamics import TestCharge, TrajectoryResponse, simulate_trajectory
 from em_workbench.physics.solver import FieldEvaluationResponse, SolverQuality, evaluate_scene
 from em_workbench.presets import get_preset, list_presets
@@ -137,6 +139,12 @@ def config() -> AppConfig:
 def presets() -> list[PresetSummary]:
     """Return loadable scene presets without solver output."""
     return list_presets()
+
+
+@app.get("/api/compute/status", response_model=ComputeStatus)
+def compute_status() -> ComputeStatus:
+    """Return CPU availability and optional CUDA runtime details."""
+    return probe_runtime()
 
 
 @app.get("/api/presets/{preset_id}", response_model=Preset)

@@ -11,6 +11,7 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page, expect, sync_playwright
 
 from em_workbench.app import app
+from em_workbench.desktop import _bridge_bootstrap_script
 
 
 @pytest.fixture(scope="module")
@@ -128,6 +129,22 @@ def _axis_tick_text_height(page: Page) -> float:
         "element => element.getBoundingClientRect().height"
     )
     return float(height)
+
+
+def test_desktop_bridge_bootstrap_waits_for_document_root(page: Page) -> None:
+    browser = page.context.browser
+    assert browser is not None
+    probe_context = browser.new_context()
+    probe_page = probe_context.new_page()
+    page_errors: list[str] = []
+    probe_page.on("pageerror", lambda error: page_errors.append(str(error)))
+    probe_page.add_init_script(_bridge_bootstrap_script())
+
+    probe_page.goto("data:text/html,<html><body>probe</body></html>", wait_until="load")
+    probe_page.wait_for_timeout(100)
+    probe_context.close()
+
+    assert page_errors == []
 
 
 def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -> None:

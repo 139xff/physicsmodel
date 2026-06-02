@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 28 - CPU JIT test-charge trajectory</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 28 - CPU JIT test-charge trajectory</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T13:58:41+08:00">2026-06-02T13:58:41+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Moved single-particle RK4 integration into a compiled Numba CPU kernel using packed electrostatic scenes.</li>
+      <li>Reused one compiled single-point field evaluator across total-field and trajectory kernels.</li>
+      <li>Preserved the scalar RK4 implementation as an explicit oracle for parity tests.</li>
+      <li>Added trajectory execution metadata, packed-scene cache reuse, record thinning, and CPU fallback metadata for explicit CUDA requests.</li>
+      <li>Kept automatic trajectory dispatch on CPU JIT because a single sequential RK4 path does not provide enough parallel work for a GPU launch.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>Backend field-line tracing, browser async field-line requests, warm-up controls, status UI,
+      desktop compute queuing, and formal multi-workload benchmarks remain scheduled in later tasks.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/em_workbench/physics/compute/cpu_backend.py</code></td><td>Shared single-point field evaluator and compiled RK4 trajectory kernel.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/dispatcher.py</code></td><td>Trajectory dispatch, metadata, packed-scene reuse, and scalar policy support.</td></tr>
+        <tr><td><code>src/em_workbench/physics/dynamics.py</code></td><td>Public compute-service facade plus retained scalar oracle.</td></tr>
+        <tr><td><code>tests/test_dynamics.py</code></td><td>Compiled/scalar parity, auto CPU selection, and record-thinning coverage.</td></tr>
+        <tr><td><code>tests/test_app.py</code></td><td>HTTP trajectory response execution metadata assertion.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_dynamics.py tests/test_app.py::test_trajectory_endpoint_simulates_test_charge_motion -q</code></td><td class="expected">Expected RED: scalar oracle export was not yet available.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_dynamics.py tests/test_app.py::test_trajectory_endpoint_simulates_test_charge_motion -q</code></td><td class="expected">Diagnostic RED: Numba rejected float32 RK4 assignments after Python literal promotion produced float64 arrays.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_dynamics.py::test_compiled_trajectory_matches_scalar_rk4_for_dipole -q</code></td><td class="pass">PASS after typed RK4 weights were supplied to the compiled kernel.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_dynamics.py tests/test_app.py::test_trajectory_endpoint_simulates_test_charge_motion tests/test_desktop_bridge.py::test_desktop_bridge_simulates_trajectory_without_http_server -q</code></td><td class="pass">PASS: 5 focused tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider -q</code></td><td class="pass">CPU-only PASS: 104 tests, 3 guarded CUDA skips, 2 upstream dependency deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS.</td></tr>
+        <tr><td><code>git diff --check</code></td><td class="pass">PASS.</td></tr>
+        <tr><td><code>@' ... 400-step warm benchmark ... '@ | .\.tools\uv\uv.exe run --locked --no-sync python -</code></td><td class="pass">PASS: compiled median 9.132 ms, compiled max 30.336 ms, scalar 8190.192 ms, measured warm speedup 896.9x.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Diagnostic notes</h2>
+    <ul>
+      <li>Numba could not unify float32 state arrays with float64 arrays created by RK4 expressions such as <code>dt_s / 2.0</code>. The kernel now receives typed half-step, one-sixth-step, and factor-two constants matching the packed-scene precision.</li>
+      <li>The benchmark warms the compiled trajectory once, measures ten compiled 400-step preview trajectories, then measures one scalar 400-step preview trajectory against the same representative scene.</li>
+    </ul>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>Trajectory integration remains single-particle and sequential. This is intentional for correctness and low overhead; multi-particle integration would need a separate parallel dispatch policy.</li>
+      <li>Explicit CUDA trajectory requests currently return CPU JIT results with a fallback reason because no CUDA trajectory kernel is exposed.</li>
+      <li>The suite still reports two upstream WebSockets deprecation warnings.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 6: add backend 2D field-line kernels and an HTTP API.</p>
+  </main>
+</body>
+</html>

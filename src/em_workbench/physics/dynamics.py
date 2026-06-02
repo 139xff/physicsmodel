@@ -25,7 +25,8 @@ from collections.abc import Iterable
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from em_workbench.models import Position, Scene
-from em_workbench.physics.solver import SolverQuality, evaluate_scene
+from em_workbench.physics.compute.contracts import BackendPolicy, ExecutionMetadata
+from em_workbench.physics.solver import SolverQuality, evaluate_scene_scalar
 from em_workbench.physics.vectors import Vector3
 
 
@@ -63,6 +64,7 @@ class TrajectoryResponse(DynamicsModel):
     step_count: int
     samples: list[TrajectorySample]
     warnings: list[str] = Field(default_factory=list)
+    execution: ExecutionMetadata | None = None
 
 
 def _vec(p: Position | Vector3) -> Vector3:
@@ -75,7 +77,11 @@ def _pos(v: Vector3) -> Position:
 
 def field_at(scene: Scene, point: Vector3, quality: SolverQuality) -> Vector3:
     """Read the total electric field E (V/m) at one point by reusing the solver."""
-    response = evaluate_scene(scene, [Position(x=point.x, y=point.y, z=point.z)], quality=quality)
+    response = evaluate_scene_scalar(
+        scene,
+        [Position(x=point.x, y=point.y, z=point.z)],
+        quality=quality,
+    )
     e = response.samples[0].field_v_per_m
     return Vector3.from_components(e.x, e.y, e.z)
 
@@ -88,6 +94,32 @@ def acceleration(
 
 
 def simulate_trajectory(
+    scene: Scene,
+    particle: TestCharge,
+    *,
+    dt_s: float,
+    steps: int,
+    quality: SolverQuality = "preview",
+    record_every: int = 1,
+    request_id: str | None = None,
+    backend: BackendPolicy = "auto",
+) -> TrajectoryResponse:
+    """Integrate a test charge through the selected compute backend."""
+    from em_workbench.physics.compute.dispatcher import DEFAULT_COMPUTE_SERVICE
+
+    return DEFAULT_COMPUTE_SERVICE.simulate_trajectory(
+        scene,
+        particle,
+        dt_s=dt_s,
+        steps=steps,
+        quality=quality,
+        record_every=record_every,
+        request_id=request_id,
+        backend=backend,
+    )
+
+
+def simulate_trajectory_scalar(
     scene: Scene,
     particle: TestCharge,
     *,

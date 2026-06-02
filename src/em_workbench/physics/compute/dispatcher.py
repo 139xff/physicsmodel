@@ -16,6 +16,7 @@ from em_workbench.physics.compute.contracts import (
 from em_workbench.physics.compute.cpu_backend import (
     evaluate_contributions_cpu,
     evaluate_totals_cpu,
+    evaluate_trajectory_cpu,
 )
 from em_workbench.physics.compute.cuda_backend import (
     CudaUnavailable,
@@ -68,6 +69,7 @@ class ComputeService:
         self.cuda_probe = cuda_probe or _cuda_status
         self._cpu_warm = False
         self._cuda_warm = False
+        self._trajectory_warm = False
 
     def evaluate_totals(
         self,
@@ -223,6 +225,123 @@ class ComputeService:
                 warm=warm,
                 compute_ms=compute_ms,
                 total_ms=(time.perf_counter() - started) * 1000.0,
+            ),
+        )
+
+    def simulate_trajectory(
+        self,
+        scene,
+        particle,
+        *,
+        dt_s: float,
+        steps: int,
+        quality: SolverQuality = "preview",
+        record_every: int = 1,
+        request_id: str | None = None,
+        backend: BackendPolicy = "auto",
+    ):
+        from em_workbench.physics.dynamics import (
+            TrajectoryResponse,
+            TrajectorySample,
+            simulate_trajectory_scalar,
+        )
+
+        if dt_s <= 0.0:
+            raise ValueError("dt_s must be positive.")
+        if steps < 1:
+            raise ValueError("steps must be at least 1.")
+        if record_every < 1:
+            raise ValueError("record_every must be at least 1.")
+        started = time.perf_counter()
+        if backend == "scalar":
+            scalar = simulate_trajectory_scalar(
+                scene,
+                particle,
+                dt_s=dt_s,
+                steps=steps,
+                quality=quality,
+                record_every=record_every,
+                request_id=request_id,
+            )
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            return scalar.model_copy(
+                update={
+                    "execution": self._execution_metadata(
+                        backend_requested=backend,
+                        backend_effective="scalar",
+                        precision="float64",
+                        scene_cache_hit=False,
+                        warm=True,
+                        compute_ms=elapsed_ms,
+                        total_ms=elapsed_ms,
+                    )
+                }
+            )
+        packed, cache_hit = self.packed_scene_cache.get_or_compile(scene, quality=quality)
+        fallback_reason = None
+        if backend == "cuda":
+            fallback_reason = "CUDA trajectory backend unavailable; using CPU JIT."
+        elif backend == "auto":
+            cuda_status = self.cuda_probe()
+            if not cuda_status.available:
+                fallback_reason = cuda_status.fallback_reason
+        initial_position = np.asarray(
+            [particle.position.x, particle.position.y, particle.position.z],
+            dtype=packed.dtype,
+        )
+        initial_velocity = np.asarray(
+            [particle.velocity.x, particle.velocity.y, particle.velocity.z],
+            dtype=packed.dtype,
+        )
+        warm = self._trajectory_warm
+        compute_started = time.perf_counter()
+        times, positions, velocities, fields = evaluate_trajectory_cpu(
+            packed,
+            initial_position,
+            initial_velocity,
+            charge_over_mass=particle.charge_c / particle.mass_kg,
+            dt_s=dt_s,
+            steps=steps,
+            record_every=record_every,
+        )
+        compute_ms = (time.perf_counter() - compute_started) * 1000.0
+        self._trajectory_warm = True
+        charge_over_mass = particle.charge_c / particle.mass_kg
+        samples = [
+            TrajectorySample(
+                t_s=float(time_s),
+                position=Position(x=float(position[0]), y=float(position[1]), z=float(position[2])),
+                velocity=Position(x=float(velocity[0]), y=float(velocity[1]), z=float(velocity[2])),
+                acceleration=Position(
+                    x=float(field[0] * charge_over_mass),
+                    y=float(field[1] * charge_over_mass),
+                    z=float(field[2] * charge_over_mass),
+                ),
+                field_v_per_m=Position(x=float(field[0]), y=float(field[1]), z=float(field[2])),
+                field_magnitude_v_per_m=float(math.sqrt(float(np.dot(field, field)))),
+            )
+            for time_s, position, velocity, field in zip(
+                times,
+                positions,
+                velocities,
+                fields,
+                strict=True,
+            )
+        ]
+        return TrajectoryResponse(
+            request_id=request_id,
+            dt_s=dt_s,
+            step_count=steps,
+            samples=samples,
+            execution=self._execution_metadata(
+                backend_requested=backend,
+                backend_effective="cpu-jit",
+                precision=self._precision(packed),
+                scene_cache_hit=cache_hit,
+                warm=warm,
+                compute_ms=compute_ms,
+                total_ms=(time.perf_counter() - started) * 1000.0,
+                fallback_reason=fallback_reason,
             ),
         )
 

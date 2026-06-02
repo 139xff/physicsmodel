@@ -145,6 +145,7 @@ def test_trajectory_endpoint_simulates_test_charge_motion():
     assert trajectory["step_count"] == 8
     assert len(trajectory["samples"]) == 9
     assert trajectory["samples"][0]["position"] != trajectory["samples"][-1]["position"]
+    assert trajectory["execution"]["backend_effective"] == "cpu-jit"
 
 
 def test_compute_status_reports_cpu_and_optional_cuda_runtime() -> None:

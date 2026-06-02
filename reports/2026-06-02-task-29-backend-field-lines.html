@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 29 - Backend 2D field-line kernels</title>
+  <style>
+    body { color: #182230; font-family: system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 1120px; padding: 0 1rem; }
+    h1, h2 { color: #101828; }
+    table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+    th, td { border: 1px solid #d0d5dd; padding: 0.65rem; text-align: left; vertical-align: top; }
+    th { background: #f2f4f7; }
+    code { background: #f2f4f7; overflow-wrap: anywhere; padding: 0.1rem 0.25rem; }
+    .pass { color: #067647; font-weight: 700; }
+    .expected { color: #b54708; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 29 - Backend 2D field-line kernels</h1>
+    <p><strong>Completed:</strong> <time datetime="2026-06-02T14:23:31+08:00">2026-06-02T14:23:31+08:00</time></p>
+
+    <h2>Scope delivered</h2>
+    <ul>
+      <li>Added strict render-ready 2D field-line DTOs and viewport validation.</li>
+      <li>Added absolute-charge-weighted point-source ray allocation with bounded per-source density.</li>
+      <li>Added CPU <code>prange</code> and CUDA one-thread-per-candidate adaptive RK4 trace kernels with shared fixed-array output and stop codes.</li>
+      <li>Added singularity handling, self-approach detection, viewport termination, charged-source endpoint classification, direction-quality filtering, source-pair caps, and display caps.</li>
+      <li>Added workload-aware dispatcher integration with CUDA fallback metadata and <code>POST /api/field/lines</code>.</li>
+      <li>Verified CUDA field-line execution on an NVIDIA GeForce RTX 5060 Ti with compute capability 12.0.</li>
+    </ul>
+
+    <h2>Scope deferred</h2>
+    <p>The browser still uses its synchronous JavaScript tracer. Async browser requests, UI loading
+      state, warm-up, desktop queueing, and formal cross-workload benchmarks remain scheduled.</p>
+
+    <h2>Changed files</h2>
+    <table>
+      <thead><tr><th>Path</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/em_workbench/physics/compute/field_lines.py</code></td><td>DTOs, candidate generation, response assembly, and public facade.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/cpu_backend.py</code></td><td>Parallel CPU adaptive RK4 field-line kernel.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/cuda_backend.py</code></td><td>CUDA adaptive RK4 field-line kernel and device transfer wrapper.</td></tr>
+        <tr><td><code>src/em_workbench/physics/compute/dispatcher.py</code></td><td>CPU/CUDA field-line selection, fallback, timing, and metadata.</td></tr>
+        <tr><td><code>src/em_workbench/app.py</code></td><td>Typed HTTP field-line request and route.</td></tr>
+        <tr><td><code>tests/test_field_lines.py</code></td><td>CPU contract, API, fallback, and guarded hardware parity tests.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Commands and outcomes</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_field_lines.py -q</code></td><td class="expected">Expected RED: <code>field_lines.py</code> did not exist.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_field_lines.py -q</code></td><td class="pass">CPU-only PASS: 3 tests and 1 guarded CUDA skip.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked --extra cuda</code></td><td class="expected">Initial command exceeded the 10-minute tool timeout while installing extra packages. A subsequent locked sync completed in milliseconds after the original process exited.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -c "from em_workbench.physics.compute.runtime import probe_runtime; print(probe_runtime().cuda.model_dump_json(indent=2))"</code></td><td class="pass">PASS: RTX 5060 Ti, compute capability 12.0.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_field_lines.py -q</code></td><td class="pass">CUDA PASS: 4 tests including hardware parity.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider tests/test_field_lines.py tests/test_app.py -q</code></td><td class="pass">CUDA PASS: 13 focused tests.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider -q</code></td><td class="pass">CUDA-extra PASS: 111 tests, 4 warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe sync --locked</code></td><td class="pass">PASS: restored the default CPU-only environment.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -m pytest -p no:cacheprovider -q</code></td><td class="pass">CPU-only PASS: 107 tests, 4 guarded CUDA skips, 2 upstream dependency deprecation warnings.</td></tr>
+        <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check --no-cache src tests scripts</code></td><td class="pass">PASS.</td></tr>
+        <tr><td><code>git diff --check</code></td><td class="pass">PASS.</td></tr>
+        <tr><td><code>@' ... warm CPU field-line benchmark ... '@ | .\.tools\uv\uv.exe run --locked --no-sync python -</code></td><td class="pass">PASS: 96 candidates, 54 displayed lines, 18.477 ms warm median and 20.101 ms warm maximum across ten runs.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Diagnostic notes</h2>
+    <ul>
+      <li>Candidate-index diagnostics compared CPU and CUDA raw fixed arrays: all 96 stop codes matched and the maximum terminal-point deviation was <code>0.000105 m</code>.</li>
+      <li>The initial response parity assertion exposed an ambiguous DTO interpretation. <code>source_id</code> now consistently identifies the seed source; negative-source paths are still point-ordered along the physical electric-field direction for rendering.</li>
+    </ul>
+
+    <h2>Known risks or limitations</h2>
+    <ul>
+      <li>The backend applies source-pair and display caps but does not yet reproduce the browser tracer's full spatial segment-conflict index. Browser migration remains a separate task.</li>
+      <li>The 96-candidate CUDA trace launches one block and triggers a Numba low-occupancy warning. Task 9 will measure CPU/CUDA crossover behavior and tune automatic selection.</li>
+      <li>Only charged point sources seed and terminate backend 2D field lines. Other source kinds still contribute to the traced field.</li>
+    </ul>
+
+    <h2>Next scheduled task</h2>
+    <p>Task 7: replace synchronous browser CPU field-line tracing with async backend requests.</p>
+  </main>
+</body>
+</html>

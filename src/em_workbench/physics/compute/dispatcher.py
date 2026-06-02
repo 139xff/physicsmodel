@@ -15,6 +15,7 @@ from em_workbench.physics.compute.contracts import (
 )
 from em_workbench.physics.compute.cpu_backend import (
     evaluate_contributions_cpu,
+    evaluate_field_lines_cpu,
     evaluate_totals_cpu,
     evaluate_trajectory_cpu,
 )
@@ -69,6 +70,8 @@ class ComputeService:
         self.cuda_probe = cuda_probe or _cuda_status
         self._cpu_warm = False
         self._cuda_warm = False
+        self._field_lines_warm = False
+        self._cuda_field_lines_warm = False
         self._trajectory_warm = False
 
     def evaluate_totals(
@@ -343,6 +346,111 @@ class ComputeService:
                 total_ms=(time.perf_counter() - started) * 1000.0,
                 fallback_reason=fallback_reason,
             ),
+        )
+
+    def trace_field_lines(
+        self,
+        scene: Scene,
+        bounds,
+        *,
+        request_id: str | None = None,
+        quality: SolverQuality = "preview",
+        density: float = 1.0,
+        display_max_count: int = 120,
+        backend: BackendPolicy = "auto",
+    ):
+        from em_workbench.physics.compute.field_lines import (
+            build_field_line_inputs,
+            build_field_line_response,
+        )
+
+        if display_max_count < 1 or display_max_count > 500:
+            raise ValueError("display_max_count must be between 1 and 500.")
+        started = time.perf_counter()
+        packed, cache_hit = self.packed_scene_cache.get_or_compile(scene, quality=quality)
+        inputs = build_field_line_inputs(scene, density=density, dtype=packed.dtype)
+        effective_backend, fallback_reason, cuda_status = self._select_backend(
+            operation="field-lines",
+            sample_count=inputs.candidate_count,
+            backend=backend,
+        )
+        bounds_tuple = (bounds.min_x, bounds.max_x, bounds.min_y, bounds.max_y)
+        if effective_backend == "scalar":
+            effective_backend = "cpu-jit"
+            fallback_reason = "Scalar field-line backend unavailable; using CPU JIT."
+        if effective_backend == "cuda" and inputs.candidate_count > 0:
+            from em_workbench.physics.compute.cuda_backend import evaluate_field_lines_cuda
+
+            warm = self._cuda_field_lines_warm
+            compute_started = time.perf_counter()
+            try:
+                result, device_cache_hit = evaluate_field_lines_cuda(
+                    packed,
+                    inputs.seeds,
+                    inputs.trace_directions,
+                    inputs.seed_source_indexes,
+                    inputs.terminal_positions,
+                    inputs.terminal_charges,
+                    inputs.terminal_source_indexes,
+                    bounds=bounds_tuple,
+                    device_cache=self.device_scene_cache,
+                )
+            except Exception as error:
+                effective_backend = "cpu-jit"
+                fallback_reason = self._cuda_failure_reason(error)
+            else:
+                compute_ms = (time.perf_counter() - compute_started) * 1000.0
+                self._cuda_field_lines_warm = True
+                execution = self._execution_metadata(
+                    backend_requested=backend,
+                    backend_effective="cuda",
+                    device=(cuda_status.device_name if cuda_status else None) or "CUDA",
+                    precision=self._precision(packed),
+                    scene_cache_hit=cache_hit,
+                    device_cache_hit=device_cache_hit,
+                    warm=warm,
+                    compute_ms=compute_ms,
+                    total_ms=(time.perf_counter() - started) * 1000.0,
+                )
+                return build_field_line_response(
+                    scene,
+                    inputs,
+                    result,
+                    execution=execution,
+                    request_id=request_id,
+                    display_max_count=display_max_count,
+                )
+        warm = self._field_lines_warm
+        compute_started = time.perf_counter()
+        result = evaluate_field_lines_cpu(
+            packed,
+            inputs.seeds,
+            inputs.trace_directions,
+            inputs.seed_source_indexes,
+            inputs.terminal_positions,
+            inputs.terminal_charges,
+            inputs.terminal_source_indexes,
+            bounds=bounds_tuple,
+        )
+        compute_ms = (time.perf_counter() - compute_started) * 1000.0
+        self._field_lines_warm = True
+        execution = self._execution_metadata(
+            backend_requested=backend,
+            backend_effective="cpu-jit",
+            precision=self._precision(packed),
+            scene_cache_hit=cache_hit,
+            warm=warm,
+            compute_ms=compute_ms,
+            total_ms=(time.perf_counter() - started) * 1000.0,
+            fallback_reason=fallback_reason,
+        )
+        return build_field_line_response(
+            scene,
+            inputs,
+            result,
+            execution=execution,
+            request_id=request_id,
+            display_max_count=display_max_count,
         )
 
     @staticmethod

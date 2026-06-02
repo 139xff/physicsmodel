@@ -11,7 +11,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from em_workbench.models import Position, Preset, PresetSummary, Scene, SceneValidationResponse
-from em_workbench.physics.compute.contracts import ComputeStatus
+from em_workbench.physics.compute.contracts import BackendPolicy, ComputeStatus
+from em_workbench.physics.compute.field_lines import (
+    FieldLineResponse,
+    ViewportBounds,
+    trace_field_lines,
+)
 from em_workbench.physics.compute.runtime import probe_runtime
 from em_workbench.physics.dynamics import TestCharge, TrajectoryResponse, simulate_trajectory
 from em_workbench.physics.solver import FieldEvaluationResponse, SolverQuality, evaluate_scene
@@ -88,6 +93,18 @@ class TrajectoryEvaluateRequest(BaseModel):
     steps: int = Field(ge=1, le=5000)
     quality: SolverQuality = "preview"
     record_every: int = Field(default=1, ge=1)
+
+
+class FieldLineEvaluateRequest(BaseModel):
+    """Render-ready 2D electric-field line request from the static client."""
+
+    request_id: str = Field(min_length=1)
+    scene: Scene
+    bounds: ViewportBounds
+    quality: SolverQuality = "preview"
+    density: float = Field(default=1.0, gt=0.0, le=4.0)
+    display_max_count: int = Field(default=120, ge=1, le=500)
+    backend: BackendPolicy = "auto"
 
 
 def _vendor_version() -> str:
@@ -189,6 +206,20 @@ def evaluate_trajectory(request: TrajectoryEvaluateRequest) -> TrajectoryRespons
         quality=request.quality,
         record_every=request.record_every,
         request_id=request.request_id,
+    )
+
+
+@app.post("/api/field/lines", response_model=FieldLineResponse)
+def evaluate_field_lines(request: FieldLineEvaluateRequest) -> FieldLineResponse:
+    """Trace render-ready 2D electric-field lines through the compute backend."""
+    return trace_field_lines(
+        request.scene,
+        request.bounds,
+        request_id=request.request_id,
+        quality=request.quality,
+        density=request.density,
+        display_max_count=request.display_max_count,
+        backend=request.backend,
     )
 
 

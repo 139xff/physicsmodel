@@ -15,6 +15,7 @@ const button2d = document.querySelector("#view-2d-button");
 const button3d = document.querySelector("#view-3d-button");
 const panToolButton = document.querySelector("#pan-tool");
 const toggleFieldLinesButton = document.querySelector("#toggle-field-lines");
+const toggleEquipotentialLinesButton = document.querySelector("#toggle-equipotential-lines");
 const addInfinitePlaneButton = document.querySelector("#add-infinite-plane");
 const addSphericalShellButton = document.querySelector("#add-spherical-shell");
 const pointSourceForm = document.querySelector("#point-source-form");
@@ -63,6 +64,7 @@ const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2
 const VIEWPORT_MIN_ZOOM = 1;
 const DEFAULT_VIEW_ZOOM = 100;
 const POINT_VISUAL_RADIUS_CM = 0.5;
+const COULOMB_CONSTANT = 8.9875517923e9;
 const RING_DISPLAY_RADIUS_UNITS = 0.2;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const MAX_AXIS_TICKS = 36;
@@ -124,6 +126,30 @@ const FIELD_LINE_ARROW_FRACTION_MAX = 0.72;
 const FIELD_LINE_ARROW_LENGTH_PX = 9;
 const FIELD_LINE_ARROW_WIDTH_PX = 7;
 const ENABLE_LEGACY_FIELD_LINE_DEBUG_COMPARISON = false;
+const EQUIPOTENTIAL_GRID_TARGET_PX = 8;
+const EQUIPOTENTIAL_GRID_MIN_SIZE = 42;
+const EQUIPOTENTIAL_GRID_MAX_SIZE = 128;
+const EQUIPOTENTIAL_TARGET_LEVEL_COUNT = 18;
+const EQUIPOTENTIAL_MAX_LEVEL_COUNT = 32;
+const EQUIPOTENTIAL_MAX_RENDER_PATHS = 140;
+const EQUIPOTENTIAL_MIN_PATH_POINTS = 6;
+const EQUIPOTENTIAL_MIN_PATH_LENGTH_PX = 24;
+const EQUIPOTENTIAL_SINGULARITY_RADIUS_M = POINT_VISUAL_RADIUS_CM / 100 + 0.001;
+const EQUIPOTENTIAL_LABEL_MAX_COUNT = 48;
+const EQUIPOTENTIAL_LABEL_MIN_PATH_LENGTH_PX = 90;
+const EQUIPOTENTIAL_LABEL_DOUBLE_MIN_PATH_LENGTH_PX = 620;
+const EQUIPOTENTIAL_LABEL_FONT_RATIO = 0.84;
+const EQUIPOTENTIAL_LABEL_PADDING_PX = 4;
+const EQUIPOTENTIAL_LABEL_COLLISION_PADDING_PX = 7;
+const EQUIPOTENTIAL_LABEL_WIDTH_FACTOR = 0.62;
+const EQUIPOTENTIAL_LABEL_LOCAL_SAMPLE_PX = 20;
+const EQUIPOTENTIAL_LABEL_STRAIGHTNESS_MIN_DOT = 0.55;
+const EQUIPOTENTIAL_LABEL_EDGE_MARGIN_PX = 12;
+const EQUIPOTENTIAL_LABEL_CANDIDATE_FRACTIONS = [0.5, 0.42, 0.58, 0.34, 0.66];
+const EQUIPOTENTIAL_LABEL_DOUBLE_FRACTIONS = [
+  [0.34, 0.3, 0.38, 0.26],
+  [0.66, 0.7, 0.62, 0.74],
+];
 
 const state = {
   mode: "2D",
@@ -149,6 +175,7 @@ const state = {
   showFieldLines: false,
   fieldLineResult: null,
   fieldLineRequestId: "",
+  showEquipotentials: false,
   lastResult: null,
   overlayResult: null,
   overlaySamples: [],
@@ -165,6 +192,11 @@ let fieldLineTraceCache = {
   result: null,
 };
 
+let equipotentialTraceCache = {
+  key: "",
+  result: null,
+};
+
 const modeStates = {
   "2D": {
     sourceIndex: { ...state.sourceIndex },
@@ -176,6 +208,7 @@ const modeStates = {
     showFieldLines: state.showFieldLines,
     fieldLineResult: state.fieldLineResult,
     fieldLineRequestId: state.fieldLineRequestId,
+    showEquipotentials: state.showEquipotentials,
   },
   "3D": {
     sourceIndex: {
@@ -199,6 +232,7 @@ const modeStates = {
     showFieldLines: false,
     fieldLineResult: null,
     fieldLineRequestId: "",
+    showEquipotentials: false,
   },
 };
 
@@ -230,6 +264,7 @@ function saveModeState(mode = state.mode) {
     showFieldLines: state.showFieldLines,
     fieldLineResult: state.fieldLineResult,
     fieldLineRequestId: state.fieldLineRequestId,
+    showEquipotentials: state.showEquipotentials,
   };
 }
 
@@ -244,6 +279,7 @@ function loadModeState(mode) {
   state.showFieldLines = Boolean(modeState.showFieldLines);
   state.fieldLineResult = modeState.fieldLineResult || null;
   state.fieldLineRequestId = modeState.fieldLineRequestId || "";
+  state.showEquipotentials = Boolean(modeState.showEquipotentials);
 }
 function formatNumber(value, digits = 3) {
   if (!Number.isFinite(value)) {
@@ -402,6 +438,7 @@ function addSource(kind, overrides = {}) {
   state.scene.sources.push(sourceDefaults(kind, overrides));
   fieldLineTraceCache = { key: "", result: null };
   state.fieldLineResult = null;
+  equipotentialTraceCache = { key: "", result: null };
   renderAll();
   scheduleEvaluation();
 }
@@ -446,6 +483,7 @@ function removeSource(sourceId) {
   state.scene.sources = state.scene.sources.filter((source) => source.id !== sourceId);
   fieldLineTraceCache = { key: "", result: null };
   state.fieldLineResult = null;
+  equipotentialTraceCache = { key: "", result: null };
   if (state.scene.sources.length === 0) {
     setEmptyComputationState();
   }
@@ -471,6 +509,7 @@ function updateSource(sourceId, field, value) {
 
   fieldLineTraceCache = { key: "", result: null };
   state.fieldLineResult = null;
+  equipotentialTraceCache = { key: "", result: null };
   renderAll();
   scheduleEvaluation();
 }
@@ -583,6 +622,19 @@ function toggleFieldLines() {
     }
   }
   renderOverlaySummary();
+}
+
+function toggleEquipotentials() {
+  state.showEquipotentials = !state.showEquipotentials;
+  render2d();
+  renderOverlaySummary();
+}
+
+function renderOverlayControls() {
+  toggleFieldLinesButton.classList.toggle("active", state.showFieldLines);
+  toggleFieldLinesButton.textContent = state.showFieldLines ? "隐藏电场" : "显示电场";
+  toggleEquipotentialLinesButton.classList.toggle("active", state.showEquipotentials);
+  toggleEquipotentialLinesButton.textContent = state.showEquipotentials ? "隐藏等势线" : "显示等势线";
 }
 
 function potentialColor(potential, maxAbs) {
@@ -1163,6 +1215,37 @@ function electricField2dAt(x, y, fieldSamples) {
     },
     { x: 0, y: 0 },
   );
+}
+
+function pointChargeSingularities2d() {
+  return state.scene.sources.filter((source) => (
+    source.kind === "point" &&
+    source.position &&
+    Math.abs(sourceChargeValue(source)) > 1e-30
+  ));
+}
+
+function isNearEquipotentialSingularity(x, y, singularities) {
+  return singularities.some((source) => (
+    Math.hypot(x - source.position.x, y - source.position.y) <= EQUIPOTENTIAL_SINGULARITY_RADIUS_M
+  ));
+}
+
+function electricPotential2dAt(x, y, fieldSamples, singularities) {
+  if (isNearEquipotentialSingularity(x, y, singularities)) {
+    return null;
+  }
+  let potential = 0;
+  for (const sample of fieldSamples) {
+    const dx = x - sample.x;
+    const dy = y - sample.y;
+    const distance = Math.hypot(dx, dy);
+    if (!Number.isFinite(distance) || distance <= FIELD_LINE_SINGULARITY_RADIUS_M) {
+      return null;
+    }
+    potential += (COULOMB_CONSTANT * sample.charge) / distance;
+  }
+  return Number.isFinite(potential) ? potential : null;
 }
 
 function fieldLineDirectionAt(x, y, traceDirection, fieldSamples) {
@@ -2409,6 +2492,668 @@ function backendFieldLineTraceResult(result, fieldSamples, seedSources, stepMetr
   };
 }
 
+function compute2dVisibleWorldBounds() {
+  const viewBox = compute2dViewBox();
+  const worldBounds = compute2dWorldBounds();
+  const minX = viewBox.minX / VIEWPORT_METERS_TO_UNITS;
+  const maxX = (viewBox.minX + viewBox.width) / VIEWPORT_METERS_TO_UNITS;
+  const minY = -(viewBox.minY + viewBox.height) / VIEWPORT_METERS_TO_UNITS;
+  const maxY = -viewBox.minY / VIEWPORT_METERS_TO_UNITS;
+  return {
+    minX: Math.max(worldBounds.minX, minX),
+    maxX: Math.min(worldBounds.maxX, maxX),
+    minY: Math.max(worldBounds.minY, minY),
+    maxY: Math.min(worldBounds.maxY, maxY),
+  };
+}
+
+function clampInteger(value, minValue, maxValue) {
+  return Math.max(minValue, Math.min(maxValue, Math.round(value)));
+}
+
+function equipotentialGridSize(scale) {
+  return {
+    columns: clampInteger(scale.widthPx / EQUIPOTENTIAL_GRID_TARGET_PX, EQUIPOTENTIAL_GRID_MIN_SIZE, EQUIPOTENTIAL_GRID_MAX_SIZE),
+    rows: clampInteger(scale.heightPx / EQUIPOTENTIAL_GRID_TARGET_PX, EQUIPOTENTIAL_GRID_MIN_SIZE, EQUIPOTENTIAL_GRID_MAX_SIZE),
+  };
+}
+
+function equipotentialCacheKey(fieldSamples, singularities, bounds, gridSize) {
+  return JSON.stringify({
+    sources: state.scene.sources,
+    fieldSampleCount: fieldSamples.length,
+    singularityIds: singularities.map((source) => source.id),
+    bounds: {
+      minX: Number(bounds.minX.toFixed(5)),
+      maxX: Number(bounds.maxX.toFixed(5)),
+      minY: Number(bounds.minY.toFixed(5)),
+      maxY: Number(bounds.maxY.toFixed(5)),
+    },
+    gridSize,
+    targetLevelCount: EQUIPOTENTIAL_TARGET_LEVEL_COUNT,
+    maxLevelCount: EQUIPOTENTIAL_MAX_LEVEL_COUNT,
+  });
+}
+
+function percentile(sortedValues, fraction) {
+  if (sortedValues.length === 0) {
+    return 0;
+  }
+  const index = (sortedValues.length - 1) * Math.max(0, Math.min(1, fraction));
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) {
+    return sortedValues[lower];
+  }
+  const t = index - lower;
+  return sortedValues[lower] * (1 - t) + sortedValues[upper] * t;
+}
+
+function nicePotentialStep(rawStep) {
+  if (!Number.isFinite(rawStep) || rawStep <= 0) {
+    return 1;
+  }
+  const exponent = Math.floor(Math.log10(rawStep));
+  const base = 10 ** exponent;
+  for (const multiplier of [1, 2, 5, 10]) {
+    const step = multiplier * base;
+    if (rawStep <= step) {
+      return step;
+    }
+  }
+  return 10 * base;
+}
+
+function sampleEquipotentialGrid(fieldSamples, singularities, bounds, gridSize) {
+  const { columns, rows } = gridSize;
+  const values = [];
+  const finiteValues = [];
+  const dx = (bounds.maxX - bounds.minX) / Math.max(1, columns - 1);
+  const dy = (bounds.maxY - bounds.minY) / Math.max(1, rows - 1);
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const x = bounds.minX + column * dx;
+      const y = bounds.minY + row * dy;
+      const value = electricPotential2dAt(x, y, fieldSamples, singularities);
+      values.push(value);
+      if (Number.isFinite(value)) {
+        finiteValues.push(value);
+      }
+    }
+  }
+  return { values, finiteValues, dx, dy };
+}
+
+function chooseEquipotentialLevels(finiteValues) {
+  if (finiteValues.length < 4) {
+    return { levels: [], step: 0, min: 0, max: 0 };
+  }
+  const sorted = [...finiteValues].sort((a, b) => a - b);
+  let low = percentile(sorted, 0.08);
+  let high = percentile(sorted, 0.92);
+  if (!Number.isFinite(low) || !Number.isFinite(high) || high <= low) {
+    low = sorted[0];
+    high = sorted[sorted.length - 1];
+  }
+  const span = high - low;
+  if (!Number.isFinite(span) || span <= 1e-12) {
+    return { levels: [], step: 0, min: low, max: high };
+  }
+  const step = nicePotentialStep(span / EQUIPOTENTIAL_TARGET_LEVEL_COUNT);
+  const levels = [];
+  let value = Math.ceil(low / step) * step;
+  while (value <= high + step * 0.001 && levels.length < EQUIPOTENTIAL_MAX_LEVEL_COUNT) {
+    if (Math.abs(value) > step * 1e-8) {
+      levels.push(value);
+    } else {
+      levels.push(0);
+    }
+    value += step;
+  }
+  return { levels: [...new Set(levels.map((level) => Number(level.toPrecision(12))))], step, min: low, max: high };
+}
+
+function gridPoint(bounds, grid, column, row) {
+  return {
+    x: bounds.minX + column * grid.dx,
+    y: bounds.minY + row * grid.dy,
+  };
+}
+
+function contourEdgePoint(edgeIndex, corners, level) {
+  const edgeCorners = [
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 0],
+  ][edgeIndex];
+  const first = corners[edgeCorners[0]];
+  const second = corners[edgeCorners[1]];
+  const denominator = second.value - first.value;
+  const t = Math.abs(denominator) <= 1e-12 ? 0.5 : (level - first.value) / denominator;
+  const clamped = Math.max(0, Math.min(1, t));
+  return {
+    x: first.x + (second.x - first.x) * clamped,
+    y: first.y + (second.y - first.y) * clamped,
+  };
+}
+
+const MARCHING_SQUARES_SEGMENTS = {
+  1: [[3, 0]],
+  2: [[0, 1]],
+  3: [[3, 1]],
+  4: [[1, 2]],
+  5: [[3, 2], [0, 1]],
+  6: [[0, 2]],
+  7: [[3, 2]],
+  8: [[2, 3]],
+  9: [[0, 2]],
+  10: [[0, 3], [1, 2]],
+  11: [[1, 2]],
+  12: [[1, 3]],
+  13: [[0, 1]],
+  14: [[3, 0]],
+};
+
+function contourSegmentsForLevel(level, bounds, grid, gridSize) {
+  const { columns, rows } = gridSize;
+  const segments = [];
+  const valueAt = (column, row) => grid.values[row * columns + column];
+  for (let row = 0; row < rows - 1; row += 1) {
+    for (let column = 0; column < columns - 1; column += 1) {
+      const corners = [
+        { ...gridPoint(bounds, grid, column, row), value: valueAt(column, row) },
+        { ...gridPoint(bounds, grid, column + 1, row), value: valueAt(column + 1, row) },
+        { ...gridPoint(bounds, grid, column + 1, row + 1), value: valueAt(column + 1, row + 1) },
+        { ...gridPoint(bounds, grid, column, row + 1), value: valueAt(column, row + 1) },
+      ];
+      if (!corners.every((corner) => Number.isFinite(corner.value))) {
+        continue;
+      }
+      const caseIndex = corners.reduce(
+        (index, corner, cornerIndex) => index | (corner.value >= level ? 1 << cornerIndex : 0),
+        0,
+      );
+      const edgePairs = MARCHING_SQUARES_SEGMENTS[caseIndex];
+      if (!edgePairs) {
+        continue;
+      }
+      for (const [firstEdge, secondEdge] of edgePairs) {
+        const first = contourEdgePoint(firstEdge, corners, level);
+        const second = contourEdgePoint(secondEdge, corners, level);
+        if (Math.hypot(first.x - second.x, first.y - second.y) > 1e-10) {
+          segments.push([first, second]);
+        }
+      }
+    }
+  }
+  return segments;
+}
+
+function contourPointKey(point, tolerance) {
+  return `${Math.round(point.x / tolerance)}:${Math.round(point.y / tolerance)}`;
+}
+
+function segmentKey(firstKey, secondKey) {
+  return firstKey < secondKey ? `${firstKey}|${secondKey}` : `${secondKey}|${firstKey}`;
+}
+
+function linkContourSegments(segments, tolerance) {
+  const nodes = new Map();
+  const edges = new Map();
+  for (const [first, second] of segments) {
+    const firstKey = contourPointKey(first, tolerance);
+    const secondKey = contourPointKey(second, tolerance);
+    if (firstKey === secondKey) {
+      continue;
+    }
+    if (!nodes.has(firstKey)) {
+      nodes.set(firstKey, { point: first, neighbors: new Set() });
+    }
+    if (!nodes.has(secondKey)) {
+      nodes.set(secondKey, { point: second, neighbors: new Set() });
+    }
+    nodes.get(firstKey).neighbors.add(secondKey);
+    nodes.get(secondKey).neighbors.add(firstKey);
+    edges.set(segmentKey(firstKey, secondKey), false);
+  }
+
+  const paths = [];
+  const walk = (startKey, nextKey) => {
+    const path = [nodes.get(startKey).point];
+    let previousKey = startKey;
+    let currentKey = nextKey;
+    while (currentKey) {
+      const edgeId = segmentKey(previousKey, currentKey);
+      if (edges.get(edgeId)) {
+        break;
+      }
+      edges.set(edgeId, true);
+      path.push(nodes.get(currentKey).point);
+      const currentNode = nodes.get(currentKey);
+      const nextCandidates = [...currentNode.neighbors].filter((candidateKey) => (
+        candidateKey !== previousKey && !edges.get(segmentKey(currentKey, candidateKey))
+      ));
+      if (nextCandidates.length === 0) {
+        break;
+      }
+      previousKey = currentKey;
+      currentKey = nextCandidates[0];
+      if (currentKey === startKey) {
+        const closingEdgeId = segmentKey(previousKey, currentKey);
+        if (!edges.get(closingEdgeId)) {
+          edges.set(closingEdgeId, true);
+          path.push(nodes.get(currentKey).point);
+        }
+        break;
+      }
+    }
+    return path;
+  };
+
+  for (const [nodeKey, node] of nodes) {
+    if (node.neighbors.size === 2) {
+      continue;
+    }
+    for (const neighborKey of node.neighbors) {
+      if (!edges.get(segmentKey(nodeKey, neighborKey))) {
+        paths.push(walk(nodeKey, neighborKey));
+      }
+    }
+  }
+
+  for (const [edgeId, visited] of edges) {
+    if (visited) {
+      continue;
+    }
+    const [startKey, nextKey] = edgeId.split("|");
+    paths.push(walk(startKey, nextKey));
+  }
+
+  return paths.filter((path) => path.length >= EQUIPOTENTIAL_MIN_PATH_POINTS);
+}
+
+function worldPathLength(points) {
+  let length = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    length += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+  }
+  return length;
+}
+
+function smoothViewportPath(points) {
+  const viewportPoints = points.map((point) => mapToViewport(point.x, point.y));
+  if (viewportPoints.length < 2) {
+    return "";
+  }
+  if (viewportPoints.length === 2) {
+    return `M ${viewportPoints[0].x.toFixed(3)} ${viewportPoints[0].y.toFixed(3)} L ${viewportPoints[1].x.toFixed(3)} ${viewportPoints[1].y.toFixed(3)}`;
+  }
+  const commands = [`M ${viewportPoints[0].x.toFixed(3)} ${viewportPoints[0].y.toFixed(3)}`];
+  for (let index = 0; index < viewportPoints.length - 1; index += 1) {
+    const p0 = viewportPoints[Math.max(0, index - 1)];
+    const p1 = viewportPoints[index];
+    const p2 = viewportPoints[index + 1];
+    const p3 = viewportPoints[Math.min(viewportPoints.length - 1, index + 2)];
+    const c1 = {
+      x: p1.x + (p2.x - p0.x) / 6,
+      y: p1.y + (p2.y - p0.y) / 6,
+    };
+    const c2 = {
+      x: p2.x - (p3.x - p1.x) / 6,
+      y: p2.y - (p3.y - p1.y) / 6,
+    };
+    commands.push(
+      `C ${c1.x.toFixed(3)} ${c1.y.toFixed(3)} ${c2.x.toFixed(3)} ${c2.y.toFixed(3)} ${p2.x.toFixed(3)} ${p2.y.toFixed(3)}`,
+    );
+  }
+  return commands.join(" ");
+}
+
+function formatPotentialLabel(value, step) {
+  if (!Number.isFinite(value)) {
+    return "n/a V";
+  }
+  if (Math.abs(value) <= Math.max(Math.abs(step) * 1e-8, 1e-12)) {
+    return "0 V";
+  }
+  const absValue = Math.abs(value);
+  if (absValue >= 10000 || absValue < 0.01) {
+    return `${formatNumber(value, 3)} V`;
+  }
+  const precision = Math.min(3, Math.max(0, decimalPlacesForStep(Math.abs(step || value))));
+  return `${value.toFixed(precision).replace(/\.?0+$/, "")} V`;
+}
+
+function worldPointToScreen(point, viewBox, scale) {
+  const viewportPoint = mapToViewport(point.x, point.y);
+  return {
+    x: (viewportPoint.x - viewBox.minX) / scale.xUnitsPerPx,
+    y: (viewportPoint.y - viewBox.minY) / scale.yUnitsPerPx,
+    viewportX: viewportPoint.x,
+    viewportY: viewportPoint.y,
+  };
+}
+
+function equipotentialPathScreenPoints(points, viewBox, scale) {
+  return points.map((point) => ({
+    world: point,
+    ...worldPointToScreen(point, viewBox, scale),
+  }));
+}
+
+function screenPolylineLength(points) {
+  let length = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    length += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+  }
+  return length;
+}
+
+function screenPointAtLength(points, targetLength) {
+  let consumed = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const segmentLength = Math.hypot(current.x - previous.x, current.y - previous.y);
+    if (segmentLength <= 1e-9) {
+      continue;
+    }
+    if (consumed + segmentLength >= targetLength) {
+      const t = (targetLength - consumed) / segmentLength;
+      return {
+        x: previous.x + (current.x - previous.x) * t,
+        y: previous.y + (current.y - previous.y) * t,
+        viewportX: previous.viewportX + (current.viewportX - previous.viewportX) * t,
+        viewportY: previous.viewportY + (current.viewportY - previous.viewportY) * t,
+        tangentX: current.x - previous.x,
+        tangentY: current.y - previous.y,
+      };
+    }
+    consumed += segmentLength;
+  }
+  return null;
+}
+
+function normalizedScreenAngle(tangentX, tangentY) {
+  let angle = (Math.atan2(tangentY, tangentX) * 180) / Math.PI;
+  if (angle > 90) {
+    angle -= 180;
+  } else if (angle < -90) {
+    angle += 180;
+  }
+  return angle;
+}
+
+function equipotentialLabelBox(text, center, angle, scale) {
+  const fontPx = scale.fontPx * EQUIPOTENTIAL_LABEL_FONT_RATIO;
+  const width = Math.max(26, text.length * fontPx * EQUIPOTENTIAL_LABEL_WIDTH_FACTOR) +
+    EQUIPOTENTIAL_LABEL_PADDING_PX * 2;
+  const height = fontPx * 1.35 + EQUIPOTENTIAL_LABEL_PADDING_PX * 2;
+  return {
+    x: center.x - width / 2 - EQUIPOTENTIAL_LABEL_COLLISION_PADDING_PX,
+    y: center.y - height / 2 - EQUIPOTENTIAL_LABEL_COLLISION_PADDING_PX,
+    width: width + EQUIPOTENTIAL_LABEL_COLLISION_PADDING_PX * 2,
+    height: height + EQUIPOTENTIAL_LABEL_COLLISION_PADDING_PX * 2,
+    rawWidth: width,
+    rawHeight: height,
+    angle,
+  };
+}
+
+function boxesOverlap(first, second) {
+  return !(
+    first.x + first.width < second.x ||
+    second.x + second.width < first.x ||
+    first.y + first.height < second.y ||
+    second.y + second.height < first.y
+  );
+}
+
+function boxInsideViewport(box, scale) {
+  return (
+    box.x >= EQUIPOTENTIAL_LABEL_EDGE_MARGIN_PX &&
+    box.y >= EQUIPOTENTIAL_LABEL_EDGE_MARGIN_PX &&
+    box.x + box.width <= scale.widthPx - EQUIPOTENTIAL_LABEL_EDGE_MARGIN_PX &&
+    box.y + box.height <= scale.heightPx - EQUIPOTENTIAL_LABEL_EDGE_MARGIN_PX
+  );
+}
+
+function equipotentialSourceObstacleBoxes(singularities, viewBox, scale) {
+  return singularities.map((source) => {
+    const center = worldPointToScreen(source.position, viewBox, scale);
+    const radiusPx = POINT_VISUAL_RADIUS_CM / Math.max(1e-6, scale.xUnitsPerPx);
+    const size = radiusPx * 2 + 42;
+    return {
+      x: center.x - size / 2,
+      y: center.y - size / 2,
+      width: size,
+      height: size,
+    };
+  });
+}
+
+function labelLocalStraightness(points, targetLength, totalLength) {
+  const before = screenPointAtLength(points, Math.max(0, targetLength - EQUIPOTENTIAL_LABEL_LOCAL_SAMPLE_PX));
+  const center = screenPointAtLength(points, targetLength);
+  const after = screenPointAtLength(points, Math.min(totalLength, targetLength + EQUIPOTENTIAL_LABEL_LOCAL_SAMPLE_PX));
+  if (!before || !center || !after) {
+    return 0;
+  }
+  const first = { x: center.x - before.x, y: center.y - before.y };
+  const second = { x: after.x - center.x, y: after.y - center.y };
+  const firstMagnitude = Math.hypot(first.x, first.y);
+  const secondMagnitude = Math.hypot(second.x, second.y);
+  if (firstMagnitude <= 1e-9 || secondMagnitude <= 1e-9) {
+    return 0;
+  }
+  return (first.x / firstMagnitude) * (second.x / secondMagnitude) +
+    (first.y / firstMagnitude) * (second.y / secondMagnitude);
+}
+
+function equipotentialLabelCandidate(entry, text, screenPoints, totalLength, fraction, scale, boxes) {
+  const targetLength = totalLength * fraction;
+  if (labelLocalStraightness(screenPoints, targetLength, totalLength) < EQUIPOTENTIAL_LABEL_STRAIGHTNESS_MIN_DOT) {
+    return null;
+  }
+  const point = screenPointAtLength(screenPoints, targetLength);
+  if (!point) {
+    return null;
+  }
+  const tangentMagnitude = Math.hypot(point.tangentX, point.tangentY);
+  if (tangentMagnitude <= 1e-9) {
+    return null;
+  }
+  const angle = normalizedScreenAngle(point.tangentX, point.tangentY);
+  const box = equipotentialLabelBox(text, point, angle, scale);
+  if (!boxInsideViewport(box, scale) || boxes.some((candidateBox) => boxesOverlap(box, candidateBox))) {
+    return null;
+  }
+  return {
+    level: entry.level,
+    text,
+    x: point.viewportX,
+    y: point.viewportY,
+    angle,
+    box,
+    widthUnits: box.rawWidth * scale.xUnitsPerPx,
+    heightUnits: box.rawHeight * scale.yUnitsPerPx,
+    fontSizeUnits: scale.fontPx * EQUIPOTENTIAL_LABEL_FONT_RATIO * scale.yUnitsPerPx,
+  };
+}
+
+function buildEquipotentialLabels(paths, step, scale, singularities) {
+  const viewBox = compute2dViewBox();
+  const acceptedBoxes = equipotentialSourceObstacleBoxes(singularities, viewBox, scale);
+  const labels = [];
+  for (const entry of paths) {
+    if (labels.length >= EQUIPOTENTIAL_LABEL_MAX_COUNT) {
+      break;
+    }
+    const screenPoints = equipotentialPathScreenPoints(entry.points, viewBox, scale);
+    const totalLength = screenPolylineLength(screenPoints);
+    if (totalLength < EQUIPOTENTIAL_LABEL_MIN_PATH_LENGTH_PX) {
+      continue;
+    }
+    const text = formatPotentialLabel(entry.level, step);
+    const fractionGroups = totalLength >= EQUIPOTENTIAL_LABEL_DOUBLE_MIN_PATH_LENGTH_PX
+      ? EQUIPOTENTIAL_LABEL_DOUBLE_FRACTIONS
+      : [EQUIPOTENTIAL_LABEL_CANDIDATE_FRACTIONS];
+    for (const fractions of fractionGroups) {
+      if (labels.length >= EQUIPOTENTIAL_LABEL_MAX_COUNT) {
+        break;
+      }
+      let accepted = null;
+      for (const fraction of fractions) {
+        accepted = equipotentialLabelCandidate(entry, text, screenPoints, totalLength, fraction, scale, acceptedBoxes);
+        if (accepted) {
+          break;
+        }
+      }
+      if (accepted) {
+        labels.push(accepted);
+        acceptedBoxes.push(accepted.box);
+      }
+    }
+  }
+  return labels;
+}
+
+function renderEquipotentialLabels(labels) {
+  if (labels.length === 0) {
+    return '<g class="equipotential-label-layer" data-testid="equipotential-label-layer" data-equipotential-label-count="0"></g>';
+  }
+  const markup = labels.map((label) => {
+    const rectX = -label.widthUnits / 2;
+    const rectY = -label.heightUnits / 2;
+    return `
+      <g
+        class="equipotential-label"
+        data-testid="equipotential-label-2d"
+        data-potential-v="${label.level.toPrecision(6)}"
+        data-label-text="${escapeHtml(label.text)}"
+        data-label-angle="${label.angle.toFixed(2)}"
+        transform="translate(${label.x.toFixed(3)} ${label.y.toFixed(3)}) rotate(${label.angle.toFixed(2)})"
+      >
+        <rect
+          class="equipotential-label-bg"
+          x="${rectX.toFixed(3)}"
+          y="${rectY.toFixed(3)}"
+          width="${label.widthUnits.toFixed(3)}"
+          height="${label.heightUnits.toFixed(3)}"
+          rx="${(label.heightUnits * 0.28).toFixed(3)}"
+        ></rect>
+        <text
+          class="equipotential-label-text"
+          x="0"
+          y="0"
+          style="font-size: ${label.fontSizeUnits.toFixed(3)}px;"
+        >${escapeHtml(label.text)}</text>
+      </g>
+    `;
+  });
+  return `
+    <g
+      class="equipotential-label-layer"
+      data-testid="equipotential-label-layer"
+      data-equipotential-label-count="${labels.length}"
+      data-label-style="contour-inline"
+    >
+      ${markup.join("")}
+    </g>
+  `;
+}
+
+function computeEquipotentialTraceResult(fieldSamples, singularities, bounds, gridSize, scale) {
+  const grid = sampleEquipotentialGrid(fieldSamples, singularities, bounds, gridSize);
+  const levelData = chooseEquipotentialLevels(grid.finiteValues);
+  const rawPaths = [];
+  const minLengthMeters = (EQUIPOTENTIAL_MIN_PATH_LENGTH_PX * ((scale.xUnitsPerPx + scale.yUnitsPerPx) / 2)) /
+    VIEWPORT_METERS_TO_UNITS;
+  const tolerance = Math.max(grid.dx, grid.dy) * 0.55;
+  for (const level of levelData.levels) {
+    const segments = contourSegmentsForLevel(level, bounds, grid, gridSize);
+    const linkedPaths = linkContourSegments(segments, tolerance);
+    for (const points of linkedPaths) {
+      const length = worldPathLength(points);
+      if (length < minLengthMeters) {
+        continue;
+      }
+      rawPaths.push({
+        level,
+        points,
+        length,
+      });
+    }
+  }
+  rawPaths.sort((a, b) => b.length - a.length);
+  return {
+    paths: rawPaths.slice(0, EQUIPOTENTIAL_MAX_RENDER_PATHS),
+    rawPathCount: rawPaths.length,
+    levelCount: levelData.levels.length,
+    step: levelData.step,
+    minPotential: levelData.min,
+    maxPotential: levelData.max,
+    finiteSampleCount: grid.finiteValues.length,
+    gridSize,
+  };
+}
+
+function getEquipotentialTraceResult(fieldSamples, singularities, bounds, gridSize, scale) {
+  const key = equipotentialCacheKey(fieldSamples, singularities, bounds, gridSize);
+  if (equipotentialTraceCache.key === key && equipotentialTraceCache.result) {
+    return equipotentialTraceCache.result;
+  }
+  const result = computeEquipotentialTraceResult(fieldSamples, singularities, bounds, gridSize, scale);
+  equipotentialTraceCache = { key, result };
+  return result;
+}
+
+function renderEquipotentialLines2d(scale) {
+  if (!state.showEquipotentials) {
+    return '<g data-testid="equipotential-layer" data-equipotential-count="0" data-enabled="false"></g>';
+  }
+  const fieldSamples = state.scene.sources.flatMap((source) => sourceChargeSamples2d(source));
+  const singularities = pointChargeSingularities2d();
+  if (fieldSamples.length === 0) {
+    return '<g data-testid="equipotential-layer" data-equipotential-count="0" data-enabled="true"></g>';
+  }
+  const bounds = compute2dVisibleWorldBounds();
+  const gridSize = equipotentialGridSize(scale);
+  const traceResult = getEquipotentialTraceResult(fieldSamples, singularities, bounds, gridSize, scale);
+  const labels = buildEquipotentialLabels(traceResult.paths, traceResult.step, scale, singularities);
+  const paths = traceResult.paths.map((entry) => `
+    <path
+      class="equipotential-line"
+      data-testid="equipotential-line-2d"
+      data-potential-v="${entry.level.toPrecision(6)}"
+      data-path-model="marching-squares-catmull-rom"
+      data-point-count="${entry.points.length}"
+      d="${smoothViewportPath(entry.points)}"
+    ></path>
+  `);
+  return `
+    <g
+      class="equipotential-layer"
+      data-testid="equipotential-layer"
+      data-enabled="true"
+      data-equipotential-count="${paths.length}"
+      data-equipotential-label-count="${labels.length}"
+      data-raw-equipotential-count="${traceResult.rawPathCount}"
+      data-level-count="${traceResult.levelCount}"
+      data-auto-delta-v="${formatNumber(traceResult.step, 5)}"
+      data-grid-columns="${traceResult.gridSize.columns}"
+      data-grid-rows="${traceResult.gridSize.rows}"
+      data-method="marching-squares"
+      data-linking="segment-graph"
+      data-singularity-radius-m="${EQUIPOTENTIAL_SINGULARITY_RADIUS_M}"
+    >
+      ${paths.join("")}
+      ${renderEquipotentialLabels(labels)}
+    </g>
+  `;
+}
+
 function renderFieldLines2d(scale) {
   if (!state.showFieldLines) {
     return '<g data-testid="field-line-layer" data-field-line-count="0" data-enabled="false"></g>';
@@ -2509,6 +3254,7 @@ function renderFieldLines2d(scale) {
 function renderOverlay2d(scale) {
   return `
     <g data-testid="overlay-vector-layer" data-vector-count="0"></g>
+    ${renderEquipotentialLines2d(scale)}
     ${renderFieldLines2d(scale)}
   `;
 }
@@ -3020,17 +3766,28 @@ function renderResult() {
 }
 
 function renderOverlaySummary() {
-  if (state.showFieldLines) {
+  if (state.showFieldLines || state.showEquipotentials) {
     const lineCount = view2d.querySelectorAll("[data-testid='field-line-2d']").length;
-    overlayStatus.textContent = state.scene.sources.length === 0 ? "等待源" : `电场线 ${lineCount} 条`;
-    overlaySummary.textContent = lineCount > 0
-      ? "二维视图已显示电场线；方向按合电场追踪，箭头表示电场方向。"
-      : "当前二维源不足以生成电场线。";
+    const equipotentialCount = view2d.querySelectorAll("[data-testid='equipotential-line-2d']").length;
+    overlayStatus.textContent = state.scene.sources.length === 0
+      ? "等待源"
+      : `电场线 ${lineCount} 条；等势线 ${equipotentialCount} 条`;
+    if (state.showFieldLines && state.showEquipotentials) {
+      overlaySummary.textContent = "二维视图已显示电场线和等势线；电场线沿合电场方向，等势线来自自动 ΔV 的电势等值线。";
+    } else if (state.showFieldLines) {
+      overlaySummary.textContent = lineCount > 0
+        ? "二维视图已显示电场线；方向按合电场追踪，箭头表示电场方向。"
+        : "当前二维源不足以生成电场线。";
+    } else {
+      overlaySummary.textContent = equipotentialCount > 0
+        ? "二维视图已显示等势线；相邻线的电势差由系统自动选择。"
+        : "当前二维源不足以生成等势线。";
+    }
     return;
   }
   if (!state.overlayResult) {
     overlayStatus.textContent = state.scene.sources.length === 0 ? "等待源" : overlayStatus.textContent;
-    overlaySummary.textContent = "点击“显示电场”后，二维视图会显示电场线。";
+    overlaySummary.textContent = "点击“显示电场”或“显示等势线”后，二维视图会显示对应的可视化。";
     return;
   }
   const magnitudes = state.overlayResult.samples.map((sample) => sample.field_magnitude_v_per_m);
@@ -3055,6 +3812,7 @@ function renderAll(options = {}) {
   }
   renderResult();
   renderOverlaySummary();
+  renderOverlayControls();
 }
 
 function setEmptyComputationState() {
@@ -3070,7 +3828,7 @@ function setEmptyComputationState() {
   fieldMagnitudeValue.textContent = "暂无";
   contributionList.innerHTML = "<li>还没有源贡献。</li>";
   warningList.innerHTML = "<li>暂无提示。</li>";
-  overlaySummary.textContent = "点击“显示电场”后，二维视图会显示电场线。";
+  overlaySummary.textContent = "点击“显示电场”或“显示等势线”后，二维视图会显示对应的可视化。";
   render2d();
 }
 
@@ -3274,6 +4032,9 @@ async function loadSelectedPreset() {
   state.lastResult = null;
   state.overlayResult = null;
   state.fieldLineResult = null;
+  state.fieldLineRequestId = "";
+  fieldLineTraceCache = { key: "", result: null };
+  equipotentialTraceCache = { key: "", result: null };
   refreshSourceIndexes();
   presetStatus.textContent = `已加载：${preset.title}。`;
   renderAll();
@@ -3322,8 +4083,11 @@ view2d.addEventListener("pointerup", end2dPan);
 view2d.addEventListener("pointercancel", end2dPan);
 toggleFieldLinesButton.addEventListener("click", () => {
   toggleFieldLines();
-  toggleFieldLinesButton.classList.toggle("active", state.showFieldLines);
-  toggleFieldLinesButton.textContent = state.showFieldLines ? "隐藏电场" : "显示电场";
+  renderOverlayControls();
+});
+toggleEquipotentialLinesButton.addEventListener("click", () => {
+  toggleEquipotentials();
+  renderOverlayControls();
 });
 probeForm.addEventListener("submit", measureProbeFromInputs);
 probeForm.addEventListener("input", () => {

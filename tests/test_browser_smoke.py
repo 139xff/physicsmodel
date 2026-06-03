@@ -747,6 +747,88 @@ def test_browser_discards_stale_field_line_response_after_zoom(page: Page) -> No
     expect(field_line_layer).to_have_attribute("data-rendered-request-id", request_ids[1])
 
 
+def test_browser_equipotential_lines_use_auto_delta_v_and_probe_potential(page: Page) -> None:
+    _add_point_charge(page, x_cm="-11", y_cm="0", charge_c="1e-9")
+    _add_point_charge(page, x_cm="11", y_cm="0", charge_c="-1e-9")
+
+    page.locator("#toggle-equipotential-lines").click()
+    equipotential_layer = page.get_by_test_id("equipotential-layer")
+    expect(equipotential_layer).to_have_attribute("data-enabled", "true")
+    expect(equipotential_layer).to_have_attribute("data-method", "marching-squares")
+    expect(equipotential_layer).to_have_attribute("data-linking", "segment-graph")
+    expect(equipotential_layer).not_to_have_attribute("data-auto-delta-v", "0")
+    equipotential_count = int(equipotential_layer.get_attribute("data-equipotential-count") or "0")
+    label_count = int(equipotential_layer.get_attribute("data-equipotential-label-count") or "0")
+    level_count = int(equipotential_layer.get_attribute("data-level-count") or "0")
+    assert 0 < equipotential_count <= 140
+    assert 0 < label_count <= 48
+    assert 0 < level_count <= 32
+    expect(page.get_by_test_id("equipotential-line-2d")).to_have_count(equipotential_count)
+    expect(page.get_by_test_id("equipotential-label-2d")).to_have_count(label_count)
+    expect(page.get_by_test_id("equipotential-label-layer")).to_have_attribute(
+        "data-label-style",
+        "contour-inline",
+    )
+    path_models = page.get_by_test_id("equipotential-line-2d").evaluate_all(
+        """
+        nodes => nodes.map((node) => ({
+            model: node.getAttribute("data-path-model"),
+            path: node.getAttribute("d"),
+            value: Number(node.getAttribute("data-potential-v")),
+        }))
+        """
+    )
+    assert all(item["model"] == "marching-squares-catmull-rom" for item in path_models)
+    assert all(" C " in item["path"] for item in path_models)
+    assert all(abs(item["value"]) >= 0 for item in path_models)
+    label_metrics = page.get_by_test_id("equipotential-label-2d").evaluate_all(
+        """
+        nodes => {
+            const boxes = nodes.map((node) => {
+                const rect = node.getBoundingClientRect();
+                return {
+                    text: node.getAttribute("data-label-text"),
+                    transform: node.getAttribute("transform"),
+                    width: rect.width,
+                    height: rect.height,
+                    left: rect.left,
+                    right: rect.right,
+                    top: rect.top,
+                    bottom: rect.bottom,
+                };
+            });
+            let overlapPairs = 0;
+            for (let i = 0; i < boxes.length; i += 1) {
+                for (let j = i + 1; j < boxes.length; j += 1) {
+                    const first = boxes[i];
+                    const second = boxes[j];
+                    const separated = first.right < second.left ||
+                        second.right < first.left ||
+                        first.bottom < second.top ||
+                        second.bottom < first.top;
+                    if (!separated) {
+                        overlapPairs += 1;
+                    }
+                }
+            }
+            return {
+                boxes,
+                overlapPairs,
+            };
+        }
+        """
+    )
+    assert label_metrics["overlapPairs"] == 0
+    assert all("V" in item["text"] for item in label_metrics["boxes"])
+    assert all("NaN" not in item["transform"] for item in label_metrics["boxes"])
+    assert all(item["width"] > 0 and item["height"] > 0 for item in label_metrics["boxes"])
+
+    page.locator("#probe-x").fill("0")
+    page.locator("#probe-y").fill("3")
+    page.locator("#probe-submit").click()
+    expect(page.get_by_test_id("potential-value")).to_contain_text("V")
+
+
 def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) -> None:
     _add_point_charge(page, x_cm="-11", y_cm="0", charge_c="1e-9")
     _add_point_charge(page, x_cm="11", y_cm="0", charge_c="-1e-9")

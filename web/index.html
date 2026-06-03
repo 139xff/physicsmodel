@@ -13,7 +13,7 @@
       }
     }
   </script>
-  <script type="module" src="./app.js?v=20260601-field-tangent-lines"></script>
+  <script type="module" src="./app.js?v=20260603-equipotentials-c-unit"></script>
 </head>
 <body>
   <div class="workbench">
@@ -138,6 +138,7 @@
           <dl class="measurement-results">
             <div><dt>电场 E</dt><dd id="field-vector-value">暂无</dd></div>
             <div><dt>电场强度 |E|</dt><dd data-testid="field-magnitude-value">暂无</dd></div>
+            <div><dt>电势 V</dt><dd data-testid="potential-value">暂无</dd></div>
           </dl>
         </section>
 
@@ -172,9 +173,10 @@
             </select>
           </label>
           <button id="toggle-field-lines" class="field-lines-toggle" type="button">显示电场</button>
+          <button id="toggle-equipotential-lines" class="field-lines-toggle" type="button">显示等势线</button>
           <p class="status-value" data-testid="overlay-status">等待源</p>
           <p class="overlay-summary" data-testid="overlay-summary">
-            点击“显示电场”后，二维视图会显示电场线。
+            点击“显示电场”或“显示等势线”后，二维视图会显示对应的可视化。
           </p>
         </section>
 

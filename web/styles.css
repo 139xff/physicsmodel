@@ -732,6 +732,44 @@ summary:focus-visible {
   pointer-events: none;
 }
 
+.equipotential-layer {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.equipotential-line {
+  fill: none;
+  stroke: #4b5563;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.85;
+  vector-effect: non-scaling-stroke;
+}
+
+.equipotential-label-layer,
+.equipotential-label {
+  pointer-events: none;
+}
+
+.equipotential-label-bg {
+  fill: rgba(255, 255, 255, 0.9);
+  stroke: rgba(75, 85, 99, 0.28);
+  stroke-width: 0.12;
+  vector-effect: non-scaling-stroke;
+}
+
+.equipotential-label-text {
+  dominant-baseline: central;
+  fill: #374151;
+  font-weight: 720;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-linejoin: round;
+  stroke-width: 0.28;
+  text-anchor: middle;
+  vector-effect: non-scaling-stroke;
+}
+
 .field-line {
   fill: none;
   stroke: #14532d;

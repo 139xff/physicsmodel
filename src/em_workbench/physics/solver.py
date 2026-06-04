@@ -19,6 +19,14 @@ from em_workbench.models import (
     SphericalShellSource,
 )
 from em_workbench.physics.compute.contracts import BackendPolicy, ExecutionMetadata
+from em_workbench.physics.integration import (
+    disk_charge_c,
+    disk_elements,
+    line_charge_c,
+    line_segment_elements,
+    ring_charge_c,
+    ring_elements,
+)
 from em_workbench.physics.vectors import ZERO_VECTOR, Vector3, orthonormal_basis_from_normal
 
 EPSILON_0 = 8.854_187_812_8e-12
@@ -246,42 +254,40 @@ def _ring_contribution(
     sample: Vector3,
     segment_count: int,
 ) -> SourceContribution:
-    charge_c = _ring_charge_c(source)
     center = Vector3.from_position(source.position)
-    axis_u, axis_v, unit_normal = orthonormal_basis_from_normal(
+    _axis_u, _axis_v, unit_normal = orthonormal_basis_from_normal(
         Vector3.from_position(source.normal)
     )
-    dq = charge_c / segment_count
     potential = 0.0
     field = ZERO_VECTOR
     warnings: list[str] = [
         (
-            f"Source {source.id} ring uses a {segment_count}-segment finite-segment "
-            "approximation; analytic ring precision is not claimed off axis."
+            f"Source {source.id} ring uses {segment_count} point-charge nodes for "
+            "quadrature integration; this finite-segment approximation preserves the "
+            "near-singular trend but does not claim analytic precision off axis."
         )
     ]
     if _sample_is_near_ring(source, sample, center, unit_normal):
         warnings.append(
-            f"Sample is near source {source.id} ring geometry; finite-segment result is "
-            "near singular and should be treated as a limitation."
+            f"Sample is near source {source.id} ring geometry; quadrature result is near "
+            "singular and should be treated as a limitation."
         )
-    for index in range(segment_count):
-        angle = 2.0 * math.pi * (index + 0.5) / segment_count
-        charge_position = center + axis_u.scale(math.cos(angle) * source.radius_m)
-        charge_position = charge_position + axis_v.scale(math.sin(angle) * source.radius_m)
+    for element in ring_elements(source, segment_count):
         partial = _point_charge_contribution(
             source_id=source.id,
             source_kind=source.kind,
-            charge_c=dq,
-            charge_position=charge_position,
+            charge_c=element.charge_c,
+            charge_position=element.position,
             sample=sample,
-            metadata={"method": "discrete-ring-segment"},
+            metadata={"method": "integrated-ring-node"},
         )
         potential += partial.potential_v
         field = field + Vector3.from_sample(partial.field_v_per_m)
         warnings.extend(partial.warnings)
     metadata: dict[str, MetadataValue] = {
-        "method": "discrete-ring",
+        "method": "integrated-ring",
+        "quadrature": "uniform-azimuthal",
+        "integration_nodes": segment_count,
         "segments": segment_count,
         "radius_m": source.radius_m,
     }
@@ -295,41 +301,38 @@ def _line_segment_contribution(
     sample: Vector3,
     segment_count: int,
 ) -> SourceContribution:
-    charge_c = _line_charge_c(source)
     center = Vector3.from_position(source.position)
     axis = Vector3.from_position(source.orientation).normalized()
-    dq = charge_c / segment_count
-    step = source.length_m / segment_count
-    start_offset = -0.5 * source.length_m + 0.5 * step
     potential = 0.0
     field = ZERO_VECTOR
     warnings = [
         (
-            f"Source {source.id} line_segment uses a {segment_count}-segment numerical "
-            "approximation; analytic finite-line precision is not claimed."
+            f"Source {source.id} line_segment uses {segment_count} Gauss-Legendre "
+            "point-charge nodes for quadrature integration; numerical approximation "
+            "near the charged segment is intentionally left steep."
         )
     ]
     if _sample_is_near_line_segment(source, sample, center, axis):
         warnings.append(
-            f"Sample is near source {source.id} line_segment geometry; finite-segment "
-            "result is near singular and should be treated as a limitation."
+            f"Sample is near source {source.id} line_segment geometry; quadrature result "
+            "is near singular and should be treated as a limitation."
         )
-    for index in range(segment_count):
-        charge_position = center + axis.scale(start_offset + index * step)
+    for element in line_segment_elements(source, segment_count):
         partial = _point_charge_contribution(
             source_id=source.id,
             source_kind=source.kind,
-            charge_c=dq,
-            charge_position=charge_position,
+            charge_c=element.charge_c,
+            charge_position=element.position,
             sample=sample,
-            metadata={"method": "discrete-line-segment"},
+            metadata={"method": "integrated-line-segment-node"},
         )
         potential += partial.potential_v
         field = field + Vector3.from_sample(partial.field_v_per_m)
         warnings.extend(partial.warnings)
     metadata: dict[str, MetadataValue] = {
-        "method": "discrete-line-segment",
-        "segments": segment_count,
+        "method": "integrated-line-segment",
+        "quadrature": "gauss-legendre",
+        "integration_nodes": segment_count,
         "length_m": source.length_m,
     }
     return _contribution(
@@ -343,42 +346,33 @@ def _disk_contribution(
     radial_segments: int,
     angular_segments: int,
 ) -> SourceContribution:
-    charge_c = _disk_charge_c(source)
-    surface_density = charge_c / (math.pi * source.radius_m**2)
-    center = Vector3.from_position(source.position)
-    axis_u, axis_v, _unit_normal = orthonormal_basis_from_normal(
-        Vector3.from_position(source.normal)
-    )
-    dr = source.radius_m / radial_segments
-    dtheta = 2.0 * math.pi / angular_segments
     potential = 0.0
     field = ZERO_VECTOR
+    integration_nodes = radial_segments * angular_segments
     warnings = [
         (
-            f"Source {source.id} disk uses a {radial_segments}x{angular_segments} "
-            "midpoint numerical approximation; analytic disk precision is not claimed."
+            f"Source {source.id} disk uses {radial_segments}x{angular_segments} "
+            "Gauss-Legendre radial by uniform-azimuthal point-charge nodes for "
+            "quadrature integration; numerical approximation near the disk is "
+            "intentionally left steep."
         )
     ]
-    for radial_index in range(radial_segments):
-        radius = (radial_index + 0.5) * dr
-        dq = surface_density * radius * dr * dtheta
-        for angular_index in range(angular_segments):
-            angle = (angular_index + 0.5) * dtheta
-            charge_position = center + axis_u.scale(math.cos(angle) * radius)
-            charge_position = charge_position + axis_v.scale(math.sin(angle) * radius)
-            partial = _point_charge_contribution(
-                source_id=source.id,
-                source_kind=source.kind,
-                charge_c=dq,
-                charge_position=charge_position,
-                sample=sample,
-                metadata={"method": "discrete-disk-patch"},
-            )
-            potential += partial.potential_v
-            field = field + Vector3.from_sample(partial.field_v_per_m)
-            warnings.extend(partial.warnings)
+    for element in disk_elements(source, radial_segments, angular_segments):
+        partial = _point_charge_contribution(
+            source_id=source.id,
+            source_kind=source.kind,
+            charge_c=element.charge_c,
+            charge_position=element.position,
+            sample=sample,
+            metadata={"method": "integrated-disk-node"},
+        )
+        potential += partial.potential_v
+        field = field + Vector3.from_sample(partial.field_v_per_m)
+        warnings.extend(partial.warnings)
     metadata: dict[str, MetadataValue] = {
-        "method": "discrete-disk",
+        "method": "integrated-disk",
+        "quadrature": "gauss-legendre-radial-uniform-azimuthal",
+        "integration_nodes": integration_nodes,
         "radial_segments": radial_segments,
         "angular_segments": angular_segments,
         "radius_m": source.radius_m,
@@ -447,21 +441,15 @@ def _spherical_shell_contribution(
 
 
 def _ring_charge_c(source: RingSource) -> float:
-    if source.charge_c is not None:
-        return source.charge_c
-    return source.linear_charge_density_c_per_m * (2.0 * math.pi * source.radius_m)
+    return ring_charge_c(source)
 
 
 def _line_charge_c(source: LineSegmentSource) -> float:
-    if source.charge_c is not None:
-        return source.charge_c
-    return source.linear_charge_density_c_per_m * source.length_m
+    return line_charge_c(source)
 
 
 def _disk_charge_c(source: DiskSource) -> float:
-    if source.charge_c is not None:
-        return source.charge_c
-    return source.surface_charge_density_c_per_m2 * math.pi * source.radius_m**2
+    return disk_charge_c(source)
 
 
 def _shell_charge_c(source: SphericalShellSource) -> float:

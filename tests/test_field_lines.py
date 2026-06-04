@@ -53,6 +53,53 @@ def test_field_line_api_returns_latest_render_contract(representative_scene: Sce
     assert body["lines"]
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        {
+            "id": "line-segment-1",
+            "kind": "line_segment",
+            "label": "Positive line segment",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0, "unit": "m"},
+            "orientation": {"x": 1.0, "y": 0.0, "z": 0.0},
+            "length_m": 0.12,
+            "charge_c": 1e-9,
+        },
+        {
+            "id": "ring-1",
+            "kind": "ring",
+            "label": "Positive ring",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0, "unit": "m"},
+            "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+            "radius_m": 0.08,
+            "charge_c": 1e-9,
+        },
+        {
+            "id": "disk-1",
+            "kind": "disk",
+            "label": "Positive disk",
+            "position": {"x": 0.0, "y": 0.0, "z": 0.0, "unit": "m"},
+            "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+            "radius_m": 0.08,
+            "charge_c": 1e-9,
+        },
+    ],
+)
+def test_cpu_field_lines_seed_integrated_sources(source: dict[str, object]) -> None:
+    scene = Scene(
+        id=f"{source['id']}-scene",
+        title="Integrated source field lines",
+        sources=[source],
+    )
+
+    response = trace_field_lines(scene, BOUNDS, quality="preview", backend="cpu")
+
+    assert response.candidate_line_count > 0
+    assert response.lines
+    assert {line.source_id for line in response.lines} == {source["id"]}
+    assert all(len(line.points) >= 2 for line in response.lines)
+
+
 def test_explicit_cuda_field_lines_fall_back_to_cpu_when_runtime_is_unavailable(
     representative_scene: Scene,
 ) -> None:

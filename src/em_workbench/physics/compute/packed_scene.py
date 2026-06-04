@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import math
 from collections import OrderedDict
 from dataclasses import dataclass
 from threading import RLock
@@ -9,14 +8,16 @@ from threading import RLock
 import numpy as np
 
 from em_workbench.models import Scene
+from em_workbench.physics.integration import (
+    disk_elements,
+    line_segment_elements,
+    ring_elements,
+)
 from em_workbench.physics.solver import (
-    _disk_charge_c,
-    _line_charge_c,
-    _ring_charge_c,
     _settings_for_quality,
     _shell_charge_c,
 )
-from em_workbench.physics.vectors import Vector3, orthonormal_basis_from_normal
+from em_workbench.physics.vectors import Vector3
 
 
 def dtype_for_quality(quality: str) -> np.dtype:
@@ -87,46 +88,24 @@ def compile_scene(scene: Scene, *, quality: str) -> PackedScene:
             element_charges.append(source.charge_c)
             element_source_indexes.append(source_index)
         elif source.kind == "line_segment":
-            total_charge = _line_charge_c(source)
-            axis = Vector3.from_position(source.orientation).normalized()
-            for index in range(settings["line_segments"]):
-                offset = (
-                    -0.5 * source.length_m
-                    + (index + 0.5) * source.length_m / settings["line_segments"]
-                )
-                element_positions.append(center + axis.scale(offset))
-                element_charges.append(total_charge / settings["line_segments"])
+            for element in line_segment_elements(source, settings["line_segments"]):
+                element_positions.append(element.position)
+                element_charges.append(element.charge_c)
                 element_source_indexes.append(source_index)
         elif source.kind == "ring":
-            total_charge = _ring_charge_c(source)
-            axis_u, axis_v, _unit_normal = orthonormal_basis_from_normal(
-                Vector3.from_position(source.normal)
-            )
-            for index in range(settings["ring_segments"]):
-                angle = 2.0 * math.pi * (index + 0.5) / settings["ring_segments"]
-                point = center + axis_u.scale(math.cos(angle) * source.radius_m)
-                point = point + axis_v.scale(math.sin(angle) * source.radius_m)
-                element_positions.append(point)
-                element_charges.append(total_charge / settings["ring_segments"])
+            for element in ring_elements(source, settings["ring_segments"]):
+                element_positions.append(element.position)
+                element_charges.append(element.charge_c)
                 element_source_indexes.append(source_index)
         elif source.kind == "disk":
-            total_charge = _disk_charge_c(source)
-            surface_density = total_charge / (math.pi * source.radius_m**2)
-            axis_u, axis_v, _unit_normal = orthonormal_basis_from_normal(
-                Vector3.from_position(source.normal)
-            )
-            dr = source.radius_m / settings["disk_radial_segments"]
-            dtheta = 2.0 * math.pi / settings["disk_angular_segments"]
-            for radial_index in range(settings["disk_radial_segments"]):
-                radius = (radial_index + 0.5) * dr
-                dq = surface_density * radius * dr * dtheta
-                for angular_index in range(settings["disk_angular_segments"]):
-                    angle = (angular_index + 0.5) * dtheta
-                    point = center + axis_u.scale(math.cos(angle) * radius)
-                    point = point + axis_v.scale(math.sin(angle) * radius)
-                    element_positions.append(point)
-                    element_charges.append(dq)
-                    element_source_indexes.append(source_index)
+            for element in disk_elements(
+                source,
+                settings["disk_radial_segments"],
+                settings["disk_angular_segments"],
+            ):
+                element_positions.append(element.position)
+                element_charges.append(element.charge_c)
+                element_source_indexes.append(source_index)
         elif source.kind == "infinite_plane":
             plane_positions.append(center)
             plane_normals.append(Vector3.from_position(source.normal).normalized())

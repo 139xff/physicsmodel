@@ -24,6 +24,40 @@ const pointSourceYInput = document.querySelector("#point-source-y");
 const pointSourceZInput = document.querySelector("#point-source-z");
 const pointSourceZField = document.querySelector("#point-source-z-field");
 const pointSourceChargeInput = document.querySelector("#point-source-charge");
+const lineSegmentSourceForm = document.querySelector("#line-segment-source-form");
+const lineSegmentSourceInputs = {
+  x: document.querySelector("#line-segment-source-x"),
+  y: document.querySelector("#line-segment-source-y"),
+  z: document.querySelector("#line-segment-source-z"),
+  orientationX: document.querySelector("#line-segment-source-orientation-x"),
+  orientationY: document.querySelector("#line-segment-source-orientation-y"),
+  orientationZ: document.querySelector("#line-segment-source-orientation-z"),
+  length: document.querySelector("#line-segment-source-length"),
+  charge: document.querySelector("#line-segment-source-charge"),
+};
+const ringSourceForm = document.querySelector("#ring-source-form");
+const ringSourceInputs = {
+  x: document.querySelector("#ring-source-x"),
+  y: document.querySelector("#ring-source-y"),
+  z: document.querySelector("#ring-source-z"),
+  radius: document.querySelector("#ring-source-radius"),
+  charge: document.querySelector("#ring-source-charge"),
+};
+const diskSourceForm = document.querySelector("#disk-source-form");
+const diskSourceInputs = {
+  x: document.querySelector("#disk-source-x"),
+  y: document.querySelector("#disk-source-y"),
+  z: document.querySelector("#disk-source-z"),
+  radius: document.querySelector("#disk-source-radius"),
+  charge: document.querySelector("#disk-source-charge"),
+};
+const sourceLibraryZFields = [
+  pointSourceZField,
+  document.querySelector("#line-segment-source-z-field"),
+  document.querySelector("#line-segment-source-orientation-z-field"),
+  document.querySelector("#ring-source-z-field"),
+  document.querySelector("#disk-source-z-field"),
+];
 const solverStatus = document.querySelector("[data-testid='solver-status']");
 const overlayStatus = document.querySelector("[data-testid='overlay-status']");
 const overlaySummary = document.querySelector("[data-testid='overlay-summary']");
@@ -65,7 +99,6 @@ const VIEWPORT_MIN_ZOOM = 1;
 const DEFAULT_VIEW_ZOOM = 100;
 const POINT_VISUAL_RADIUS_CM = 0.5;
 const COULOMB_CONSTANT = 8.9875517923e9;
-const RING_DISPLAY_RADIUS_UNITS = 0.2;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const MAX_AXIS_TICKS = 36;
 const AXIS_TICK_TARGET_COUNT = 36;
@@ -355,6 +388,8 @@ function sourceDefaults(kind, overrides = {}) {
   const index = state.sourceIndex[kind];
   const idPrefix = kind.replaceAll("_", "-");
   const overridePosition = overrides.position || {};
+  const overrideOrientation = overrides.orientation || {};
+  const overrideNormal = overrides.normal || {};
   const base = {
     id: `${idPrefix}-${index}`,
     kind,
@@ -384,30 +419,57 @@ function sourceDefaults(kind, overrides = {}) {
     return {
       ...base,
       label: `带电线段 ${index}`,
-      position: { x: -0.08, y: 0.08, z: 0, unit: "m" },
-      orientation: { x: 1, y: 0, z: 0 },
-      length_m: 0.16,
-      charge_c: 1.5e-9,
+      position: {
+        x: Number(overridePosition.x ?? -0.08),
+        y: Number(overridePosition.y ?? 0.08),
+        z: Number(overridePosition.z ?? 0),
+        unit: "m",
+      },
+      orientation: {
+        x: Number(overrideOrientation.x ?? 1),
+        y: Number(overrideOrientation.y ?? 0),
+        z: Number(overrideOrientation.z ?? 0),
+      },
+      length_m: Number(overrides.length_m ?? 0.16),
+      charge_c: Number(overrides.charge_c ?? 1.5e-9),
     };
   }
   if (kind === "ring") {
     return {
       ...base,
       label: `带电圆环 ${index}`,
-      position: { x: 0.12, y: 0, z: 0, unit: "m" },
-      normal: { x: 0, y: 0, z: 1 },
-      radius_m: 0.08,
-      charge_c: 2e-9,
+      position: {
+        x: Number(overridePosition.x ?? 0.12),
+        y: Number(overridePosition.y ?? 0),
+        z: Number(overridePosition.z ?? 0),
+        unit: "m",
+      },
+      normal: {
+        x: Number(overrideNormal.x ?? 0),
+        y: Number(overrideNormal.y ?? 0),
+        z: Number(overrideNormal.z ?? 1),
+      },
+      radius_m: Number(overrides.radius_m ?? 0.08),
+      charge_c: Number(overrides.charge_c ?? 2e-9),
     };
   }
   if (kind === "disk") {
     return {
       ...base,
       label: `带电圆盘 ${index}`,
-      position: { x: 0, y: -0.11, z: 0, unit: "m" },
-      normal: { x: 0, y: 0, z: 1 },
-      radius_m: 0.09,
-      charge_c: 2e-9,
+      position: {
+        x: Number(overridePosition.x ?? 0),
+        y: Number(overridePosition.y ?? -0.11),
+        z: Number(overridePosition.z ?? 0),
+        unit: "m",
+      },
+      normal: {
+        x: Number(overrideNormal.x ?? 0),
+        y: Number(overrideNormal.y ?? 0),
+        z: Number(overrideNormal.z ?? 1),
+      },
+      radius_m: Number(overrides.radius_m ?? 0.09),
+      charge_c: Number(overrides.charge_c ?? 2e-9),
     };
   }
   if (kind === "infinite_plane") {
@@ -471,11 +533,93 @@ function addPointSourceFromForm(event) {
   });
 }
 
+function addLineSegmentFromForm(event) {
+  event.preventDefault();
+  const xCm = inputNumberValue(lineSegmentSourceInputs.x, -8);
+  const yCm = inputNumberValue(lineSegmentSourceInputs.y, 8);
+  const zCm = state.mode === "2D" ? 0 : inputNumberValue(lineSegmentSourceInputs.z, 0);
+  const orientation = {
+    x: inputNumberValue(lineSegmentSourceInputs.orientationX, 1),
+    y: inputNumberValue(lineSegmentSourceInputs.orientationY, 0),
+    z: state.mode === "2D"
+      ? 0
+      : inputNumberValue(lineSegmentSourceInputs.orientationZ, 0),
+  };
+  const lengthCm = inputNumberValue(lineSegmentSourceInputs.length, 16);
+  const charge = inputNumberValue(lineSegmentSourceInputs.charge, 1.5e-9);
+  const values = [xCm, yCm, zCm, orientation.x, orientation.y, orientation.z, lengthCm, charge];
+  if (!values.every(Number.isFinite) || lengthCm <= 0 || vectorMagnitude(orientation) <= 1e-12) {
+    solverStatus.textContent = "带电线段参数必须有限，长度和方向必须有效。";
+    return;
+  }
+  addSource("line_segment", {
+    position: {
+      x: centimetersToMeters(xCm),
+      y: centimetersToMeters(yCm),
+      z: centimetersToMeters(zCm),
+    },
+    orientation,
+    length_m: centimetersToMeters(lengthCm),
+    charge_c: charge,
+  });
+}
+
+function addRingFromForm(event) {
+  event.preventDefault();
+  const xCm = inputNumberValue(ringSourceInputs.x, 12);
+  const yCm = inputNumberValue(ringSourceInputs.y, 0);
+  const zCm = state.mode === "2D" ? 0 : inputNumberValue(ringSourceInputs.z, 0);
+  const radiusCm = inputNumberValue(ringSourceInputs.radius, 8);
+  const charge = inputNumberValue(ringSourceInputs.charge, 2e-9);
+  if (![xCm, yCm, zCm, radiusCm, charge].every(Number.isFinite) || radiusCm <= 0) {
+    solverStatus.textContent = "带电圆环参数必须有限，半径必须大于 0。";
+    return;
+  }
+  addSource("ring", {
+    position: {
+      x: centimetersToMeters(xCm),
+      y: centimetersToMeters(yCm),
+      z: centimetersToMeters(zCm),
+    },
+    normal: { x: 0, y: 0, z: 1 },
+    radius_m: centimetersToMeters(radiusCm),
+    charge_c: charge,
+  });
+}
+
+function addDiskFromForm(event) {
+  event.preventDefault();
+  const xCm = inputNumberValue(diskSourceInputs.x, 0);
+  const yCm = inputNumberValue(diskSourceInputs.y, -11);
+  const zCm = state.mode === "2D" ? 0 : inputNumberValue(diskSourceInputs.z, 0);
+  const radiusCm = inputNumberValue(diskSourceInputs.radius, 9);
+  const charge = inputNumberValue(diskSourceInputs.charge, 2e-9);
+  if (![xCm, yCm, zCm, radiusCm, charge].every(Number.isFinite) || radiusCm <= 0) {
+    solverStatus.textContent = "带电圆盘参数必须有限，半径必须大于 0。";
+    return;
+  }
+  addSource("disk", {
+    position: {
+      x: centimetersToMeters(xCm),
+      y: centimetersToMeters(yCm),
+      z: centimetersToMeters(zCm),
+    },
+    normal: { x: 0, y: 0, z: 1 },
+    radius_m: centimetersToMeters(radiusCm),
+    charge_c: charge,
+  });
+}
+
 function renderPointSourceForm() {
   if (!pointSourceForm || !pointSourceZField) {
     return;
   }
   pointSourceZField.hidden = state.mode === "2D";
+  for (const field of sourceLibraryZFields) {
+    if (field) {
+      field.hidden = state.mode === "2D";
+    }
+  }
 }
 
 function removeSource(sourceId) {
@@ -1047,16 +1191,20 @@ function renderSource2d(source, scale) {
     `;
   }
   if (source.kind === "ring") {
+    const radius = radiusToViewport(source.radius_m, MIN_VISIBLE_MARKER_RADIUS_UNITS);
+    const physicalRadiusCm = formatCentimeters(source.radius_m);
     return `
       <g data-testid="source-ring-group-2d-${source.id}">
         <circle
           class="source-ring"
           data-testid="source-ring-2d-${source.id}"
-          data-display-diameter-cm="${RING_DISPLAY_RADIUS_UNITS * 2}"
+          data-display-diameter-cm="${formatCentimeters(source.radius_m * 2)}"
+          data-physical-radius-cm="${physicalRadiusCm}"
+          data-visual-model="hollow-ring"
           cx="${point.x}"
           cy="${point.y}"
-          r="${RING_DISPLAY_RADIUS_UNITS}"
-          style="stroke-width: ${markerStrokeWidth}px; stroke: ${chargeColor}; fill: ${chargeColor}; fill-opacity: 0.08;"
+          r="${radius}"
+          style="stroke-width: ${markerStrokeWidth}px; stroke: ${chargeColor}; fill: none; fill-opacity: 0;"
           data-charge-color="${chargeColor}"
           data-charge-sign="${chargeSign}"
           data-stroke-px="${scale.fontPx.toFixed(2)}"
@@ -1304,13 +1452,11 @@ function rk4FieldLineStep(x, y, traceDirection, fieldSamples, stepSize) {
 }
 
 function fieldLineSeedSources2d() {
-  const chargedSources = state.scene.sources.filter((source) => Math.abs(sourceChargeValue(source)) > 1e-30);
-  const pointSources = chargedSources.filter((source) => source.kind === "point");
-  if (pointSources.length > 0) {
-    return pointSources;
-  }
-  const positiveSources = chargedSources.filter((source) => sourceChargeValue(source) > 0 && source.position);
-  return positiveSources.length > 0 ? positiveSources : chargedSources.filter((source) => source.position);
+  return state.scene.sources.filter((source) => (
+    ["point", "line_segment", "ring", "disk", "spherical_shell"].includes(source.kind) &&
+    source.position &&
+    Math.abs(sourceChargeValue(source)) > 1e-30
+  ));
 }
 
 function fieldLineStartRadiusMeters(source) {
@@ -3183,7 +3329,7 @@ function renderFieldLines2d(scale) {
   const arrows = [];
   for (const entry of traceResult.entries) {
     const charge = entry.charge;
-    const renderPoints = entry.displayPoints;
+    const renderPoints = entry.arrowPoints;
     const sourceSign = charge > 0 ? "positive" : charge < 0 ? "negative" : "boundary";
     paths.push(`
         <path
@@ -3219,6 +3365,7 @@ function renderFieldLines2d(scale) {
       data-field-line-count="${paths.length}"
       data-display-strategy="${FIELD_LINE_DISPLAY_STRATEGY}"
       data-candidates-per-point-charge="${traceResult.chargeRayCount}"
+      data-candidates-per-charged-source="${traceResult.chargeRayCount}"
       data-target-total-charge-rays="${FIELD_LINE_TARGET_TOTAL_CHARGE_RAYS}"
       data-min-charge-rays="${FIELD_LINE_MIN_CHARGE_RAYS}"
       data-max-charge-rays="${FIELD_LINE_MAX_CHARGE_RAYS}"
@@ -3540,13 +3687,17 @@ function renderMotionLayer2d() {
   const charge = Number(motionInputs.charge.value);
   return `
     <g class="motion-layer" data-testid="motion-layer-2d" data-point-count="${visibleSamples.length}">
-      <path class="motion-trail" d="${path}"></path>
+      <path class="motion-trail" fill="none" stroke="#39ff14" stroke-width="0.22" d="${path}"></path>
       <circle
         class="motion-particle ${charge >= 0 ? "positive" : "negative"}"
         data-testid="motion-particle-2d"
         cx="${marker.x}"
         cy="${marker.y}"
-        r="0.32"
+        fill="#39ff14"
+        stroke="#39ff14"
+        stroke-width="0.06"
+        r="0.16"
+        style="fill: #39ff14; stroke: #39ff14; stroke-width: 0.06px;"
       ></circle>
     </g>
   `;
@@ -4051,11 +4202,21 @@ async function initialiseShell() {
 }
 
 pointSourceForm.addEventListener("submit", addPointSourceFromForm);
-document
-  .querySelector("#add-line-segment")
-  .addEventListener("click", () => addSource("line_segment"));
-document.querySelector("#add-ring").addEventListener("click", () => addSource("ring"));
-document.querySelector("#add-disk").addEventListener("click", () => addSource("disk"));
+lineSegmentSourceForm.addEventListener("submit", addLineSegmentFromForm);
+ringSourceForm.addEventListener("submit", addRingFromForm);
+diskSourceForm.addEventListener("submit", addDiskFromForm);
+document.querySelector("#add-line-segment").addEventListener("click", (event) => {
+  event.preventDefault();
+  lineSegmentSourceForm.requestSubmit();
+});
+document.querySelector("#add-ring").addEventListener("click", (event) => {
+  event.preventDefault();
+  ringSourceForm.requestSubmit();
+});
+document.querySelector("#add-disk").addEventListener("click", (event) => {
+  event.preventDefault();
+  diskSourceForm.requestSubmit();
+});
 document
   .querySelector("#add-infinite-plane")
   .addEventListener("click", () => addSource("infinite_plane"));

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 39 - Source Module Parity</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    body {
+      margin: 0;
+      background: #f6f8fb;
+      color: #172033;
+    }
+    main {
+      margin: 0 auto;
+      max-width: 960px;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    section {
+      background: #fff;
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      margin-top: 18px;
+      padding: 18px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      border-bottom: 1px solid #e7edf5;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f0f4f9;
+      font-weight: 700;
+    }
+    code {
+      background: #eef2f7;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 39 - Source Module Parity</h1>
+    <p><strong>Completion timestamp:</strong> 2026-06-04 18:41:05 +08:00</p>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <p>
+        Updated the source library so the line segment, ring, and disk modules use the same
+        internal column structure as the point-charge module: collapsible <code>details</code>,
+        a <code>source-form-heading</code>, a parameter grid, and an add button inside the form.
+        The modules remain foldable and are open by default for direct use.
+      </p>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <p>No solver behavior, GitHub sync, branch merge, or theme changes were performed in this task.</p>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Path</th>
+            <th>Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>web/index.html</code></td><td>Moved line/ring/disk add buttons inside their parameter forms and made those modules open by default.</td></tr>
+          <tr><td><code>web/styles.css</code></td><td>Extended point-form button sizing and hover styles to all source parameter forms.</td></tr>
+          <tr><td><code>tests/test_browser_smoke.py</code></td><td>Added assertions that all source modules share the same internal form contract and remain collapsible.</td></tr>
+          <tr><td><code>tests/test_app.py</code></td><td>Updated static asset version assertions.</td></tr>
+          <tr><td><code>reports/2026-06-04-task-39-source-module-parity.html</code></td><td>Added this engineering record.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Commands Executed</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_source_library_modules_are_collapsible_parameter_forms</code></td><td>RED: failed before implementation; GREEN: 1 passed, 2 warnings.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>1 passed.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_interaction_slice_keeps_state_across_2d_3d_toggle tests\test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>3 passed, 2 warnings.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td><td>All checks passed.</td></tr>
+          <tr><td><code>git diff --check</code></td><td>Exit 0; Git reported only CRLF conversion warnings.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Verification Evidence</h2>
+      <p>
+        Browser tests now verify that point, line segment, ring, and disk modules are all
+        <code>details</code> elements, open by default, contain their form, heading, mini-grid,
+        and add button internally, and can still be folded and reopened.
+      </p>
+    </section>
+
+    <section>
+      <h2>Known Risks or Limitations</h2>
+      <p>
+        This was a focused UI structure pass. The broader integrated-source test suite was
+        already run in task 38; this task reran the relevant browser, app, lint, and diff checks.
+      </p>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p>Await user instruction before additional UI, solver, GitHub, or branch operations.</p>
+    </section>
+  </main>
+</body>
+</html>

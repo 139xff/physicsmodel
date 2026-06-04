@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 38 - Integrated Source Forms</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    body {
+      margin: 0;
+      background: #f6f8fb;
+      color: #172033;
+    }
+    main {
+      margin: 0 auto;
+      max-width: 980px;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    section {
+      background: #fff;
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      margin-top: 18px;
+      padding: 18px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      border-bottom: 1px solid #e7edf5;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f0f4f9;
+      font-weight: 700;
+    }
+    code {
+      background: #eef2f7;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 38 - Integrated Source Forms</h1>
+    <p><strong>Completion timestamp:</strong> 2026-06-04 18:24:54 +08:00</p>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <p>
+        Implemented a shared point-charge integration layer for uniform line segments,
+        rings, and disks. Scalar evaluation and packed CPU/CUDA-capable paths now use the
+        same integrated charge elements. The source library now exposes collapsible
+        parameter modules, so line segments, rings, and disks can be configured before
+        adding them to the scene.
+      </p>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <p>
+        No Git branch merge or GitHub synchronization was performed. The Pydantic source
+        contract still requires explicit <code>normal</code> fields for API ring/disk payloads;
+        the browser source library supplies the default xy-plane normal.
+      </p>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Path</th>
+            <th>Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>src/em_workbench/physics/integration.py</code></td><td>Added shared Gauss-Legendre and uniform-azimuthal integrated charge element generation.</td></tr>
+          <tr><td><code>src/em_workbench/physics/solver.py</code></td><td>Switched scalar line/ring/disk contributions to integrated point-charge nodes and updated metadata.</td></tr>
+          <tr><td><code>src/em_workbench/physics/compute/packed_scene.py</code></td><td>Reused shared integrated source elements for CPU/CUDA packed scenes.</td></tr>
+          <tr><td><code>src/em_workbench/physics/compute/dispatcher.py</code></td><td>Updated CPU-JIT/API metadata and warnings for integrated source quadrature.</td></tr>
+          <tr><td><code>web/index.html</code></td><td>Added collapsible source parameter modules and updated asset version strings.</td></tr>
+          <tr><td><code>web/app.js</code></td><td>Added form handlers for line segment, ring, and disk parameters.</td></tr>
+          <tr><td><code>web/styles.css</code></td><td>Styled source modules and extended source parameter forms.</td></tr>
+          <tr><td><code>tests/test_solver.py</code></td><td>Added integrated quadrature metadata coverage and updated ring method expectations.</td></tr>
+          <tr><td><code>tests/test_solver_api.py</code></td><td>Updated API metadata assertions for integrated ring sources.</td></tr>
+          <tr><td><code>tests/test_browser_smoke.py</code></td><td>Added browser coverage for collapsible source modules and parameterized source creation.</td></tr>
+          <tr><td><code>tests/test_app.py</code></td><td>Updated static asset version assertions.</td></tr>
+          <tr><td><code>reports/2026-06-04-task-38-integrated-source-forms.html</code></td><td>Added this engineering record.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Commands Executed</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_solver.py::test_extended_sources_report_integrated_point_charge_quadrature_metadata</code></td><td>RED: failed on old <code>discrete-*</code> metadata; GREEN: passed after implementation.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_source_library_modules_are_collapsible_parameter_forms</code></td><td>RED: failed because source modules did not exist; GREEN: passed after HTML/JS/CSS implementation.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_solver.py tests\test_packed_scene.py tests\test_cpu_backend.py tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>28 passed.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_interaction_slice_keeps_state_across_2d_3d_toggle tests\test_browser_smoke.py::test_browser_source_library_modules_are_collapsible_parameter_forms tests\test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets tests\test_browser_smoke.py::test_browser_motion_playback_preserves_complex_field_line_layer</code></td><td>4 passed, 2 warnings.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_solver_api.py::test_field_evaluate_refined_ring_response_includes_per_source_metadata tests\test_solver_api.py::test_field_evaluate_surfaces_ring_approximation_and_near_source_warnings</code></td><td>2 passed.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td><td>117 passed, 4 skipped, 2 warnings.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td><td>All checks passed.</td></tr>
+          <tr><td><code>git diff --check</code></td><td>Exit 0; Git reported only CRLF conversion warnings.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Verification Evidence</h2>
+      <p>
+        The solver and API now report <code>integrated-line-segment</code>,
+        <code>integrated-ring</code>, and <code>integrated-disk</code> metadata. Browser
+        smoke tests verify that collapsible source modules are present and that cm-based
+        line, ring, and disk form inputs are converted to SI source-card values.
+      </p>
+    </section>
+
+    <section>
+      <h2>Known Risks or Limitations</h2>
+      <p>
+        The near-singular behavior remains finite because individual integration nodes use
+        the existing minimum-distance guard to avoid NaN/Infinity. This preserves steep
+        near-source trends without attempting to return mathematical infinities.
+      </p>
+      <p>
+        A read-only subagent review was requested after implementation; it had not returned
+        within the 180 second wait window before this report was written.
+      </p>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p>Await user instruction before GitHub sync, branch merge, or additional UI changes.</p>
+    </section>
+  </main>
+</body>
+</html>

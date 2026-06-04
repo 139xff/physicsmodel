@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 36 - Revert to Opened Project Version</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    body {
+      margin: 0;
+      background: #f6f8fb;
+      color: #172033;
+    }
+    main {
+      margin: 0 auto;
+      max-width: 960px;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    section {
+      background: #fff;
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      margin-top: 18px;
+      padding: 18px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      border-bottom: 1px solid #e7edf5;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f0f4f9;
+      font-weight: 700;
+    }
+    code {
+      background: #eef2f7;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 36 - Revert to Opened Project Version</h1>
+    <p><strong>Completion timestamp:</strong> 2026-06-04 14:01:53 +08:00</p>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <p>
+        Restored the tracked application and test files changed after the user's "open project"
+        checkpoint back to the current branch version. Removed the generated visual task reports
+        and dark theme screenshot from tasks 34 and 35.
+      </p>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <p>No additional visual changes, branch merges, or GitHub synchronization were performed.</p>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Path</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>tests/test_app.py</code></td><td>Restored to branch version.</td></tr>
+          <tr><td><code>tests/test_browser_smoke.py</code></td><td>Restored to branch version.</td></tr>
+          <tr><td><code>web/app.js</code></td><td>Restored to branch version.</td></tr>
+          <tr><td><code>web/index.html</code></td><td>Restored to branch version.</td></tr>
+          <tr><td><code>web/styles.css</code></td><td>Restored to branch version.</td></tr>
+          <tr><td><code>reports/2026-06-04-task-34-line-and-motion-visual-styling.html</code></td><td>Removed generated report for reverted task.</td></tr>
+          <tr><td><code>reports/2026-06-04-task-35-dark-tech-literary-theme.html</code></td><td>Removed generated report for reverted task.</td></tr>
+          <tr><td><code>reports/2026-06-04-dark-tech-theme.png</code></td><td>Removed generated screenshot for reverted task.</td></tr>
+          <tr><td><code>reports/2026-06-04-task-36-revert-to-opened-project-version.html</code></td><td>Added this engineering record.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Commands Executed</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>git status --short --branch</code></td><td>Found five modified tracked files and task 34/35 generated artifacts.</td></tr>
+          <tr><td><code>git diff --name-only</code></td><td>Confirmed tracked changes were limited to test and web frontend files.</td></tr>
+          <tr><td><code>git restore -- tests/test_app.py tests/test_browser_smoke.py web/app.js web/index.html web/styles.css</code></td><td>Exit 0; restored tracked files.</td></tr>
+          <tr><td><code>Remove-Item</code> for task 34/35 reports and screenshot</td><td>Exit 0; removed only explicit files inside the workspace.</td></tr>
+          <tr><td><code>git diff --exit-code -- tests/test_app.py tests/test_browser_smoke.py web/app.js web/index.html web/styles.css</code></td><td>Exit 0; no tracked diff in restored files.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>1 passed in 0.78s.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td><td>All checks passed.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync --extra desktop em-workbench-desktop</code></td><td>Desktop application restarted; PID 130424.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Verification Evidence</h2>
+      <p>
+        The restored tracked frontend and test files have no diff against the branch version.
+        The app shell smoke test passed through project-local uv, and Ruff reported no lint issues.
+      </p>
+    </section>
+
+    <section>
+      <h2>Known Risks or Limitations</h2>
+      <p>
+        The pre-existing untracked <code>releases/opened-20260601-140453/</code> directory was left
+        untouched per repository safety guidance. This report remains as the record of the restore.
+      </p>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p>Await user confirmation before making further visual, Git, or synchronization changes.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 37 - Motion Neon Half Size</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    body {
+      margin: 0;
+      background: #f6f8fb;
+      color: #172033;
+    }
+    main {
+      margin: 0 auto;
+      max-width: 960px;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    section {
+      background: #fff;
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      margin-top: 18px;
+      padding: 18px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      border-bottom: 1px solid #e7edf5;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f0f4f9;
+      font-weight: 700;
+    }
+    code {
+      background: #eef2f7;
+      border-radius: 6px;
+      padding: 2px 5px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 37 - Motion Neon Half Size</h1>
+    <p><strong>Completion timestamp:</strong> 2026-06-04 14:09:19 +08:00</p>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <p>
+        Updated the 2D moving test charge and its trajectory to use fluorescent green
+        <code>#39ff14</code>. Reduced the moving charge radius from <code>0.32</code> to
+        <code>0.16</code>, the particle stroke width from <code>0.12</code> to
+        <code>0.06</code>, and the trajectory stroke width from <code>0.44</code> to
+        <code>0.22</code>. Added explicit SVG attributes plus matching CSS fallback styles.
+      </p>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <p>No changes were made to field lines, equipotential lines, grid colors, solver behavior, or branch state.</p>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Path</th>
+            <th>Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>web/app.js</code></td><td>Added explicit motion trail and particle SVG color and size attributes.</td></tr>
+          <tr><td><code>web/styles.css</code></td><td>Updated motion trail and particle fallback styles to fluorescent green and half size.</td></tr>
+          <tr><td><code>web/index.html</code></td><td>Updated static asset query strings to force browser reload of CSS and JS.</td></tr>
+          <tr><td><code>tests/test_browser_smoke.py</code></td><td>Added browser assertions for motion particle and trail color and dimensions.</td></tr>
+          <tr><td><code>tests/test_app.py</code></td><td>Updated expected static asset version strings.</td></tr>
+          <tr><td><code>reports/2026-06-04-task-37-motion-neon-half-size.html</code></td><td>Added this engineering record.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Commands Executed</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_motion_playback_preserves_complex_field_line_layer</code></td><td>RED: failed as expected on old motion color and size values.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_motion_playback_preserves_complex_field_line_layer</code></td><td>GREEN: 1 passed, 2 warnings.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>RED: failed as expected on old static asset query string.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell tests\test_browser_smoke.py::test_browser_motion_playback_preserves_complex_field_line_layer</code></td><td>2 passed, 2 warnings.</td></tr>
+          <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td><td>All checks passed.</td></tr>
+          <tr><td><code>git diff --check</code></td><td>Exit 0; only line-ending warnings from Git were reported.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Verification Evidence</h2>
+      <p>
+        Browser smoke assertions now verify <code>rgb(57, 255, 20)</code> for both moving
+        particle and trajectory, particle radius <code>0.16</code>, particle stroke width
+        <code>0.06px</code>, and trajectory width <code>0.22px</code>.
+      </p>
+    </section>
+
+    <section>
+      <h2>Known Risks or Limitations</h2>
+      <p>
+        This task only updates the 2D motion playback visual layer. The pre-existing untracked
+        <code>releases/opened-20260601-140453/</code> directory was not modified.
+      </p>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p>Await user instruction before changing other visual layers or syncing to GitHub.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -371,7 +371,7 @@ class ComputeService:
             raise ValueError("display_max_count must be between 1 and 500.")
         started = time.perf_counter()
         packed, cache_hit = self.packed_scene_cache.get_or_compile(scene, quality=quality)
-        inputs = build_field_line_inputs(scene, density=density, dtype=packed.dtype)
+        inputs = build_field_line_inputs(scene, packed, density=density, dtype=packed.dtype)
         effective_backend, fallback_reason, cuda_status = self._select_backend(
             operation="field-lines",
             sample_count=inputs.candidate_count,
@@ -697,49 +697,60 @@ class ComputeService:
             metadata: dict[str, MetadataValue] = {"method": "analytic-point"}
         elif source.kind == "ring":
             metadata = {
-                "method": "discrete-ring",
+                "method": "integrated-ring",
+                "quadrature": "uniform-azimuthal",
+                "integration_nodes": settings["ring_segments"],
                 "segments": settings["ring_segments"],
                 "radius_m": source.radius_m,
             }
             warnings.append(
-                f"Source {source.id} ring uses a {settings['ring_segments']}-segment "
-                "finite-segment approximation; analytic ring precision is not claimed off axis."
+                f"Source {source.id} ring uses {settings['ring_segments']} point-charge nodes "
+                "for quadrature integration; this finite-segment approximation preserves the "
+                "near-singular trend but does not claim analytic precision off axis."
             )
             center = Vector3.from_position(source.position)
             normal = Vector3.from_position(source.normal).normalized()
             if _sample_is_near_ring(source, sample, center, normal):
                 warnings.append(
-                    f"Sample is near source {source.id} ring geometry; finite-segment result is "
+                    f"Sample is near source {source.id} ring geometry; quadrature result is "
                     "near singular and should be treated as a limitation."
                 )
         elif source.kind == "line_segment":
             metadata = {
-                "method": "discrete-line-segment",
-                "segments": settings["line_segments"],
+                "method": "integrated-line-segment",
+                "quadrature": "gauss-legendre",
+                "integration_nodes": settings["line_segments"],
                 "length_m": source.length_m,
             }
             warnings.append(
-                f"Source {source.id} line_segment uses a {settings['line_segments']}-segment "
-                "numerical approximation; analytic finite-line precision is not claimed."
+                f"Source {source.id} line_segment uses {settings['line_segments']} "
+                "Gauss-Legendre point-charge nodes for quadrature integration; numerical "
+                "approximation near the charged segment is intentionally left steep."
             )
             center = Vector3.from_position(source.position)
             axis = Vector3.from_position(source.orientation).normalized()
             if _sample_is_near_line_segment(source, sample, center, axis):
                 warnings.append(
-                    f"Sample is near source {source.id} line_segment geometry; finite-segment "
+                    f"Sample is near source {source.id} line_segment geometry; quadrature "
                     "result is near singular and should be treated as a limitation."
                 )
         elif source.kind == "disk":
+            integration_nodes = (
+                settings["disk_radial_segments"] * settings["disk_angular_segments"]
+            )
             metadata = {
-                "method": "discrete-disk",
+                "method": "integrated-disk",
+                "quadrature": "gauss-legendre-radial-uniform-azimuthal",
+                "integration_nodes": integration_nodes,
                 "radial_segments": settings["disk_radial_segments"],
                 "angular_segments": settings["disk_angular_segments"],
                 "radius_m": source.radius_m,
             }
             warnings.append(
                 f"Source {source.id} disk uses a {settings['disk_radial_segments']}x"
-                f"{settings['disk_angular_segments']} midpoint numerical approximation; "
-                "analytic disk precision is not claimed."
+                f"{settings['disk_angular_segments']} Gauss-Legendre radial by "
+                "uniform-azimuthal point-charge nodes for quadrature integration; numerical "
+                "approximation near the disk is intentionally left steep."
             )
         elif source.kind == "infinite_plane":
             metadata = {"method": "analytic-infinite-plane"}

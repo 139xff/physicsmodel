@@ -13,6 +13,7 @@ from em_workbench.physics.compute.contracts import (
     ComputeModel,
     ExecutionMetadata,
 )
+from em_workbench.physics.compute.packed_scene import PackedScene
 from em_workbench.physics.solver import SolverQuality
 
 FIELD_LINE_TARGET_TOTAL_CHARGE_RAYS = 96
@@ -107,6 +108,7 @@ class FieldLineInputs:
     seeds: np.ndarray
     trace_directions: np.ndarray
     seed_source_indexes: np.ndarray
+    seed_source_charges: np.ndarray
     seed_indexes: np.ndarray
     terminal_positions: np.ndarray
     terminal_charges: np.ndarray
@@ -131,48 +133,140 @@ def _round_ray_count(value: float) -> int:
     return max(FIELD_LINE_MIN_CHARGE_RAYS, min(FIELD_LINE_MAX_CHARGE_RAYS, rounded))
 
 
-def build_field_line_inputs(scene: Scene, *, density: float, dtype: np.dtype) -> FieldLineInputs:
+def _empty_field_line_inputs(dtype: np.dtype) -> FieldLineInputs:
+    return FieldLineInputs(
+        seeds=np.empty((0, 2), dtype=dtype),
+        trace_directions=np.empty(0, dtype=dtype),
+        seed_source_indexes=np.empty(0, dtype=np.int32),
+        seed_source_charges=np.empty(0, dtype=dtype),
+        seed_indexes=np.empty(0, dtype=np.int32),
+        terminal_positions=np.empty((0, 2), dtype=dtype),
+        terminal_charges=np.empty(0, dtype=dtype),
+        terminal_source_indexes=np.empty(0, dtype=np.int32),
+    )
+
+
+def _source_seed_position(
+    scene: Scene,
+    packed: PackedScene,
+    source_index: int,
+    element_indexes: list[int],
+    seed_index: int,
+    ray_count: int,
+) -> tuple[float, float]:
+    source = scene.sources[source_index]
+    angle = math.tau * seed_index / ray_count
+    if source.kind == "point":
+        return (
+            source.position.x + math.cos(angle) * FIELD_LINE_START_RADIUS_M,
+            source.position.y + math.sin(angle) * FIELD_LINE_START_RADIUS_M,
+        )
+    element_offset = min(
+        len(element_indexes) - 1,
+        int((seed_index * len(element_indexes)) / ray_count),
+    )
+    element_position = packed.element_positions[element_indexes[element_offset]]
+    origin_x = float(element_position[0])
+    origin_y = float(element_position[1])
+    if source.kind in {"ring", "disk"}:
+        radial_x = origin_x - source.position.x
+        radial_y = origin_y - source.position.y
+        radial_magnitude = math.hypot(radial_x, radial_y)
+        if radial_magnitude > 1e-12:
+            return (
+                origin_x + (radial_x / radial_magnitude) * FIELD_LINE_START_RADIUS_M,
+                origin_y + (radial_y / radial_magnitude) * FIELD_LINE_START_RADIUS_M,
+            )
+    if source.kind == "line_segment":
+        axis_x = source.orientation.x
+        axis_y = source.orientation.y
+        axis_magnitude = math.hypot(axis_x, axis_y)
+        if axis_magnitude > 1e-12:
+            side = 1.0 if seed_index % 2 == 0 else -1.0
+            normal_x = -axis_y / axis_magnitude
+            normal_y = axis_x / axis_magnitude
+            return (
+                origin_x + normal_x * side * FIELD_LINE_START_RADIUS_M,
+                origin_y + normal_y * side * FIELD_LINE_START_RADIUS_M,
+            )
+    return (
+        origin_x + math.cos(angle) * FIELD_LINE_START_RADIUS_M,
+        origin_y + math.sin(angle) * FIELD_LINE_START_RADIUS_M,
+    )
+
+
+def build_field_line_inputs(
+    scene: Scene,
+    packed: PackedScene,
+    *,
+    density: float,
+    dtype: np.dtype,
+) -> FieldLineInputs:
     if density <= 0.0 or density > 4.0:
         raise ValueError("density must be greater than 0 and at most 4.")
-    point_sources = [
-        (source_index, source)
-        for source_index, source in enumerate(scene.sources)
-        if source.kind == "point" and abs(source.charge_c) > 1e-30
-    ]
-    total_abs_charge = sum(abs(source.charge_c) for _index, source in point_sources)
-    seeds: list[tuple[float, float]] = []
-    trace_directions: list[float] = []
-    seed_source_indexes: list[int] = []
-    seed_indexes: list[int] = []
+    source_element_indexes: dict[int, list[int]] = {}
+    source_charges: dict[int, float] = {}
     terminal_positions: list[tuple[float, float]] = []
     terminal_charges: list[float] = []
     terminal_source_indexes: list[int] = []
 
-    for source_index, source in point_sources:
-        terminal_positions.append((source.position.x, source.position.y))
-        terminal_charges.append(source.charge_c)
+    for element_index, source_index_value in enumerate(packed.element_source_indexes):
+        charge = float(packed.element_charges[element_index])
+        if abs(charge) <= 1e-30:
+            continue
+        source_index = int(source_index_value)
+        source_element_indexes.setdefault(source_index, []).append(element_index)
+        source_charges[source_index] = source_charges.get(source_index, 0.0) + charge
+        position = packed.element_positions[element_index]
+        terminal_positions.append((float(position[0]), float(position[1])))
+        terminal_charges.append(charge)
         terminal_source_indexes.append(source_index)
-        charge_fraction = abs(source.charge_c) / total_abs_charge
+
+    charged_source_indexes = [
+        source_index
+        for source_index, charge in source_charges.items()
+        if abs(charge) > 1e-30 and source_element_indexes.get(source_index)
+    ]
+    total_abs_charge = sum(
+        abs(source_charges[source_index]) for source_index in charged_source_indexes
+    )
+    if total_abs_charge <= 0.0:
+        return _empty_field_line_inputs(dtype)
+
+    seeds: list[tuple[float, float]] = []
+    trace_directions: list[float] = []
+    seed_source_indexes: list[int] = []
+    seed_source_charges: list[float] = []
+    seed_indexes: list[int] = []
+
+    for source_index in charged_source_indexes:
+        charge = source_charges[source_index]
+        element_indexes = source_element_indexes[source_index]
+        charge_fraction = abs(charge) / total_abs_charge
         ray_count = _round_ray_count(
             FIELD_LINE_TARGET_TOTAL_CHARGE_RAYS * density * charge_fraction
         )
-        trace_direction = 1.0 if source.charge_c >= 0.0 else -1.0
+        trace_direction = 1.0 if charge >= 0.0 else -1.0
         for seed_index in range(ray_count):
-            angle = math.tau * seed_index / ray_count
-            seeds.append(
-                (
-                    source.position.x + math.cos(angle) * FIELD_LINE_START_RADIUS_M,
-                    source.position.y + math.sin(angle) * FIELD_LINE_START_RADIUS_M,
-                )
+            seed_x, seed_y = _source_seed_position(
+                scene,
+                packed,
+                source_index,
+                element_indexes,
+                seed_index,
+                ray_count,
             )
+            seeds.append((seed_x, seed_y))
             trace_directions.append(trace_direction)
             seed_source_indexes.append(source_index)
+            seed_source_charges.append(charge)
             seed_indexes.append(seed_index)
 
     return FieldLineInputs(
         seeds=np.asarray(seeds, dtype=dtype).reshape(-1, 2),
         trace_directions=np.asarray(trace_directions, dtype=dtype),
         seed_source_indexes=np.asarray(seed_source_indexes, dtype=np.int32),
+        seed_source_charges=np.asarray(seed_source_charges, dtype=dtype),
         seed_indexes=np.asarray(seed_indexes, dtype=np.int32),
         terminal_positions=np.asarray(terminal_positions, dtype=dtype).reshape(-1, 2),
         terminal_charges=np.asarray(terminal_charges, dtype=dtype),
@@ -223,7 +317,8 @@ def build_field_line_response(
             scene.sources[terminal_source_index] if terminal_source_index >= 0 else None
         )
         raw_points = result.points[candidate_index, :point_count]
-        if seed_source.charge_c < 0.0:
+        seed_source_charge = float(inputs.seed_source_charges[candidate_index])
+        if seed_source_charge < 0.0:
             raw_points = raw_points[::-1]
         points = [FieldLinePoint(x=float(point[0]), y=float(point[1])) for point in raw_points]
         if stop_code == STOP_OPPOSITE_CHARGE and terminal_source is not None:
@@ -235,7 +330,7 @@ def build_field_line_response(
                 conflict_rejected_line_count += 1
                 continue
             pair_counts[pair_key] = pair_counts.get(pair_key, 0) + 1
-        elif seed_source.charge_c >= 0.0:
+        elif seed_source_charge >= 0.0:
             topology = "source-to-infinity"
             source_id = seed_source.id
             terminal_source_id = None

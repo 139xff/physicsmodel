@@ -92,7 +92,9 @@ def test_field_evaluate_refined_ring_response_includes_per_source_metadata():
     assert body["quality"] == "refined"
     assert body["metadata"]["ring_segments"] >= 256
     assert contribution["source_kind"] == "ring"
-    assert contribution["metadata"]["method"] == "discrete-ring"
+    assert contribution["metadata"]["method"] == "integrated-ring"
+    assert contribution["metadata"]["quadrature"] == "uniform-azimuthal"
+    assert contribution["metadata"]["integration_nodes"] == body["metadata"]["ring_segments"]
     assert contribution["metadata"]["segments"] == body["metadata"]["ring_segments"]
 
 
@@ -124,7 +126,7 @@ def test_field_evaluate_surfaces_ring_approximation_and_near_source_warnings():
     body = response.json()
     sample = body["samples"][0]
     contribution = sample["contributions"][0]
-    assert contribution["metadata"]["method"] == "discrete-ring"
+    assert contribution["metadata"]["method"] == "integrated-ring"
     assert any("finite-segment approximation" in warning for warning in contribution["warnings"])
     assert any("near source api-warning-ring ring" in warning for warning in sample["warnings"])
     assert any("near source api-warning-ring ring" in warning for warning in body["warnings"])

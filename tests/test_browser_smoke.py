@@ -237,7 +237,31 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     ring_x = _number_attr(page, "source-ring-2d-ring-1", "cx")
     ring_y = _number_attr(page, "source-ring-2d-ring-1", "cy")
     ring_radius = _number_attr(page, "source-ring-2d-ring-1", "r")
-    assert ring_radius == 0.2
+    assert ring_radius == 8
+    expect(page.get_by_test_id("source-ring-2d-ring-1")).to_have_attribute(
+        "data-display-diameter-cm",
+        "16",
+    )
+    expect(page.get_by_test_id("source-ring-2d-ring-1")).to_have_attribute(
+        "data-physical-radius-cm",
+        "8",
+    )
+    expect(page.get_by_test_id("source-ring-2d-ring-1")).to_have_attribute(
+        "data-visual-model",
+        "hollow-ring",
+    )
+    ring_style = page.get_by_test_id("source-ring-2d-ring-1").evaluate(
+        """
+        element => ({
+          fill: getComputedStyle(element).fill,
+          fillOpacity: getComputedStyle(element).fillOpacity,
+          stroke: getComputedStyle(element).stroke,
+        })
+        """
+    )
+    assert ring_style["fill"] == "none"
+    assert ring_style["fillOpacity"] == "0"
+    assert ring_style["stroke"] == "rgb(217, 45, 32)"
     assert float(
         page.get_by_test_id("source-ring-2d-ring-1").get_attribute("data-stroke-px") or "0"
     ) == pytest.approx(axis_label_size, abs=0.05)
@@ -287,6 +311,122 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("source-count")).to_contain_text("3 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("22")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
+
+
+def test_browser_source_library_modules_are_collapsible_parameter_forms(page: Page) -> None:
+    for test_id in [
+        "source-module-point",
+        "source-module-line-segment",
+        "source-module-ring",
+        "source-module-disk",
+    ]:
+        module = page.get_by_test_id(test_id)
+        assert module.evaluate("node => node.tagName.toLowerCase()") == "details"
+
+    module_contract = page.evaluate(
+        """
+        () => [
+            ['source-module-point', 'point-source-form', 'add-point'],
+            ['source-module-line-segment', 'line-segment-source-form', 'add-line-segment'],
+            ['source-module-ring', 'ring-source-form', 'add-ring'],
+            ['source-module-disk', 'disk-source-form', 'add-disk'],
+        ].map(([testId, formId, buttonId]) => {
+            const module = document.querySelector(`[data-testid="${testId}"]`);
+            const form = document.querySelector(`#${formId}`);
+            const button = document.querySelector(`#${buttonId}`);
+            return {
+                testId,
+                open: module?.hasAttribute('open') ?? false,
+                formInsideModule: Boolean(form && module?.contains(form)),
+                headingInsideForm: Boolean(form?.querySelector('.source-form-heading')),
+                miniGridInsideForm: Boolean(form?.querySelector('.mini-grid')),
+                buttonInsideForm: Boolean(button && form?.contains(button)),
+            };
+        })
+        """
+    )
+    assert module_contract == [
+        {
+            "testId": "source-module-point",
+            "open": True,
+            "formInsideModule": True,
+            "headingInsideForm": True,
+            "miniGridInsideForm": True,
+            "buttonInsideForm": True,
+        },
+        {
+            "testId": "source-module-line-segment",
+            "open": True,
+            "formInsideModule": True,
+            "headingInsideForm": True,
+            "miniGridInsideForm": True,
+            "buttonInsideForm": True,
+        },
+        {
+            "testId": "source-module-ring",
+            "open": True,
+            "formInsideModule": True,
+            "headingInsideForm": True,
+            "miniGridInsideForm": True,
+            "buttonInsideForm": True,
+        },
+        {
+            "testId": "source-module-disk",
+            "open": True,
+            "formInsideModule": True,
+            "headingInsideForm": True,
+            "miniGridInsideForm": True,
+            "buttonInsideForm": True,
+        },
+    ]
+
+    page.locator("#source-module-line-segment summary").click()
+    expect(page.get_by_test_id("source-module-line-segment")).not_to_have_attribute("open", "")
+    page.locator("#source-module-line-segment summary").click()
+    expect(page.get_by_test_id("source-module-line-segment")).to_have_attribute("open", "")
+    page.locator("#line-segment-source-x").fill("3")
+    page.locator("#line-segment-source-y").fill("5")
+    page.locator("#line-segment-source-orientation-x").fill("0")
+    page.locator("#line-segment-source-orientation-y").fill("1")
+    page.locator("#line-segment-source-length").fill("12")
+    page.locator("#line-segment-source-charge").fill("-2.5e-9")
+    page.locator("#add-line-segment").click()
+
+    expect(page.get_by_test_id("source-card-line-segment-1")).to_be_visible()
+    expect(page.locator('[data-source-id="line-segment-1"][data-field="position.x"]')).to_have_value("0.03")
+    expect(page.locator('[data-source-id="line-segment-1"][data-field="position.y"]')).to_have_value("0.05")
+    expect(page.locator('[data-source-id="line-segment-1"][data-field="orientation.x"]')).to_have_value("0")
+    expect(page.locator('[data-source-id="line-segment-1"][data-field="orientation.y"]')).to_have_value("1")
+    expect(page.locator('[data-source-id="line-segment-1"][data-field="length_m"]')).to_have_value("0.12")
+    expect(page.locator('[data-source-id="line-segment-1"][data-field="charge_c"]')).to_have_value("-2.5e-9")
+
+    expect(page.get_by_test_id("source-module-ring")).to_have_attribute("open", "")
+    page.locator("#ring-source-x").fill("-2")
+    page.locator("#ring-source-y").fill("4")
+    page.locator("#ring-source-radius").fill("7")
+    page.locator("#ring-source-charge").fill("3e-9")
+    page.locator("#add-ring").click()
+
+    expect(page.get_by_test_id("source-card-ring-1")).to_be_visible()
+    expect(page.locator('[data-source-id="ring-1"][data-field="position.x"]')).to_have_value("-0.02")
+    expect(page.locator('[data-source-id="ring-1"][data-field="position.y"]')).to_have_value("0.04")
+    expect(page.locator('[data-source-id="ring-1"][data-field="normal.x"]')).to_have_value("0")
+    expect(page.locator('[data-source-id="ring-1"][data-field="normal.y"]')).to_have_value("0")
+    expect(page.locator('[data-source-id="ring-1"][data-field="radius_m"]')).to_have_value("0.07")
+    expect(page.locator('[data-source-id="ring-1"][data-field="charge_c"]')).to_have_value("3e-9")
+
+    expect(page.get_by_test_id("source-module-disk")).to_have_attribute("open", "")
+    page.locator("#disk-source-y").fill("-6")
+    page.locator("#disk-source-radius").fill("9")
+    page.locator("#disk-source-charge").fill("-4e-9")
+    page.locator("#add-disk").click()
+
+    expect(page.get_by_test_id("source-card-disk-1")).to_be_visible()
+    expect(page.locator('[data-source-id="disk-1"][data-field="position.y"]')).to_have_value("-0.06")
+    expect(page.locator('[data-source-id="disk-1"][data-field="normal.x"]')).to_have_value("0")
+    expect(page.locator('[data-source-id="disk-1"][data-field="normal.y"]')).to_have_value("0")
+    expect(page.locator('[data-source-id="disk-1"][data-field="radius_m"]')).to_have_value("0.09")
+    expect(page.locator('[data-source-id="disk-1"][data-field="charge_c"]')).to_have_value("-4e-9")
 
 
 def test_browser_views_use_fixed_ten_meter_centimeter_grid(page: Page) -> None:
@@ -709,6 +849,54 @@ def test_browser_field_lines_are_loaded_from_backend(page: Page) -> None:
     assert any(url.endswith("/api/field/lines") for url in requests)
 
 
+@pytest.mark.parametrize(
+    ("button_selector", "source_id"),
+    [
+        ("#add-line-segment", "line-segment-1"),
+        ("#add-ring", "ring-1"),
+        ("#add-disk", "disk-1"),
+    ],
+)
+def test_browser_field_lines_render_for_integrated_sources(
+    page: Page,
+    button_selector: str,
+    source_id: str,
+) -> None:
+    page.locator(button_selector).click()
+
+    page.locator("#toggle-field-lines").click()
+    page.wait_for_function(
+        """
+        () => {
+            const layer = document.querySelector('[data-testid="field-line-layer"]');
+            return layer?.dataset.requestCurrent === "true" &&
+                Number(layer.dataset.fieldLineCount || 0) > 0;
+        }
+        """
+    )
+
+    field_line_layer = page.get_by_test_id("field-line-layer")
+    expect(field_line_layer).to_have_attribute("data-compute-source", "backend")
+    display_count = int(field_line_layer.get_attribute("data-field-line-count") or "0")
+    candidate_count = int(field_line_layer.get_attribute("data-candidate-line-count") or "0")
+    raw_count = int(field_line_layer.get_attribute("data-raw-line-count") or "0")
+    assert 0 < display_count <= 120
+    assert candidate_count > 0
+    assert raw_count > 0
+
+    source_ids = page.get_by_test_id("field-line-2d").evaluate_all(
+        """
+        nodes => [...new Set(nodes.map((node) => {
+            return node.getAttribute("data-field-start-id") === "infinity"
+                ? node.getAttribute("data-field-end-id")
+                : node.getAttribute("data-field-start-id");
+        }))]
+        """
+    )
+    assert source_ids == [source_id]
+    expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(display_count)
+
+
 def test_browser_discards_stale_field_line_response_after_zoom(page: Page) -> None:
     page.add_init_script(
         """
@@ -861,6 +1049,31 @@ def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) 
         """
     )
     expect(page.get_by_test_id("motion-particle-2d")).to_be_visible()
+    motion_style = page.get_by_test_id("motion-particle-2d").evaluate(
+        """
+        node => {
+            const trail = document.querySelector('.motion-trail');
+            const particleStyle = getComputedStyle(node);
+            const trailStyle = getComputedStyle(trail);
+            return {
+                particleFill: particleStyle.fill,
+                particleStroke: particleStyle.stroke,
+                particleRadius: node.getAttribute('r'),
+                particleStrokeWidth: particleStyle.strokeWidth,
+                trailStroke: trailStyle.stroke,
+                trailWidth: trailStyle.strokeWidth,
+            };
+        }
+        """
+    )
+    assert motion_style == {
+        "particleFill": "rgb(57, 255, 20)",
+        "particleStroke": "rgb(57, 255, 20)",
+        "particleRadius": "0.16",
+        "particleStrokeWidth": "0.06px",
+        "trailStroke": "rgb(57, 255, 20)",
+        "trailWidth": "0.22px",
+    }
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
@@ -889,12 +1102,17 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
         "data-display-strategy",
         "uniform-charge-angle-field-tangent",
     )
-    expect(field_line_layer).to_have_attribute("data-candidates-per-point-charge", "64")
+    expect(field_line_layer).to_have_attribute("data-candidates-per-point-charge", "26")
+    expect(field_line_layer).to_have_attribute("data-candidates-per-charged-source", "26")
     expect(field_line_layer).to_have_attribute("data-target-total-charge-rays", "96")
     expect(field_line_layer).to_have_attribute("data-display-max-line-count", "120")
     expect(field_line_layer).to_have_attribute("data-target-line-count", "120")
+    candidate_field_line_count = int(
+        field_line_layer.get_attribute("data-candidate-line-count") or "0"
+    )
+    assert candidate_field_line_count == 104
     raw_field_line_count = int(field_line_layer.get_attribute("data-raw-line-count") or "0")
-    assert 0 < raw_field_line_count <= 64
+    assert 0 < raw_field_line_count <= candidate_field_line_count
     expect(field_line_layer).to_have_attribute("data-arrow-placement", "arc-fraction")
     expect(field_line_layer).to_have_attribute("data-arrow-fraction-base", "0.42")
     expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(field_line_count)
@@ -952,15 +1170,15 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
                 }
                 return points;
             };
-            const distanceToSegment = (point, start, end) => {
-                const dx = end.x - start.x;
-                const dy = end.y - start.y;
-                const lengthSq = dx * dx + dy * dy;
-                const projection = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq;
-                const t = lengthSq > 0
-                    ? Math.max(0, Math.min(1, projection))
-                    : 0;
-                return Math.hypot(point.x - (start.x + dx * t), point.y - (start.y + dy * t));
+            const distanceToPath = (point, path) => {
+                const totalLength = path.getTotalLength();
+                const samples = Math.max(240, Math.ceil(totalLength * 100));
+                let nearest = Infinity;
+                for (let index = 0; index <= samples; index += 1) {
+                    const sample = path.getPointAtLength((totalLength * index) / samples);
+                    nearest = Math.min(nearest, Math.hypot(point.x - sample.x, point.y - sample.y));
+                }
+                return nearest;
             };
             const toScreen = (svg, point) => {
                 const svgPoint = svg.createSVGPoint();
@@ -971,21 +1189,10 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
             };
             const lines = [...document.querySelectorAll('[data-testid="field-line-2d"]')];
             const arrows = [...document.querySelectorAll('[data-testid="field-line-arrow-2d"]')];
-            const metrics = arrows.map((arrow, index) => {
-                const arrowPoints = parsePoints(arrow.getAttribute("d"));
-                const linePoints = parsePoints(lines[index].getAttribute("d"));
-                let tipDistance = Infinity;
-                for (let pointIndex = 1; pointIndex < linePoints.length; pointIndex += 1) {
-                    tipDistance = Math.min(
-                        tipDistance,
-                        distanceToSegment(
-                            arrowPoints[0],
-                            linePoints[pointIndex - 1],
-                            linePoints[pointIndex],
-                        ),
-                    );
-                }
-                const svg = arrow.ownerSVGElement;
+                const metrics = arrows.map((arrow, index) => {
+                    const arrowPoints = parsePoints(arrow.getAttribute("d"));
+                    const tipDistance = distanceToPath(arrowPoints[0], lines[index]);
+                    const svg = arrow.ownerSVGElement;
                 const tip = toScreen(svg, arrowPoints[0]);
                 const left = toScreen(svg, arrowPoints[1]);
                 const right = toScreen(svg, arrowPoints[2]);

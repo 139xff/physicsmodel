@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 40 - Hollow Ring Visual</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      color: #1f2933;
+      background: #f7f9fb;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      color: #102a43;
+      line-height: 1.2;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.8rem;
+    }
+    h2 {
+      margin-top: 28px;
+      font-size: 1.2rem;
+    }
+    .meta {
+      color: #52606d;
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid #d9e2ec;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 10px 12px;
+      border-bottom: 1px solid #d9e2ec;
+    }
+    th {
+      width: 28%;
+      color: #243b53;
+      background: #edf2f7;
+      font-weight: 650;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      font-size: 0.95em;
+      background: #eef2f7;
+      padding: 0.1em 0.3em;
+      border-radius: 4px;
+    }
+    ul {
+      padding-left: 1.3rem;
+    }
+    .pass {
+      color: #166534;
+      font-weight: 650;
+    }
+    .note {
+      color: #7c2d12;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Task 40 - Hollow Ring Visual</h1>
+  <p class="meta">Completion timestamp: 2026-06-04 18:58:52 +08:00</p>
+
+  <h2>Scope Delivered</h2>
+  <ul>
+    <li>Changed the 2D charged ring source marker from a tiny filled disk-like marker to a hollow circle.</li>
+    <li>Made the 2D ring radius follow the configured physical ring radius instead of a fixed display radius.</li>
+    <li>Added DOM metadata for visual regression checks: display diameter, physical radius, and hollow-ring model identifier.</li>
+    <li>Updated browser coverage so the default 8 cm ring renders as a 16 cm diameter hollow ring in 2D.</li>
+    <li>Updated static asset cache keys for the changed JavaScript and CSS.</li>
+  </ul>
+
+  <h2>Scope Deferred</h2>
+  <ul>
+    <li>This task only changes the 2D source marker rendering. It does not change electrostatic solver behavior.</li>
+    <li>Full repository test suite was not rerun after this minor visual fix; relevant browser/app tests and lint were run.</li>
+  </ul>
+
+  <h2>Changed Files</h2>
+  <table>
+    <tr><th>File</th><th>Purpose</th></tr>
+    <tr><td><code>web/app.js</code></td><td>Render ring markers as hollow circles using the source radius.</td></tr>
+    <tr><td><code>web/styles.css</code></td><td>Keep ring marker fill transparent so it reads visually as a ring, not a disk.</td></tr>
+    <tr><td><code>web/index.html</code></td><td>Update static asset cache keys.</td></tr>
+    <tr><td><code>tests/test_app.py</code></td><td>Update expected static asset cache keys.</td></tr>
+    <tr><td><code>tests/test_browser_smoke.py</code></td><td>Add browser assertions for ring radius, metadata, fill, opacity, and stroke.</td></tr>
+    <tr><td><code>reports/2026-06-04-task-40-hollow-ring-visual.html</code></td><td>Record completion evidence for this task.</td></tr>
+  </table>
+
+  <h2>Commands Executed</h2>
+  <table>
+    <tr><th>Command</th><th>Outcome</th></tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_interaction_slice_keeps_state_across_2d_3d_toggle</code></td>
+      <td><span class="pass">Passed</span>: 1 passed, 2 warnings after implementation. The same test failed first as expected when it still observed fixed radius <code>0.2</code> instead of <code>8</code>.</td>
+    </tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td>
+      <td><span class="pass">Passed</span>: 1 passed.</td>
+    </tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_source_library_modules_are_collapsible_parameter_forms tests\test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td>
+      <td><span class="pass">Passed</span>: 3 passed, 2 warnings.</td>
+    </tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td>
+      <td><span class="pass">Passed</span>: lint check completed successfully.</td>
+    </tr>
+    <tr>
+      <td><code>git diff --check</code></td>
+      <td><span class="pass">Passed</span>: exit code 0. Git reported existing CRLF normalization warnings only.</td>
+    </tr>
+  </table>
+
+  <h2>Browser Verification Evidence</h2>
+  <ul>
+    <li>The browser smoke test now verifies the ring SVG element has radius <code>8</code> for the default 8 cm ring.</li>
+    <li>The same test verifies <code>data-display-diameter-cm="16"</code>, <code>data-physical-radius-cm="8"</code>, and <code>data-visual-model="hollow-ring"</code>.</li>
+    <li>The computed style is asserted as transparent fill, zero fill opacity, and charged-source stroke color.</li>
+  </ul>
+
+  <h2>Known Risks Or Limitations</h2>
+  <ul>
+    <li>Very large rings can visually dominate the 2D scene because the marker now reflects the configured radius.</li>
+    <li>The visual marker is still a planar 2D representation; 3D ring/source geometry was not changed in this task.</li>
+    <li class="note">Other uncommitted project changes from previous tasks remain in the worktree and were not reverted.</li>
+  </ul>
+
+  <h2>Next Scheduled Task</h2>
+  <p>Inspect the 3D representation of integrated sources if the visual distinction between line, ring, and disk also needs improvement there.</p>
+</main>
+</body>
+</html>

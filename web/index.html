@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>电磁工作台 | 静电场</title>
-  <link rel="stylesheet" href="./styles.css?v=20260601-point-form-field-focus">
+  <link rel="stylesheet" href="./styles.css?v=20260604-integrated-source-field-lines">
   <script type="importmap">
     {
       "imports": {
@@ -13,7 +13,7 @@
       }
     }
   </script>
-  <script type="module" src="./app.js?v=20260603-equipotentials-c-unit"></script>
+  <script type="module" src="./app.js?v=20260604-integrated-source-field-lines"></script>
 </head>
 <body>
   <div class="workbench">
@@ -41,7 +41,13 @@
             <span>可编辑</span>
           </div>
           <p class="panel-copy">把不同带电体加入同一个场景，自由组合、观察和测量。</p>
-          <form id="point-source-form" class="point-source-form">
+          <div class="source-module-list" aria-label="Electrostatic source parameter modules">
+            <details class="source-module" data-testid="source-module-point" open>
+              <summary>
+                <span>点电荷参数</span>
+                <small>离散源</small>
+              </summary>
+          <form id="point-source-form" class="point-source-form source-parameter-form">
             <div class="source-form-heading">
               <strong>点电荷参数</strong>
               <span>创建后只读</span>
@@ -54,12 +60,78 @@
             </div>
             <button id="add-point" type="submit">加入点电荷</button>
           </form>
-          <div class="source-grid" aria-label="Electrostatic source types">
-            <button id="add-line-segment" type="button">加入带电线段</button>
-            <button id="add-ring" type="button">加入带电圆环</button>
-            <button id="add-disk" type="button">加入带电圆盘</button>
+            </details>
+
+            <details class="source-module" data-testid="source-module-line-segment" id="source-module-line-segment" open>
+              <summary>
+                <span>带电线段参数</span>
+                <small>均匀线密度积分</small>
+              </summary>
+              <form id="line-segment-source-form" class="source-parameter-form">
+                <div class="source-form-heading">
+                  <strong>带电线段参数</strong>
+                  <span>创建后可编辑</span>
+                </div>
+                <div class="mini-grid">
+                  <label>位置 x / cm <input id="line-segment-source-x" type="number" step="0.1" value="-8"></label>
+                  <label>位置 y / cm <input id="line-segment-source-y" type="number" step="0.1" value="8"></label>
+                  <label id="line-segment-source-z-field">位置 z / cm <input id="line-segment-source-z" type="number" step="0.1" value="0"></label>
+                  <label>方向 x <input id="line-segment-source-orientation-x" type="number" step="0.1" value="1"></label>
+                  <label>方向 y <input id="line-segment-source-orientation-y" type="number" step="0.1" value="0"></label>
+                  <label id="line-segment-source-orientation-z-field">方向 z <input id="line-segment-source-orientation-z" type="number" step="0.1" value="0"></label>
+                  <label>长度 / cm <input id="line-segment-source-length" type="number" step="0.1" value="16"></label>
+                  <label>电荷量 C <input id="line-segment-source-charge" type="number" step="1e-10" value="1.5e-9"></label>
+                </div>
+                <button id="add-line-segment" type="submit">加入带电线段</button>
+              </form>
+            </details>
+
+            <details class="source-module" data-testid="source-module-ring" id="source-module-ring" open>
+              <summary>
+                <span>带电圆环参数</span>
+                <small>xy 平面均匀积分</small>
+              </summary>
+              <form id="ring-source-form" class="source-parameter-form">
+                <div class="source-form-heading">
+                  <strong>带电圆环参数</strong>
+                  <span>创建后可编辑</span>
+                </div>
+                <div class="mini-grid">
+                  <label>位置 x / cm <input id="ring-source-x" type="number" step="0.1" value="12"></label>
+                  <label>位置 y / cm <input id="ring-source-y" type="number" step="0.1" value="0"></label>
+                  <label id="ring-source-z-field">位置 z / cm <input id="ring-source-z" type="number" step="0.1" value="0"></label>
+                  <label>半径 / cm <input id="ring-source-radius" type="number" step="0.1" value="8"></label>
+                  <label>电荷量 C <input id="ring-source-charge" type="number" step="1e-10" value="2e-9"></label>
+                </div>
+                <button id="add-ring" type="submit">加入带电圆环</button>
+              </form>
+            </details>
+
+            <details class="source-module" data-testid="source-module-disk" id="source-module-disk" open>
+              <summary>
+                <span>带电圆盘参数</span>
+                <small>xy 平面面积积分</small>
+              </summary>
+              <form id="disk-source-form" class="source-parameter-form">
+                <div class="source-form-heading">
+                  <strong>带电圆盘参数</strong>
+                  <span>创建后可编辑</span>
+                </div>
+                <div class="mini-grid">
+                  <label>位置 x / cm <input id="disk-source-x" type="number" step="0.1" value="0"></label>
+                  <label>位置 y / cm <input id="disk-source-y" type="number" step="0.1" value="-11"></label>
+                  <label id="disk-source-z-field">位置 z / cm <input id="disk-source-z" type="number" step="0.1" value="0"></label>
+                  <label>半径 / cm <input id="disk-source-radius" type="number" step="0.1" value="9"></label>
+                  <label>电荷量 C <input id="disk-source-charge" type="number" step="1e-10" value="2e-9"></label>
+                </div>
+                <button id="add-disk" type="submit">加入带电圆盘</button>
+              </form>
+            </details>
+
+          <div class="source-grid" aria-label="Electrostatic source actions">
             <button id="add-infinite-plane" type="button">加入无限平面</button>
             <button id="add-spherical-shell" type="button">加入球壳</button>
+          </div>
           </div>
         </section>
 

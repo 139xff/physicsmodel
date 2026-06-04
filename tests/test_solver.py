@@ -138,7 +138,7 @@ def test_ring_on_axis_matches_analytic_potential_and_field():
     assert result.field_v_per_m.z == pytest.approx(expected_field_z, rel=1.0e-6)
     assert result.field_v_per_m.x == pytest.approx(0.0, abs=1.0e-9)
     assert result.field_v_per_m.y == pytest.approx(0.0, abs=1.0e-9)
-    assert result.contributions[0].metadata["method"] == "discrete-ring"
+    assert result.contributions[0].metadata["method"] == "integrated-ring"
 
 
 def test_arbitrary_orientation_ring_is_rotation_equivalent_on_its_axis():
@@ -217,6 +217,70 @@ def test_preview_and_refined_ring_modes_report_quality_metadata():
     )
 
 
+def test_extended_sources_report_integrated_point_charge_quadrature_metadata():
+    scene = _scene(
+        [
+            {
+                "id": "line",
+                "kind": "line_segment",
+                "label": "Line",
+                "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "orientation": {"x": 1.0, "y": 0.0, "z": 0.0},
+                "length_m": 0.2,
+                "charge_c": 2.0e-9,
+            },
+            {
+                "id": "ring",
+                "kind": "ring",
+                "label": "Ring",
+                "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+                "radius_m": 0.1,
+                "charge_c": 3.0e-9,
+            },
+            {
+                "id": "disk",
+                "kind": "disk",
+                "label": "Disk",
+                "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+                "radius_m": 0.12,
+                "charge_c": 4.0e-9,
+            },
+        ]
+    )
+
+    evaluation = evaluate_scene(scene, [(0.21, 0.13, 0.07)], quality="preview")
+
+    metadata = {
+        contribution.source_id: contribution.metadata
+        for contribution in evaluation.samples[0].contributions
+    }
+    assert metadata["line"] == {
+        "method": "integrated-line-segment",
+        "quadrature": "gauss-legendre",
+        "integration_nodes": evaluation.metadata["line_segments"],
+        "length_m": 0.2,
+    }
+    assert metadata["ring"] == {
+        "method": "integrated-ring",
+        "quadrature": "uniform-azimuthal",
+        "integration_nodes": evaluation.metadata["ring_segments"],
+        "segments": evaluation.metadata["ring_segments"],
+        "radius_m": 0.1,
+    }
+    assert metadata["disk"] == {
+        "method": "integrated-disk",
+        "quadrature": "gauss-legendre-radial-uniform-azimuthal",
+        "integration_nodes": evaluation.metadata["disk_radial_segments"]
+        * evaluation.metadata["disk_angular_segments"],
+        "radial_segments": evaluation.metadata["disk_radial_segments"],
+        "angular_segments": evaluation.metadata["disk_angular_segments"],
+        "radius_m": 0.12,
+    }
+    assert any("quadrature integration" in warning for warning in evaluation.warnings)
+
+
 def test_ring_contribution_warns_about_finite_segment_approximation():
     scene = _scene(
         [
@@ -236,7 +300,9 @@ def test_ring_contribution_warns_about_finite_segment_approximation():
 
     result = evaluation.samples[0]
     contribution = result.contributions[0]
-    assert contribution.metadata["method"] == "discrete-ring"
+    assert contribution.metadata["method"] == "integrated-ring"
+    assert contribution.metadata["quadrature"] == "uniform-azimuthal"
+    assert contribution.metadata["integration_nodes"] == evaluation.metadata["ring_segments"]
     assert contribution.metadata["segments"] == evaluation.metadata["ring_segments"]
     assert any("finite-segment approximation" in warning for warning in contribution.warnings)
     assert any("finite-segment approximation" in warning for warning in result.warnings)

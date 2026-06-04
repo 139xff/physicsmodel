@@ -279,13 +279,65 @@ summary:focus-visible {
   color: var(--accent);
 }
 
-.source-grid {
+.source-module-list {
   display: grid;
   gap: 10px;
 }
 
+.source-module {
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+  overflow: hidden;
+}
+
+.source-module summary {
+  align-items: center;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 44px;
+  padding: 12px;
+}
+
+.source-module summary::-webkit-details-marker {
+  display: none;
+}
+
+.source-module summary::before {
+  color: var(--accent);
+  content: "+";
+  font-weight: 760;
+}
+
+.source-module[open] summary::before {
+  content: "-";
+}
+
+.source-module summary span {
+  flex: 1;
+  font-size: 0.86rem;
+  font-weight: 720;
+}
+
+.source-module summary small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.source-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+}
+
 .source-grid button,
 .point-source-form button,
+.source-parameter-form button,
 .preset-form button {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 249, 252, 0.88));
   border: 1px solid var(--line);
@@ -302,19 +354,19 @@ summary:focus-visible {
 
 .source-grid button:hover,
 .point-source-form button:hover,
+.source-parameter-form button:hover,
 .preset-form button:hover {
   border-color: rgba(0, 113, 227, 0.38);
   box-shadow: 0 14px 28px rgba(0, 113, 227, 0.12);
   transform: translateY(-1px);
 }
 
-.point-source-form {
+.point-source-form,
+.source-parameter-form {
   background: rgba(255, 255, 255, 0.58);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-medium);
+  border-top: 1px solid var(--line);
   display: grid;
   gap: 10px;
-  margin-bottom: 12px;
   padding: 12px;
 }
 
@@ -335,7 +387,8 @@ summary:focus-visible {
   font-weight: 700;
 }
 
-.point-source-form label {
+.point-source-form label,
+.source-parameter-form label {
   color: var(--muted);
   display: grid;
   font-size: 0.73rem;
@@ -343,11 +396,13 @@ summary:focus-visible {
   gap: 6px;
 }
 
-.point-source-form label[hidden] {
+.point-source-form label[hidden],
+.source-parameter-form label[hidden] {
   display: none;
 }
 
-.point-source-form input {
+.point-source-form input,
+.source-parameter-form input {
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -357,7 +412,8 @@ summary:focus-visible {
   padding: 8px 10px;
 }
 
-.point-source-form button {
+.point-source-form button,
+.source-parameter-form button {
   background: linear-gradient(180deg, #0a84ff, #0071e3);
   color: #fff;
   text-align: center;
@@ -501,6 +557,7 @@ summary:focus-visible {
 
 .source-card input:focus,
 .point-source-form input:focus,
+.source-parameter-form input:focus,
 .probe-form input:focus,
 .preset-form select:focus,
 .quality-control select:focus {
@@ -692,7 +749,8 @@ summary:focus-visible {
 }
 
 .source-ring {
-  fill: rgba(183, 121, 31, 0.08);
+  fill: none;
+  fill-opacity: 0;
   stroke: #b7791f;
   stroke-width: 1.15;
 }
@@ -802,23 +860,23 @@ summary:focus-visible {
 
 .motion-trail {
   fill: none;
-  stroke: #b7791f;
+  stroke: #39ff14;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 0.44;
+  stroke-width: 0.22;
 }
 
 .motion-particle {
-  stroke: #fff;
-  stroke-width: 0.12;
+  stroke: #39ff14;
+  stroke-width: 0.06;
 }
 
 .motion-particle.positive {
-  fill: #0f766e;
+  fill: #39ff14;
 }
 
 .motion-particle.negative {
-  fill: #c53030;
+  fill: #39ff14;
 }
 
 .motion-heading,

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 41 - Integrated Source Field Lines</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #1f2933;
+      background: #f7f9fb;
+      line-height: 1.5;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      color: #102a43;
+      line-height: 1.2;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.8rem;
+    }
+    h2 {
+      margin-top: 28px;
+      font-size: 1.2rem;
+    }
+    .meta {
+      color: #52606d;
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border: 1px solid #d9e2ec;
+    }
+    th, td {
+      text-align: left;
+      vertical-align: top;
+      padding: 10px 12px;
+      border-bottom: 1px solid #d9e2ec;
+    }
+    th {
+      width: 28%;
+      color: #243b53;
+      background: #edf2f7;
+      font-weight: 650;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      background: #eef2f7;
+      padding: 0.1em 0.3em;
+      border-radius: 4px;
+    }
+    ul {
+      padding-left: 1.3rem;
+    }
+    .pass {
+      color: #166534;
+      font-weight: 650;
+    }
+    .fail {
+      color: #991b1b;
+      font-weight: 650;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Task 41 - Integrated Source Field Lines</h1>
+  <p class="meta">Completion timestamp: 2026-06-04 19:29:21 +08:00</p>
+
+  <h2>Task Title</h2>
+  <p>Enable field-line rendering around finite non-point charge models.</p>
+
+  <h2>Root Cause</h2>
+  <p>
+    The backend field-line input builder only seeded from point charges. Line segments, rings,
+    and disks were already packed into discrete charge elements for field evaluation, but no
+    field-line seeds were generated from those elements. The browser therefore received a backend
+    response with zero candidates or zero displayable lines for non-point-only scenes.
+  </p>
+
+  <h2>Scope Delivered</h2>
+  <ul>
+    <li>Field-line seeding now uses packed finite charge elements, covering point charges, charged line segments, charged rings, and charged disks.</li>
+    <li>Seed ownership still resolves back to the original source ID, so rendered lines are associated with the editable source.</li>
+    <li>Ring and disk seeds are offset radially outward from their discrete elements to reduce initial direction reversal and low-quality rejection.</li>
+    <li>The browser seed-source metadata now treats finite charged sources consistently instead of only point charges.</li>
+    <li>Field-line paths and arrow placement now share the same geometry point set.</li>
+    <li>Motion charge styling was made explicit through inline SVG style to stabilize computed style checks.</li>
+  </ul>
+
+  <h2>Scope Deferred</h2>
+  <ul>
+    <li>Infinite plane and spherical shell field-line seeding remains deferred; the immediate user issue concerned the newly added finite integrated sources.</li>
+    <li>CUDA field-line parity for integrated sources was not executed because CUDA is unavailable in this environment.</li>
+  </ul>
+
+  <h2>Changed Files</h2>
+  <table>
+    <tr><th>File</th><th>Purpose</th></tr>
+    <tr><td><code>src/em_workbench/physics/compute/field_lines.py</code></td><td>Generate field-line seeds from packed finite charge elements and carry source charge signs into response construction.</td></tr>
+    <tr><td><code>src/em_workbench/physics/compute/dispatcher.py</code></td><td>Pass the packed scene into field-line input generation.</td></tr>
+    <tr><td><code>tests/test_field_lines.py</code></td><td>Add regression coverage for line segment, ring, and disk field lines.</td></tr>
+    <tr><td><code>tests/test_browser_smoke.py</code></td><td>Add browser regression coverage for integrated-source field lines and update metadata assertions.</td></tr>
+    <tr><td><code>web/app.js</code></td><td>Synchronize finite charged source handling, path/arrow geometry, and motion particle styling.</td></tr>
+    <tr><td><code>web/index.html</code></td><td>Update static asset cache keys.</td></tr>
+    <tr><td><code>tests/test_app.py</code></td><td>Update expected static asset cache keys.</td></tr>
+    <tr><td><code>reports/2026-06-04-task-41-integrated-source-field-lines.html</code></td><td>Record task evidence.</td></tr>
+  </table>
+
+  <h2>Commands Executed</h2>
+  <table>
+    <tr><th>Command</th><th>Outcome</th></tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py::test_cpu_field_lines_seed_integrated_sources</code></td>
+      <td><span class="fail">Failed first</span>: confirmed candidate count was zero for line segment, ring, and disk before the fix. <span class="pass">Passed after implementation</span>: 3 passed.</td>
+    </tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_field_lines_render_for_integrated_sources</code></td>
+      <td><span class="pass">Passed</span>: 3 passed, 2 warnings.</td>
+    </tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_motion_playback_preserves_complex_field_line_layer</code></td>
+      <td><span class="pass">Passed</span>: 1 passed, 2 warnings after explicit motion SVG style fix.</td>
+    </tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td>
+      <td><span class="pass">Passed</span>: 123 passed, 4 skipped, 2 warnings. CUDA tests were skipped because CUDA is unavailable.</td>
+    </tr>
+    <tr>
+      <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td>
+      <td><span class="pass">Passed</span>: all checks passed.</td>
+    </tr>
+    <tr>
+      <td><code>git diff --check</code></td>
+      <td><span class="pass">Passed</span>: exit code 0. Git reported existing CRLF normalization warnings only.</td>
+    </tr>
+  </table>
+
+  <h2>Browser Verification Evidence</h2>
+  <ul>
+    <li>Browser regression confirms line segment, ring, and disk sources each render backend field lines when they are the only source in the scene.</li>
+    <li>Rendered field lines retain the original source ID through <code>data-field-start-id</code> or <code>data-field-end-id</code>.</li>
+    <li>Static source editing regression confirms mixed point, line, ring, and disk scenes still render bounded, finite, arrowed field lines.</li>
+  </ul>
+
+  <h2>Known Risks Or Limitations</h2>
+  <ul>
+    <li>Field-line density is based on packed element charge totals, so different quality settings can influence seed distribution around extended sources.</li>
+    <li>Ring and disk seeding is planar and optimized for the 2D xy view.</li>
+    <li>CUDA integrated-source field-line execution was not locally verified because CUDA is unavailable.</li>
+  </ul>
+
+  <h2>Next Scheduled Task</h2>
+  <p>Push the validated branch to GitHub and avoid including the generated release bundle directory.</p>
+</main>
+</body>
+</html>

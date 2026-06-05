@@ -879,6 +879,30 @@ summary:focus-visible {
   fill: #39ff14;
 }
 
+.scattering-layer {
+  pointer-events: none;
+}
+
+.scattering-track {
+  fill: none;
+  opacity: 0.82;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.08;
+}
+
+.scattering-particle {
+  fill: #16a34a;
+  stroke: #fff;
+  stroke-width: 0.08;
+}
+
+.scattering-nucleus {
+  fill: #f8c847;
+  stroke: #8a5f00;
+  stroke-width: 0.08;
+}
+
 .motion-heading,
 .motion-actions {
   align-items: center;
@@ -900,12 +924,30 @@ summary:focus-visible {
   margin-top: 10px;
 }
 
+.scattering-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
 .motion-grid label {
   color: var(--muted);
   font-size: 0.72rem;
 }
 
+.scattering-grid label {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
 .motion-grid input {
+  margin-top: 4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.scattering-grid input {
   margin-top: 4px;
   min-width: 0;
   width: 100%;

@@ -75,6 +75,10 @@ def main(argv: list[str] | None = None) -> int:
         def pollCompute(self, ticket: str) -> str:
             return self._bridge.poll_compute(ticket)
 
+        @Slot(str, result=str)
+        def evaluateScattering(self, payload: str) -> str:
+            return self._bridge.evaluate_scattering(payload)
+
     app = QApplication(args)
     view = QWebEngineView()
     view.setWindowTitle("EM Workbench - 电磁工作台")

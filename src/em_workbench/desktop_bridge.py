@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from em_workbench.app import (
     FieldLineEvaluateRequest,
+    ScatteringEvaluateRequest,
     TrajectoryEvaluateRequest,
     compute_status,
     config,
@@ -18,6 +19,7 @@ from em_workbench.app import (
 from em_workbench.models import Position, Preset, PresetSummary, Scene
 from em_workbench.physics.compute.field_lines import FieldLineResponse, trace_field_lines
 from em_workbench.physics.dynamics import TrajectoryResponse, simulate_trajectory
+from em_workbench.physics.scattering import ScatterResponse, simulate_scattering
 from em_workbench.physics.solver import FieldEvaluationResponse, SolverQuality, evaluate_scene
 from em_workbench.presets import get_preset, list_presets
 
@@ -80,6 +82,20 @@ def _evaluate_field_lines_json(payload: str) -> str:
     return result.model_dump_json()
 
 
+def _evaluate_scattering_json(payload: str) -> str:
+    request = ScatteringEvaluateRequest.model_validate_json(payload)
+    result = simulate_scattering(
+        request.nucleus,
+        request.beam,
+        dt_s=request.dt_s,
+        max_steps=request.max_steps,
+        exit_radius_m=request.exit_radius_m,
+        record_every=request.record_every,
+        request_id=request.request_id,
+    )
+    return result.model_dump_json()
+
+
 class DesktopComputeQueue:
     """Serialize desktop compute work away from the Qt UI thread."""
 
@@ -126,6 +142,7 @@ class DesktopComputeQueue:
             "evaluateField": _evaluate_field_json,
             "evaluateTrajectory": _evaluate_trajectory_json,
             "evaluateFieldLines": _evaluate_field_lines_json,
+            "evaluateScattering": _evaluate_scattering_json,
         }
         try:
             invoke = methods[method]
@@ -178,6 +195,9 @@ class WorkbenchDesktopBridge:
     def poll_compute(self, ticket: str) -> str:
         return self._compute_queue.poll(ticket)
 
+    def evaluate_scattering(self, payload: str) -> str:
+        return _evaluate_scattering_json(payload)
+
 
 def _json_list(
     items: (
@@ -186,6 +206,7 @@ def _json_list(
         | list[FieldEvaluationResponse]
         | list[TrajectoryResponse]
         | list[FieldLineResponse]
+        | list[ScatterResponse]
     ),
 ) -> str:
     return json.dumps([item.model_dump(mode="json") for item in items], ensure_ascii=False)

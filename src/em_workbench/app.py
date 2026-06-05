@@ -20,6 +20,12 @@ from em_workbench.physics.compute.field_lines import (
 )
 from em_workbench.physics.compute.runtime import probe_runtime
 from em_workbench.physics.dynamics import TestCharge, TrajectoryResponse, simulate_trajectory
+from em_workbench.physics.scattering import (
+    AlphaBeam,
+    Nucleus,
+    ScatterResponse,
+    simulate_scattering,
+)
 from em_workbench.physics.solver import FieldEvaluationResponse, SolverQuality, evaluate_scene
 from em_workbench.presets import get_preset, list_presets
 
@@ -106,6 +112,18 @@ class FieldLineEvaluateRequest(BaseModel):
     density: float = Field(default=1.0, gt=0.0, le=4.0)
     display_max_count: int = Field(default=120, ge=1, le=500)
     backend: BackendPolicy = "auto"
+
+
+class ScatteringEvaluateRequest(BaseModel):
+    """Rutherford scattering request from the static client."""
+
+    request_id: str = Field(min_length=1)
+    nucleus: Nucleus
+    beam: AlphaBeam
+    dt_s: float = Field(gt=0)
+    max_steps: int = Field(default=20000, ge=1, le=50000)
+    exit_radius_m: float | None = Field(default=None, gt=0)
+    record_every: int = Field(default=10, ge=1)
 
 
 def _vendor_version() -> str:
@@ -226,6 +244,20 @@ def evaluate_field_lines(request: FieldLineEvaluateRequest) -> FieldLineResponse
         density=request.density,
         display_max_count=request.display_max_count,
         backend=request.backend,
+    )
+
+
+@app.post("/api/scattering/evaluate", response_model=ScatterResponse)
+def evaluate_scattering(request: ScatteringEvaluateRequest) -> ScatterResponse:
+    """Simulate a Rutherford alpha-particle beam against a fixed target nucleus."""
+    return simulate_scattering(
+        request.nucleus,
+        request.beam,
+        dt_s=request.dt_s,
+        max_steps=request.max_steps,
+        exit_radius_m=request.exit_radius_m,
+        record_every=request.record_every,
+        request_id=request.request_id,
     )
 
 

@@ -134,3 +134,17 @@ export async function getComputeStatus() {
   });
   return parseJsonResponse(response, "Compute-status load failed");
 }
+
+export async function evaluateScattering(request) {
+  const bridgeResult = await callDesktopCompute("evaluateScattering", request);
+  if (bridgeResult !== null) {
+    return bridgeResult;
+  }
+
+  const response = await fetch("/api/scattering/evaluate", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  return parseJsonResponse(response, "Scattering evaluation failed");
+}

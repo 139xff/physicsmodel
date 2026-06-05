@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 24: Scattering display and performance fixes</title>
+    <style>
+      body {
+        color: #18202a;
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+        margin: 2rem auto;
+        max-width: 1100px;
+        padding: 0 1rem;
+      }
+      h1, h2 { color: #12355b; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td {
+        border: 1px solid #b8c2cc;
+        padding: 0.55rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: #eef4f8; }
+      code {
+        background: #f3f5f7;
+        border-radius: 3px;
+        padding: 0.1rem 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 24: Scattering display and performance fixes</h1>
+      <p><strong>Completed:</strong> 2026-06-05 13:12:12 +08:00</p>
+
+      <h2>Scope delivered</h2>
+      <ul>
+        <li>Removed the plus-sign label from the target nucleus to eliminate the distracting cross-like mark.</li>
+        <li>Rendered alpha particles as visible green circular markers, while retaining angle-colored trajectory lines.</li>
+        <li>Slowed scattering playback to a clearer 90 ms frame cadence.</li>
+        <li>Added a beam center-y control so particle count, beam width, start x, and beam vertical position are all adjustable.</li>
+        <li>Reduced animation work by drawing trajectory paths once and updating only the green particle marker layer during playback.</li>
+      </ul>
+
+      <h2>Scope deferred</h2>
+      <p>No new histogram or cross-section statistics were added in this display/performance pass.</p>
+
+      <h2>Changed files</h2>
+      <table>
+        <thead>
+          <tr><th>File</th><th>Change</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>web/app.js</code></td>
+            <td>Beam center control, green particle rendering, slower animation, and lighter per-frame updates.</td>
+          </tr>
+          <tr>
+            <td><code>web/styles.css</code></td>
+            <td>Green alpha marker styling and removal of unused nucleus-label styling.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_browser_smoke.py</code></td>
+            <td>Browser coverage for no nucleus cross, green particles, adjustable beam center, and stable trajectory elements during animation.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Commands and outcomes</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Outcome</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>node --check web\app.js</code> and <code>node --check web\api-client.js</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py::test_browser_rutherford_scattering_panel_renders_tracks -q</code></td>
+            <td>Passed: targeted scattering browser test.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests -q -p no:cacheprovider --ignore=tests\test_browser_smoke.py --ignore=tests\test_bootstrap_uv.py --ignore=tests\test_vendor_manifest.py</code></td>
+            <td>Passed: 66 tests.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run ruff check --no-cache src tests</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --extra desktop python -m em_workbench.desktop --check</code></td>
+            <td>Passed: <code>desktop runtime ok</code>.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py -q</code></td>
+            <td>Passed: 12 browser tests.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Verification evidence</h2>
+      <ul>
+        <li>The browser test confirms the nucleus label is absent and the alpha markers compute to <code>rgb(22, 163, 74)</code>.</li>
+        <li>The test sets the beam center to 2 cm and confirms the first and last impact parameters shift to -2 cm and 6 cm.</li>
+        <li>The test stores a trajectory path node reference and confirms it remains the same after animation advances, proving paths are not rebuilt each frame.</li>
+      </ul>
+
+      <h2>Known risks and limitations</h2>
+      <ul>
+        <li>Very high particle counts with very small time steps can still be computationally heavier, but animation no longer redraws every path every frame.</li>
+        <li>The current visual keeps trajectory lines visible while green particle markers show motion along those trajectories.</li>
+      </ul>
+
+      <h2>Next scheduled task</h2>
+      <p>Restart the desktop app for user inspection, then publish the branch if approved.</p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Task 23: Rutherford scattering module</title>
+    <style>
+      body {
+        color: #18202a;
+        font-family: Arial, sans-serif;
+        line-height: 1.5;
+        margin: 2rem auto;
+        max-width: 1100px;
+        padding: 0 1rem;
+      }
+      h1, h2 { color: #12355b; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td {
+        border: 1px solid #b8c2cc;
+        padding: 0.55rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th { background: #eef4f8; }
+      code {
+        background: #f3f5f7;
+        border-radius: 3px;
+        padding: 0.1rem 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Task 23: Rutherford scattering module</h1>
+      <p><strong>Completed:</strong> 2026-06-05 12:55:04 +08:00</p>
+
+      <h2>Scope delivered</h2>
+      <ul>
+        <li>Integrated the external Rutherford alpha-particle scattering module into the main EM Workbench project.</li>
+        <li>Added a pure Python scattering solver using exact Coulomb acceleration rather than the clamped field solver.</li>
+        <li>Added the <code>/api/scattering/evaluate</code> endpoint and desktop bridge support through <code>evaluateScattering</code>.</li>
+        <li>Added a main-workbench Rutherford scattering panel with beam controls, animated 2D trajectories, angle coloring, and backscatter statistics.</li>
+        <li>Added unit, API, desktop bridge, and browser regression coverage.</li>
+      </ul>
+
+      <h2>Scope deferred</h2>
+      <p>Histogram and differential cross-section analysis are not included in this slice. The current UI focuses on beam trajectories, scattering angles, and backscatter count.</p>
+
+      <h2>Changed files</h2>
+      <table>
+        <thead>
+          <tr><th>File</th><th>Change</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>src/em_workbench/physics/scattering.py</code></td>
+            <td>New Rutherford scattering physics module.</td>
+          </tr>
+          <tr>
+            <td><code>src/em_workbench/app.py</code></td>
+            <td>New scattering request model and API endpoint.</td>
+          </tr>
+          <tr>
+            <td><code>src/em_workbench/desktop.py</code>, <code>src/em_workbench/desktop_bridge.py</code></td>
+            <td>Desktop bridge support for local scattering evaluation.</td>
+          </tr>
+          <tr>
+            <td><code>web/api-client.js</code>, <code>web/app.js</code>, <code>web/styles.css</code></td>
+            <td>Client call, scattering controls, animated 2D layer, and styling.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_scattering.py</code>, <code>tests/test_app.py</code>, <code>tests/test_desktop_bridge.py</code>, <code>tests/test_browser_smoke.py</code></td>
+            <td>Physics, API, desktop bridge, and browser smoke coverage.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Commands and outcomes</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Outcome</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests\test_scattering.py tests\test_app.py::test_scattering_endpoint_simulates_rutherford_beam tests\test_desktop_bridge.py::test_desktop_bridge_simulates_scattering_without_http_server -q</code></td>
+            <td>Passed: 4 targeted tests.</td>
+          </tr>
+          <tr>
+            <td><code>node --check web\app.js</code> and <code>node --check web\api-client.js</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py::test_browser_rutherford_scattering_panel_renders_tracks -q</code></td>
+            <td>Passed: scattering browser smoke test.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests -q -p no:cacheprovider --ignore=tests\test_browser_smoke.py --ignore=tests\test_bootstrap_uv.py --ignore=tests\test_vendor_manifest.py</code></td>
+            <td>Passed: 66 tests.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run ruff check --no-cache src tests</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --extra desktop python -m em_workbench.desktop --check</code></td>
+            <td>Passed: <code>desktop runtime ok</code>.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run pytest tests\test_browser_smoke.py -q</code></td>
+            <td>Passed: 12 browser tests.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Verification evidence</h2>
+      <ul>
+        <li>The numerical scattering angle matches the Rutherford theory angle within focused tolerances for symmetric impact parameters.</li>
+        <li>The head-on particle turns back at approximately the characteristic distance of closest approach.</li>
+        <li>The browser smoke test renders five scattering tracks, a nucleus marker, five alpha markers, and at least one backscattered track.</li>
+        <li>The existing field-line and motion playback browser tests still pass.</li>
+      </ul>
+
+      <h2>Known risks and limitations</h2>
+      <ul>
+        <li>The UI uses scaled classroom units, not a literal gold-foil laboratory length and speed scale.</li>
+        <li>The solver uses a fixed time step; very aggressive small-impact-parameter settings may need a smaller <code>dt</code> for tighter angle agreement.</li>
+        <li>The dynamically inserted panel avoids touching legacy mojibake text in <code>web/index.html</code>.</li>
+      </ul>
+
+      <h2>Next scheduled task</h2>
+      <p>Let the user inspect the running desktop app, then optionally publish the branch to GitHub after confirmation.</p>
+    </main>
+  </body>
+</html>

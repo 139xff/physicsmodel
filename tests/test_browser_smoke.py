@@ -1076,6 +1076,67 @@ def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) 
     }
 
 
+def test_browser_rutherford_scattering_panel_renders_tracks(page: Page) -> None:
+    expect(page.get_by_role("heading", name="卢瑟福散射实验")).to_be_visible()
+    expect(page.get_by_test_id("scattering-state")).to_contain_text("待命")
+    expect(page.locator("#scatter-run")).to_contain_text("运行散射")
+    expect(page.locator("#scatter-center-y")).to_have_value("0")
+
+    page.locator("#scatter-particles").fill("5")
+    page.locator("#scatter-half-width").fill("4")
+    page.locator("#scatter-center-y").fill("2")
+    page.locator("#scatter-run").click()
+    page.wait_for_function(
+        """
+        () => {
+            const layer = document.querySelector('[data-testid="scattering-layer-2d"]');
+            return Number(layer?.dataset.trackCount || 0) === 5 &&
+                document.querySelectorAll('[data-testid="scattering-particle-2d"]').length === 5;
+        }
+        """
+    )
+
+    layer = page.get_by_test_id("scattering-layer-2d")
+    expect(layer).to_have_attribute("data-track-count", "5")
+    expect(page.get_by_test_id("scattering-nucleus-2d")).to_be_visible()
+    expect(page.locator(".scattering-nucleus-label")).to_have_count(0)
+    expect(page.get_by_test_id("scattering-particle-2d")).to_have_count(5)
+    expect(page.get_by_test_id("scattering-track-2d")).to_have_count(0)
+    expect(page.get_by_test_id("scattering-particle-layer-2d")).to_have_attribute(
+        "data-frame-index",
+        "0",
+    )
+    page.wait_for_function(
+        """
+        () => document.querySelectorAll('[data-testid="scattering-track-2d"]').length === 5
+        """
+    )
+    expect(page.get_by_test_id("scattering-track-2d").nth(0)).to_have_attribute(
+        "data-impact-cm",
+        "-2.000",
+    )
+    expect(page.get_by_test_id("scattering-track-2d").nth(4)).to_have_attribute(
+        "data-impact-cm",
+        "6.000",
+    )
+    particle_fill = page.get_by_test_id("scattering-particle-2d").first.evaluate(
+        "element => getComputedStyle(element).fill"
+    )
+    assert particle_fill == "rgb(22, 163, 74)"
+    assert float(layer.get_attribute("data-max-angle-deg") or "0") > 90
+    assert int(layer.get_attribute("data-backscatter-count") or "0") >= 1
+    expect(page.get_by_test_id("scattering-readout")).to_contain_text("个粒子")
+
+    initial_path = page.get_by_test_id("scattering-track-2d").first.get_attribute("d")
+    page.wait_for_function(
+        """
+        (initialPath) => document.querySelector('[data-testid="scattering-track-2d"]')
+            ?.getAttribute('d') !== initialPath
+        """,
+        arg=initial_path,
+    )
+
+
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     expect(page.locator("#add-infinite-plane")).to_be_hidden()
     expect(page.locator("#add-spherical-shell")).to_be_hidden()

@@ -1,4 +1,13 @@
-import { evaluateField, evaluateFieldLines, evaluateTrajectory, getComputeStatus, getConfig, getPreset, listPresets } from "./api-client.js";
+import {
+  evaluateField,
+  evaluateFieldLines,
+  evaluateScattering,
+  evaluateTrajectory,
+  getComputeStatus,
+  getConfig,
+  getPreset,
+  listPresets,
+} from "./api-client.js";
 import { render3d, resize3d, stopAnimLoop } from "./renderers/view3d.js?v=20260529-axis-labels-pan-preserve";
 
 document.documentElement.classList.toggle("desktop-runtime", Boolean(window.emWorkbenchBridgeReady));
@@ -83,6 +92,49 @@ const motionInputs = {
   vy: document.querySelector("#motion-vy"),
   dt: document.querySelector("#motion-dt"),
   steps: document.querySelector("#motion-steps"),
+};
+
+motionReadout.closest(".status-block")?.insertAdjacentHTML(
+  "afterend",
+  `
+    <section class="status-block scattering-block">
+      <div class="motion-heading">
+        <h3>卢瑟福散射实验</h3>
+        <span data-testid="scattering-state">待命</span>
+      </div>
+      <div class="scattering-grid">
+        <label>原子核电荷 Q (nC)<input id="scatter-target-charge" type="number" step="0.1" value="1"></label>
+        <label>α 粒子电荷 q (nC)<input id="scatter-alpha-charge" type="number" step="0.1" value="1"></label>
+        <label>α 粒子质量 m (mg)<input id="scatter-alpha-mass" type="number" step="0.1" min="0.01" value="1"></label>
+        <label>入射速度 v (m/s)<input id="scatter-speed" type="number" step="0.1" min="0.01" value="1.5"></label>
+        <label>起始 x (cm)<input id="scatter-start-x" type="number" step="1" value="-50"></label>
+        <label>束流中心 y (cm)<input id="scatter-center-y" type="number" step="0.5" value="0"></label>
+        <label>入射半宽 b (cm)<input id="scatter-half-width" type="number" step="0.5" min="0" value="5"></label>
+        <label>粒子数<input id="scatter-particles" type="number" step="2" min="1" max="61" value="21"></label>
+        <label>时间步 dt (s)<input id="scatter-dt" type="number" step="0.0005" min="0.000001" value="0.001"></label>
+        <label>最大步数<input id="scatter-max-steps" type="number" step="100" min="1" max="50000" value="4000"></label>
+      </div>
+      <div class="motion-actions">
+        <button id="scatter-run" class="motion-primary" type="button">运行散射</button>
+        <button id="scatter-reset" type="button">清除</button>
+      </div>
+      <p class="motion-readout" data-testid="scattering-readout">尚未运行散射实验。</p>
+    </section>
+  `,
+);
+const scatteringState = document.querySelector("[data-testid='scattering-state']");
+const scatteringReadout = document.querySelector("[data-testid='scattering-readout']");
+const scatteringInputs = {
+  targetCharge: document.querySelector("#scatter-target-charge"),
+  alphaCharge: document.querySelector("#scatter-alpha-charge"),
+  alphaMass: document.querySelector("#scatter-alpha-mass"),
+  speed: document.querySelector("#scatter-speed"),
+  startX: document.querySelector("#scatter-start-x"),
+  centerY: document.querySelector("#scatter-center-y"),
+  halfWidth: document.querySelector("#scatter-half-width"),
+  particles: document.querySelector("#scatter-particles"),
+  dt: document.querySelector("#scatter-dt"),
+  maxSteps: document.querySelector("#scatter-max-steps"),
 };
 let probeInputs = {
   x: document.querySelector("#probe-x"),
@@ -183,6 +235,8 @@ const EQUIPOTENTIAL_LABEL_DOUBLE_FRACTIONS = [
   [0.34, 0.3, 0.38, 0.26],
   [0.66, 0.7, 0.62, 0.74],
 ];
+const SCATTERING_ANIMATION_INTERVAL_MS = 90;
+const SCATTERING_PARTICLE_COLOR = "#16a34a";
 
 const state = {
   mode: "2D",
@@ -217,6 +271,13 @@ const state = {
     frameIndex: 0,
     animationId: null,
     running: false,
+  },
+  scattering: {
+    tracks: [],
+    frameIndex: 0,
+    animationId: null,
+    running: false,
+    characteristicDistanceM: null,
   },
 };
 
@@ -2653,8 +2714,12 @@ function compute2dVisibleWorldBounds() {
   };
 }
 
-function clampInteger(value, minValue, maxValue) {
-  return Math.max(minValue, Math.min(maxValue, Math.round(value)));
+function clampInteger(value, minValue, maxValue, fallback = minValue) {
+  const parsed = Math.round(Number(value));
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(minValue, Math.min(maxValue, parsed));
 }
 
 function equipotentialGridSize(scale) {
@@ -3665,6 +3730,7 @@ function render2d() {
       ${renderHeatmap2d()}
       ${renderOverlay2d(scale)}
       ${renderMotionLayer2d()}
+      ${renderScatteringLayer2d()}
       ${sourceMarkup}
     </svg>
   `;
@@ -3710,6 +3776,265 @@ function renderMotionFrame2d() {
     return;
   }
   layer.outerHTML = renderMotionLayer2d();
+}
+
+function impactParameterSeries(count, halfWidthM, centerM = 0) {
+  if (count <= 1 || Math.abs(halfWidthM) <= 1e-15) {
+    return [centerM];
+  }
+  return Array.from({ length: count }, (_unused, index) => (
+    centerM - halfWidthM + (2 * halfWidthM * index) / (count - 1)
+  ));
+}
+
+function scatteringColor(angleDeg) {
+  const t = Math.min(Math.abs(Number(angleDeg) || 0), 180) / 180;
+  const red = Math.round(46 + 198 * t);
+  const green = Math.round(111 - 78 * t);
+  const blue = Math.round(215 - 146 * t);
+  return `rgb(${red}, ${green}, ${blue})`;
+}
+
+function scatteringMaxFrameCount() {
+  return Math.max(0, ...state.scattering.tracks.map((track) => track.samples.length));
+}
+
+function scatteringCurrentSample(track) {
+  const index = Math.min(track.samples.length - 1, state.scattering.frameIndex);
+  return track.samples[Math.max(0, index)];
+}
+
+function scatteringVisibleSamples(track) {
+  const endIndex = Math.min(track.samples.length, state.scattering.frameIndex + 1);
+  return track.samples.slice(0, Math.max(1, endIndex));
+}
+
+function scatteringTrackPath(track) {
+  const visibleSamples = scatteringVisibleSamples(track);
+  if (visibleSamples.length < 2) {
+    return "";
+  }
+  return visibleSamples
+    .map((sample, sampleIndex) => {
+      const point = mapToViewport(sample.x, sample.y);
+      return `${sampleIndex === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+    })
+    .join(" ");
+}
+
+function renderScatteringTracks2d() {
+  return `
+    <g
+      class="scattering-trail-layer"
+      data-testid="scattering-trail-layer-2d"
+      data-frame-index="${state.scattering.frameIndex}"
+    >
+      ${state.scattering.tracks
+        .map((track, index) => {
+          const path = scatteringTrackPath(track);
+          if (!path) {
+            return "";
+          }
+          return `
+            <path
+              class="scattering-track"
+              data-testid="scattering-track-2d"
+              data-track-index="${index}"
+              data-impact-cm="${(track.impact_parameter_m * 100).toFixed(3)}"
+              data-angle-deg="${track.scattering_angle_deg.toFixed(3)}"
+              data-theory-angle-deg="${track.rutherford_angle_deg.toFixed(3)}"
+              d="${path}"
+              style="stroke: ${scatteringColor(track.scattering_angle_deg)};"
+            ></path>
+          `;
+        })
+        .join("")}
+    </g>
+  `;
+}
+
+function renderScatteringParticles2d() {
+  return `
+    <g
+      class="scattering-particle-layer"
+      data-testid="scattering-particle-layer-2d"
+      data-frame-index="${state.scattering.frameIndex}"
+    >
+      ${state.scattering.tracks
+        .map((track, index) => {
+          const sample = scatteringCurrentSample(track);
+          const marker = mapToViewport(sample.x, sample.y);
+          return `
+            <circle
+              class="scattering-particle"
+              data-testid="scattering-particle-2d"
+              data-track-index="${index}"
+              cx="${marker.x}"
+              cy="${marker.y}"
+              r="0.34"
+              style="fill: ${SCATTERING_PARTICLE_COLOR};"
+            ></circle>
+          `;
+        })
+        .join("")}
+    </g>
+  `;
+}
+
+function renderScatteringLayer2d() {
+  const tracks = state.scattering.tracks;
+  if (tracks.length === 0) {
+    return '<g data-testid="scattering-layer-2d" data-track-count="0"></g>';
+  }
+  const maxAngle = Math.max(...tracks.map((track) => Math.abs(track.scattering_angle_deg)));
+  const backscatterCount = tracks.filter((track) => Math.abs(track.scattering_angle_deg) > 90).length;
+  const nucleus = mapToViewport(0, 0);
+  return `
+    <g
+      class="scattering-layer"
+      data-testid="scattering-layer-2d"
+      data-track-count="${tracks.length}"
+      data-frame-index="${state.scattering.frameIndex}"
+      data-max-frame-count="${scatteringMaxFrameCount()}"
+      data-backscatter-count="${backscatterCount}"
+      data-max-angle-deg="${maxAngle.toFixed(3)}"
+      data-characteristic-distance-cm="${(
+        (state.scattering.characteristicDistanceM || 0) * 100
+      ).toFixed(4)}"
+    >
+      <circle
+        class="scattering-nucleus"
+        data-testid="scattering-nucleus-2d"
+        cx="${nucleus.x}"
+        cy="${nucleus.y}"
+        r="0.45"
+      ></circle>
+      ${renderScatteringTracks2d()}
+      ${renderScatteringParticles2d()}
+    </g>
+  `;
+}
+
+function renderScatteringFrame2d() {
+  const layer = view2d.querySelector("[data-testid='scattering-layer-2d']");
+  if (!layer) {
+    render2d();
+    return;
+  }
+  layer.dataset.frameIndex = String(state.scattering.frameIndex);
+  const trailLayer = layer.querySelector("[data-testid='scattering-trail-layer-2d']");
+  const particleLayer = layer.querySelector("[data-testid='scattering-particle-layer-2d']");
+  if (!trailLayer || !particleLayer) {
+    render2d();
+    return;
+  }
+  trailLayer.outerHTML = renderScatteringTracks2d();
+  particleLayer.outerHTML = renderScatteringParticles2d();
+}
+
+function cancelScatteringAnimation() {
+  if (state.scattering.animationId !== null) {
+    window.cancelAnimationFrame(state.scattering.animationId);
+    state.scattering.animationId = null;
+  }
+  state.scattering.running = false;
+}
+
+function updateScatteringReadout() {
+  const tracks = state.scattering.tracks;
+  if (tracks.length === 0) {
+    scatteringReadout.textContent = "尚未运行散射实验。";
+    return;
+  }
+  const maxAngle = Math.max(...tracks.map((track) => Math.abs(track.scattering_angle_deg)));
+  const backscatterCount = tracks.filter((track) => Math.abs(track.scattering_angle_deg) > 90).length;
+  scatteringReadout.textContent =
+    `${tracks.length} 个粒子；` +
+    `最大散射角 ${maxAngle.toFixed(1)}°；` +
+    `大角度反弹 ${backscatterCount} 个；` +
+    `d=${formatNumber((state.scattering.characteristicDistanceM || 0) * 100, 4)} cm`;
+}
+
+function clearScatteringSimulation() {
+  cancelScatteringAnimation();
+  state.scattering.tracks = [];
+  state.scattering.frameIndex = 0;
+  state.scattering.characteristicDistanceM = null;
+  scatteringState.textContent = "待命";
+  updateScatteringReadout();
+  render2d();
+}
+
+function animateScatteringTracks() {
+  cancelScatteringAnimation();
+  if (state.scattering.tracks.length === 0) {
+    return;
+  }
+  state.scattering.running = true;
+  state.scattering.frameIndex = 0;
+  scatteringState.textContent = "播放中";
+  const maxFrameCount = scatteringMaxFrameCount();
+  let previousTime = 0;
+
+  function tick(timestamp) {
+    if (!state.scattering.running) {
+      return;
+    }
+    if (previousTime === 0) {
+      previousTime = timestamp;
+      state.scattering.animationId = window.requestAnimationFrame(tick);
+      return;
+    }
+    if (timestamp - previousTime >= SCATTERING_ANIMATION_INTERVAL_MS) {
+      previousTime = timestamp;
+      state.scattering.frameIndex += 1;
+      renderScatteringFrame2d();
+    }
+    if (state.scattering.frameIndex >= maxFrameCount - 1) {
+      cancelScatteringAnimation();
+      scatteringState.textContent = "完成";
+      updateScatteringReadout();
+      return;
+    }
+    state.scattering.animationId = window.requestAnimationFrame(tick);
+  }
+
+  renderScatteringFrame2d();
+  updateScatteringReadout();
+  state.scattering.animationId = window.requestAnimationFrame(tick);
+}
+
+async function runScatteringSimulation() {
+  cancelScatteringAnimation();
+  clearMotionTrajectory();
+  setMode("2D");
+  scatteringState.textContent = "计算中";
+  const particleCount = clampInteger(scatteringInputs.particles.value, 1, 61, 21);
+  const halfWidthM = Math.max(0, centimetersToMeters(Number(scatteringInputs.halfWidth.value)));
+  const centerYM = centimetersToMeters(Number(scatteringInputs.centerY.value));
+  const result = await evaluateScattering({
+    request_id: `ui-scatter-${Date.now()}`,
+    nucleus: {
+      charge_c: Number(scatteringInputs.targetCharge.value) * 1e-9,
+      position: { x: 0, y: 0, z: 0, unit: "m" },
+    },
+    beam: {
+      charge_c: Number(scatteringInputs.alphaCharge.value) * 1e-9,
+      mass_kg: Number(scatteringInputs.alphaMass.value) * 1e-6,
+      speed_m_per_s: Number(scatteringInputs.speed.value),
+      start_x_m: centimetersToMeters(Number(scatteringInputs.startX.value)),
+      impact_parameters_m: impactParameterSeries(particleCount, halfWidthM, centerYM),
+    },
+    dt_s: Number(scatteringInputs.dt.value),
+    max_steps: clampInteger(scatteringInputs.maxSteps.value, 1, 50000, 4000),
+    record_every: 10,
+  });
+  state.scattering.tracks = result.tracks;
+  state.scattering.characteristicDistanceM = result.characteristic_distance_m;
+  state.scattering.frameIndex = 0;
+  scatteringState.textContent = `已计算 ${result.tracks.length} 个`;
+  render2d();
+  animateScatteringTracks();
 }
 
 function cancelMotionAnimation() {
@@ -4261,6 +4586,13 @@ document.querySelector("#motion-run").addEventListener("click", () => {
   });
 });
 document.querySelector("#motion-reset").addEventListener("click", clearMotionTrajectory);
+document.querySelector("#scatter-run").addEventListener("click", () => {
+  runScatteringSimulation().catch((error) => {
+    scatteringState.textContent = "失败";
+    scatteringReadout.textContent = error.message;
+  });
+});
+document.querySelector("#scatter-reset").addEventListener("click", clearScatteringSimulation);
 presetForm.addEventListener("submit", (event) => {
   event.preventDefault();
   loadSelectedPreset().catch((error) => {

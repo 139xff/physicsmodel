@@ -157,3 +157,34 @@ def test_compute_status_reports_cpu_and_optional_cuda_runtime() -> None:
     assert status["warmup"]["state"] in {"warming", "ready"}
     assert isinstance(status["cuda"]["installed"], bool)
     assert isinstance(status["cuda"]["available"], bool)
+
+
+def test_scattering_endpoint_simulates_rutherford_beam():
+    response = client.post(
+        "/api/scattering/evaluate",
+        json={
+            "request_id": "scatter-api-test",
+            "nucleus": {
+                "charge_c": 1.0e-9,
+                "position": {"x": 0.0, "y": 0.0, "z": 0.0, "unit": "m"},
+            },
+            "beam": {
+                "charge_c": 1.0e-9,
+                "mass_kg": 1.0e-6,
+                "speed_m_per_s": 1.5,
+                "start_x_m": -0.5,
+                "impact_parameters_m": [0.0, 0.02, -0.02],
+            },
+            "dt_s": 0.001,
+            "max_steps": 4000,
+            "record_every": 20,
+        },
+    )
+
+    assert response.status_code == 200
+    scatter = response.json()
+    assert scatter["request_id"] == "scatter-api-test"
+    assert len(scatter["tracks"]) == 3
+    assert abs(scatter["tracks"][0]["scattering_angle_deg"]) > 170
+    assert scatter["tracks"][1]["scattering_angle_deg"] > 0
+    assert scatter["tracks"][2]["scattering_angle_deg"] < 0

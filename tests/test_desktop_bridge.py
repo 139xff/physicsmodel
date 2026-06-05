@@ -108,6 +108,38 @@ def test_desktop_queue_returns_ticket_then_result() -> None:
     assert json.loads(result)["cpu"]["logical_processors"] >= 1
 
 
+def test_desktop_bridge_simulates_scattering_without_http_server() -> None:
+    bridge = WorkbenchDesktopBridge()
+
+    result = json.loads(
+        bridge.evaluate_scattering(
+            json.dumps(
+                {
+                    "request_id": "desktop-scatter-test",
+                    "nucleus": {
+                        "charge_c": 1.0e-9,
+                        "position": {"x": 0.0, "y": 0.0, "z": 0.0, "unit": "m"},
+                    },
+                    "beam": {
+                        "charge_c": 1.0e-9,
+                        "mass_kg": 1.0e-6,
+                        "speed_m_per_s": 1.5,
+                        "start_x_m": -0.5,
+                        "impact_parameters_m": [0.0, 0.02, -0.02],
+                    },
+                    "dt_s": 0.001,
+                    "max_steps": 4000,
+                    "record_every": 20,
+                }
+            )
+        )
+    )
+
+    assert result["request_id"] == "desktop-scatter-test"
+    assert len(result["tracks"]) == 3
+    assert abs(result["tracks"][0]["scattering_angle_deg"]) > 170
+
+
 def test_desktop_bridge_bootstrap_waits_for_document_root() -> None:
     script = _bridge_bootstrap_script()
 

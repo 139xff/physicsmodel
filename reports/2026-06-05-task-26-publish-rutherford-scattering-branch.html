@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 26 - Publish Rutherford Scattering Branch</title>
+    <style>
+      body {
+        color: #172033;
+        font-family: Arial, sans-serif;
+        line-height: 1.55;
+        margin: 2rem auto;
+        max-width: 960px;
+      }
+      h1,
+      h2 {
+        color: #0f172a;
+      }
+      table {
+        border-collapse: collapse;
+        margin: 1rem 0;
+        width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid #cbd5e1;
+        padding: 0.6rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #e2e8f0;
+      }
+      code {
+        background: #f1f5f9;
+        padding: 0.1rem 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Task 26 - Publish Rutherford Scattering Branch</h1>
+    <p><strong>Completion timestamp:</strong> 2026-06-05 18:26:08 +08:00</p>
+
+    <h2>Scope Delivered</h2>
+    <ul>
+      <li>Rebased <code>codex/rutherford-scattering-module</code> onto the latest remote <code>feature/em-workbench-foundation</code> commit <code>492da38</code>.</li>
+      <li>Resolved conflicts between the integrated field-line/equipotential work and the Rutherford scattering module.</li>
+      <li>Published the new branch to <code>origin/codex/rutherford-scattering-module</code> without merging into the shared foundation branch.</li>
+      <li>Verified the remote branch points to commit <code>aa47ddfdf0949259c7bf15e7422ce3bb9217363f</code>.</li>
+    </ul>
+
+    <h2>Scope Deferred</h2>
+    <ul>
+      <li>No pull request was opened in this task because the requested action was to upload a new branch only.</li>
+      <li>No merge into the public group branch was performed.</li>
+    </ul>
+
+    <h2>Changed Files</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Path</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>reports/2026-06-05-task-26-publish-rutherford-scattering-branch.html</code></td>
+          <td>Records branch publication, rebase conflict resolution, validation, and push evidence.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Commands Executed</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Outcome</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --project C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish pytest tests\test_scattering.py tests\test_app.py tests\test_desktop_bridge.py -q</code></td>
+          <td>Passed: 21 tests.</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --project C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish pytest tests\test_browser_smoke.py::test_browser_rutherford_scattering_panel_renders_tracks -q</code></td>
+          <td>First run exposed a duplicate <code>clampInteger</code> declaration; after fixing the merge conflict, the rerun passed.</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --project C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish ruff check --no-cache src tests</code></td>
+          <td>Passed: all checks passed.</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --project C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish --extra desktop python -m em_workbench.desktop --check</code></td>
+          <td>Passed: <code>desktop runtime ok</code>.</td>
+        </tr>
+        <tr>
+          <td><code>node --check web\app.js</code> and <code>node --check web\api-client.js</code></td>
+          <td>Passed: JavaScript syntax checks returned exit code 0.</td>
+        </tr>
+        <tr>
+          <td><code>git -c http.proxy=http://127.0.0.1:7890 push -u origin codex/rutherford-scattering-module</code></td>
+          <td>Passed: new remote branch created and tracking configured.</td>
+        </tr>
+        <tr>
+          <td><code>git -c http.proxy=http://127.0.0.1:7890 ls-remote origin refs/heads/codex/rutherford-scattering-module</code></td>
+          <td>Passed: remote branch resolved to <code>aa47ddfdf0949259c7bf15e7422ce3bb9217363f</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Verification Evidence</h2>
+    <ul>
+      <li>Core Python/API/desktop tests passed after rebasing onto the latest shared branch.</li>
+      <li>Browser scattering panel test passed after the duplicate helper conflict was resolved.</li>
+      <li>Ruff passed for <code>src</code> and <code>tests</code>.</li>
+      <li>The desktop runtime check reported <code>desktop runtime ok</code>.</li>
+      <li>The GitHub remote branch exists at <code>refs/heads/codex/rutherford-scattering-module</code>.</li>
+    </ul>
+
+    <h2>Known Risks or Limitations</h2>
+    <ul>
+      <li>The branch has not been merged; teammates must review and merge it through the GitHub workflow if they want it in the shared branch.</li>
+      <li>Only the targeted Rutherford browser smoke test was rerun after conflict resolution; the full browser smoke suite had passed before the publication step.</li>
+    </ul>
+
+    <h2>Next Scheduled Task</h2>
+    <p>Open a pull request from <code>codex/rutherford-scattering-module</code> into the group branch when the team is ready to review and merge.</p>
+  </body>
+</html>

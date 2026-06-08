@@ -64,8 +64,8 @@ def test_cpu_field_lines_use_smooth_rk4_step_spacing_for_point_charge() -> None:
         for point, next_point in zip(line.points, line.points[1:], strict=False)
     ]
     assert segment_lengths
-    assert max(segment_lengths) <= 0.009
-    assert sum(segment_lengths) / len(segment_lengths) <= 0.008
+    assert max(segment_lengths) <= 0.0068
+    assert sum(segment_lengths) / len(segment_lengths) <= 0.006
 
 
 def test_field_line_api_returns_latest_render_contract(representative_scene: Scene) -> None:

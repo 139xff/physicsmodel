@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 45 - Glass Catmull Field Lines</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+      margin: 2rem auto;
+      max-width: 980px;
+      padding: 0 1rem;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #c9d3e0;
+      padding: 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3f8;
+    }
+    code {
+      background: #f3f6fa;
+      border-radius: 4px;
+      padding: 0.1rem 0.25rem;
+    }
+    .status {
+      background: #eefaf1;
+      border-left: 4px solid #278a45;
+      padding: 0.75rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task 45 - Glass Catmull Field Lines</h1>
+  <p class="status"><strong>Completion timestamp:</strong> 2026-06-08 23:22:09 +08:00</p>
+
+  <h2>Scope Delivered</h2>
+  <ul>
+    <li>Reduced backend field-line RK4 step sizes from 0.004/0.008 m to 0.003/0.006 m and raised the step and point budgets for smoother traced geometry.</li>
+    <li>Reduced frontend trace and display sample spacing, then rendered final field lines as bounded centripetal Catmull-Rom SVG curves constrained by RK4 sample points.</li>
+    <li>Expanded field-line request bounds so source geometry is always included even when a source is near or slightly outside the current visible viewport.</li>
+    <li>Strengthened the source charge material into layered fruit glass with rim, refractive body, caustic, highlight, and specular filter layers.</li>
+    <li>Stabilized the motion-charge SVG layer by updating animated path and particle attributes in place instead of replacing the whole layer each frame.</li>
+  </ul>
+
+  <h2>Scope Deferred</h2>
+  <ul>
+    <li>3D source material parity was not implemented; this task targets the 2D SVG workbench surface.</li>
+    <li>CUDA hardware validation was not executed because CUDA is unavailable in this environment.</li>
+  </ul>
+
+  <h2>Changed Files</h2>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Change</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>src/em_workbench/physics/compute/field_lines.py</code></td><td>Smoother field-line step constants and larger trace budgets.</td></tr>
+      <tr><td><code>web/app.js</code></td><td>Bounded Catmull-Rom field-line paths, source-inclusive bounds, enhanced fruit-glass SVG layers and stable motion-layer updates.</td></tr>
+      <tr><td><code>web/styles.css</code></td><td>Fruit-glass rim, refraction, highlight, and caustic styles.</td></tr>
+      <tr><td><code>web/index.html</code></td><td>Static asset version updated to <code>20260608-glass-catmull-field-lines</code>.</td></tr>
+      <tr><td><code>tests/test_app.py</code></td><td>Static asset version assertion updated.</td></tr>
+      <tr><td><code>tests/test_browser_smoke.py</code></td><td>Browser assertions updated for Catmull field-line paths, fruit-glass depth layers, mixed-source balance, and motion-layer stability.</td></tr>
+      <tr><td><code>tests/test_field_lines.py</code></td><td>Backend smoothness threshold tightened for smaller RK4 steps.</td></tr>
+      <tr><td><code>reports/2026-06-08-task-45-glass-catmull-field-lines.html</code></td><td>Task report.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Commands Executed</h2>
+  <table>
+    <thead>
+      <tr><th>Command</th><th>Outcome</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py::test_cpu_field_lines_use_smooth_rk4_step_spacing_for_point_charge tests\test_browser_smoke.py::test_browser_sources_use_fruit_glass_material tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources tests\test_browser_smoke.py::test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs tests\test_browser_smoke.py::test_browser_field_lines_render_for_integrated_sources tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>Initial run failed on over-tight average segment-length assertion and missing point-source lines in the mixed-source viewport case.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync python -</code></td><td>Used uv-managed inline diagnostics to compare backend and browser field-line source counts and identify source-excluding bounds at 1440x900.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources</code></td><td>Passed after source-inclusive field-line bounds: 1 passed, 2 warnings.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_motion_playback_preserves_complex_field_line_layer tests\test_field_lines.py::test_cpu_field_lines_use_smooth_rk4_step_spacing_for_point_charge tests\test_browser_smoke.py::test_browser_sources_use_fruit_glass_material tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources tests\test_browser_smoke.py::test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs tests\test_browser_smoke.py::test_browser_field_lines_render_for_integrated_sources tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>Passed: 9 passed, 2 warnings.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td><td>Passed: all checks passed.</td></tr>
+      <tr><td><code>git diff --check</code></td><td>Passed with existing LF/CRLF warnings only.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td><td>Passed: 136 passed, 4 skipped, 2 warnings. Skipped tests require unavailable CUDA hardware.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Verification Evidence</h2>
+  <ul>
+    <li>Browser mixed-source test confirms point, line segment, ring, and disk field lines all remain represented and non-intersecting after smoothing.</li>
+    <li>Browser material test confirms fruit-glass metadata plus rim, refraction, caustic, and highlight layers.</li>
+    <li>Backend smoothness test confirms lower RK4 segment spacing for point-charge field lines.</li>
+    <li>Full repository tests and lint passed through the uv-managed toolchain.</li>
+  </ul>
+
+  <h2>Known Risks or Limitations</h2>
+  <ul>
+    <li>Smaller RK4 steps and denser display curves increase CPU work for complex scenes.</li>
+    <li>The 2D material uses SVG filters and blend modes; appearance may vary slightly between browser engines.</li>
+    <li>CUDA code paths inherit the field-line constants but were not hardware-validated here.</li>
+  </ul>
+
+  <h2>Next Scheduled Task</h2>
+  <p>Review the 2D visual result in the running workbench, then decide whether to add equivalent fruit-glass materials to the 3D renderer.</p>
+</body>
+</html>

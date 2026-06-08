@@ -174,11 +174,11 @@ const FIELD_LINE_DISPLAY_MAX_COUNT = 120;
 const FIELD_LINE_MAX_PAIR_DISPLAY_COUNT = 72;
 const FIELD_LINE_START_RADIUS_M = POINT_VISUAL_RADIUS_CM / 100;
 const FIELD_LINE_ENDPOINT_MARGIN_M = 0.0015;
-const FIELD_LINE_BASE_STEP_M = 0.004;
-const FIELD_LINE_MIN_STEP_M = 0.0008;
-const FIELD_LINE_MAX_STEP_M = 0.008;
-const FIELD_LINE_MAX_STEPS = 2400;
-const FIELD_LINE_MAX_POINTS = 2200;
+const FIELD_LINE_BASE_STEP_M = 0.003;
+const FIELD_LINE_MIN_STEP_M = 0.0006;
+const FIELD_LINE_MAX_STEP_M = 0.006;
+const FIELD_LINE_MAX_STEPS = 3200;
+const FIELD_LINE_MAX_POINTS = 3000;
 const FIELD_LINE_MIN_FIELD = 1e-15;
 const FIELD_LINE_SINGULARITY_RADIUS_M = 1e-6;
 const FIELD_LINE_REVERSAL_DOT_LIMIT = -0.2;
@@ -198,10 +198,12 @@ const FIELD_LINE_DISPLAY_SMOOTHING_ITERATIONS = 0;
 const FIELD_LINE_DISPLAY_SMOOTHING_WEIGHT = 0.18;
 const FIELD_LINE_DIRECTION_DOT_MIN = 0.2;
 const FIELD_LINE_DISPLAY_STRATEGY = "uniform-charge-angle-field-tangent";
-const FIELD_LINE_TRACE_TARGET_STEP_PX = 5;
-const FIELD_LINE_CURVE_SAMPLE_SPACING_PX = 4;
-const FIELD_LINE_CURVE_MIN_SAMPLE_SPACING_M = 0.001;
-const FIELD_LINE_CURVE_MAX_SAMPLE_SPACING_M = 0.02;
+const FIELD_LINE_TRACE_TARGET_STEP_PX = 3.5;
+const FIELD_LINE_CURVE_SAMPLE_SPACING_PX = 2.5;
+const FIELD_LINE_CURVE_MIN_SAMPLE_SPACING_M = 0.00075;
+const FIELD_LINE_CURVE_MAX_SAMPLE_SPACING_M = 0.012;
+const FIELD_LINE_CURVE_CENTRIPETAL_ALPHA = 0.5;
+const FIELD_LINE_CURVE_CONTROL_LIMIT = 0.42;
 const FIELD_LINE_MIN_VISIBLE_LENGTH_PX = 18;
 const FIELD_LINE_BOUNDS_PADDING_PX = 128;
 const FIELD_LINE_ARROW_FRACTION_BASE = 0.42;
@@ -1163,10 +1165,34 @@ function compute2dFieldLineBounds(scale) {
   const worldBounds = compute2dWorldBounds();
   const paddingX = ((scale?.xUnitsPerPx || 1) * FIELD_LINE_BOUNDS_PADDING_PX) / VIEWPORT_METERS_TO_UNITS;
   const paddingY = ((scale?.yUnitsPerPx || 1) * FIELD_LINE_BOUNDS_PADDING_PX) / VIEWPORT_METERS_TO_UNITS;
-  const minX = viewBox.minX / VIEWPORT_METERS_TO_UNITS;
-  const maxX = (viewBox.minX + viewBox.width) / VIEWPORT_METERS_TO_UNITS;
-  const minY = -(viewBox.minY + viewBox.height) / VIEWPORT_METERS_TO_UNITS;
-  const maxY = -viewBox.minY / VIEWPORT_METERS_TO_UNITS;
+  let minX = viewBox.minX / VIEWPORT_METERS_TO_UNITS;
+  let maxX = (viewBox.minX + viewBox.width) / VIEWPORT_METERS_TO_UNITS;
+  let minY = -(viewBox.minY + viewBox.height) / VIEWPORT_METERS_TO_UNITS;
+  let maxY = -viewBox.minY / VIEWPORT_METERS_TO_UNITS;
+  const sourceMargin = FIELD_LINE_START_RADIUS_M + FIELD_LINE_MAX_STEP_M * 2;
+  for (const source of fieldLineSeedSources2d()) {
+    const position = source.position || { x: 0, y: 0 };
+    const sourcePoints = [{ x: Number(position.x) || 0, y: Number(position.y) || 0 }];
+    let extent = sourceMargin;
+    if (["ring", "disk", "spherical_shell"].includes(source.kind)) {
+      extent += Number(source.radius_m) || 0;
+    }
+    if (source.kind === "line_segment") {
+      const length = Number(source.length_m) || 0;
+      const direction = source.orientation || { x: 1, y: 0 };
+      const directionLength = Math.hypot(Number(direction.x) || 0, Number(direction.y) || 0) || 1;
+      sourcePoints.push({
+        x: (Number(position.x) || 0) + ((Number(direction.x) || 0) / directionLength) * length,
+        y: (Number(position.y) || 0) + ((Number(direction.y) || 0) / directionLength) * length,
+      });
+    }
+    for (const point of sourcePoints) {
+      minX = Math.min(minX, point.x - extent);
+      maxX = Math.max(maxX, point.x + extent);
+      minY = Math.min(minY, point.y - extent);
+      maxY = Math.max(maxY, point.y + extent);
+    }
+  }
 
   return {
     minX: Math.max(worldBounds.minX, minX - paddingX),
@@ -1204,12 +1230,19 @@ function sourceFruitGradientId(source) {
 }
 
 function sourceFruitMaterialAttributes() {
-  return 'data-material="fruit-glass" data-material-finish="translucent-caustic"';
+  return 'data-material="fruit-glass" data-material-finish="translucent-caustic" data-material-depth="layered-rind-lens"';
 }
 
 function sourceFruitCircleLayers(source, point, radius) {
   const gradientId = sourceFruitGradientId(source);
   return `
+    <circle
+      class="source-fruit-rim"
+      data-testid="source-fruit-rim-2d-${source.id}"
+      cx="${point.x}"
+      cy="${point.y}"
+      r="${radius}"
+    ></circle>
     <ellipse
       class="source-fruit-caustic"
       data-testid="source-fruit-caustic-2d-${source.id}"
@@ -1217,6 +1250,15 @@ function sourceFruitCircleLayers(source, point, radius) {
       cy="${point.y + radius * 0.22}"
       rx="${radius * 0.58}"
       ry="${radius * 0.18}"
+      fill="url(#${gradientId})"
+    ></ellipse>
+    <ellipse
+      class="source-fruit-refract"
+      data-testid="source-fruit-refract-2d-${source.id}"
+      cx="${point.x + radius * 0.08}"
+      cy="${point.y - radius * 0.02}"
+      rx="${radius * 0.44}"
+      ry="${radius * 0.66}"
       fill="url(#${gradientId})"
     ></ellipse>
     <ellipse
@@ -1240,6 +1282,14 @@ function sourceFruitLineLayers(source, point, dx, dy, markerStrokeWidth) {
   const highlightOffset = Math.max(markerStrokeWidth * 0.3, 0.18);
   const causticOffset = Math.max(markerStrokeWidth * 0.42, 0.24);
   return `
+    <line
+      class="source-fruit-rim source-fruit-rim-line"
+      data-testid="source-fruit-rim-2d-${source.id}"
+      x1="${point.x}"
+      y1="${point.y}"
+      x2="${point.x + dx}"
+      y2="${point.y - dy}"
+    ></line>
     <line
       class="source-fruit-caustic source-fruit-caustic-line"
       data-testid="source-fruit-caustic-2d-${source.id}"
@@ -2190,11 +2240,78 @@ function fieldLinePolylineLength(points) {
   return length;
 }
 
+function extrapolatedFieldLineEndpoint(anchor, neighbor) {
+  return {
+    x: anchor.x * 2 - neighbor.x,
+    y: anchor.y * 2 - neighbor.y,
+  };
+}
+
+function fieldLineCentripetalDistance(start, end) {
+  const distance = Math.hypot(end.x - start.x, end.y - start.y);
+  return Math.max(1e-6, distance ** FIELD_LINE_CURVE_CENTRIPETAL_ALPHA);
+}
+
+function boundedFieldLineControlPoint(anchor, control, segmentLength) {
+  const controlLength = Math.hypot(control.x - anchor.x, control.y - anchor.y);
+  const maxControlLength = Math.max(1e-6, segmentLength * FIELD_LINE_CURVE_CONTROL_LIMIT);
+  if (controlLength <= maxControlLength) {
+    return control;
+  }
+  const scale = maxControlLength / controlLength;
+  return {
+    x: anchor.x + (control.x - anchor.x) * scale,
+    y: anchor.y + (control.y - anchor.y) * scale,
+  };
+}
+
 function fieldLinePath(points) {
   const viewportPoints = points.map((point) => mapToViewport(point.x, point.y));
-  return viewportPoints
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(3)} ${point.y.toFixed(3)}`)
-    .join(" ");
+  if (viewportPoints.length < 2) {
+    return "";
+  }
+  if (viewportPoints.length === 2) {
+    return `M ${viewportPoints[0].x.toFixed(3)} ${viewportPoints[0].y.toFixed(3)} L ${viewportPoints[1].x.toFixed(3)} ${viewportPoints[1].y.toFixed(3)}`;
+  }
+
+  const commands = [`M ${viewportPoints[0].x.toFixed(3)} ${viewportPoints[0].y.toFixed(3)}`];
+  for (let index = 0; index < viewportPoints.length - 1; index += 1) {
+    const p1 = viewportPoints[index];
+    const p2 = viewportPoints[index + 1];
+    const p0 = index === 0
+      ? extrapolatedFieldLineEndpoint(p1, p2)
+      : viewportPoints[index - 1];
+    const p3 = index + 2 >= viewportPoints.length
+      ? extrapolatedFieldLineEndpoint(p2, p1)
+      : viewportPoints[index + 2];
+    const segmentLength = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    if (segmentLength <= 1e-6) {
+      continue;
+    }
+    const d01 = fieldLineCentripetalDistance(p0, p1);
+    const d12 = fieldLineCentripetalDistance(p1, p2);
+    const d23 = fieldLineCentripetalDistance(p2, p3);
+    const c1 = boundedFieldLineControlPoint(
+      p1,
+      {
+        x: p1.x + ((p2.x - p0.x) * d12) / (3 * (d01 + d12)),
+        y: p1.y + ((p2.y - p0.y) * d12) / (3 * (d01 + d12)),
+      },
+      segmentLength,
+    );
+    const c2 = boundedFieldLineControlPoint(
+      p2,
+      {
+        x: p2.x - ((p3.x - p1.x) * d12) / (3 * (d12 + d23)),
+        y: p2.y - ((p3.y - p1.y) * d12) / (3 * (d12 + d23)),
+      },
+      segmentLength,
+    );
+    commands.push(
+      `C ${c1.x.toFixed(3)} ${c1.y.toFixed(3)} ${c2.x.toFixed(3)} ${c2.y.toFixed(3)} ${p2.x.toFixed(3)} ${p2.y.toFixed(3)}`,
+    );
+  }
+  return commands.join(" ");
 }
 
 function fieldLinePointTangent(points, index) {
@@ -3560,8 +3677,8 @@ function renderFieldLines2d(scale) {
           data-field-topology="${entry.topology}"
           data-seed-kind="${entry.seedKind}"
           data-trace-method="adaptive-rk4"
-          data-path-model="verified-rk4-sampled-polyline"
-          data-display-smoothing="rk4-linear-interpolation"
+          data-path-model="verified-rk4-bounded-catmull-rom"
+          data-display-smoothing="bounded-centripetal-catmull-rom"
           data-endpoint-class="${entry.endpointClass}"
           data-terminal-source-id="${entry.terminalSourceId}"
           data-seed-attempt="${entry.seedAttempt}"
@@ -3856,16 +3973,22 @@ function render2d() {
       aria-label="Top-down electrostatic scene"
     >
       <defs>
-        <filter id="source-fruit-glass-filter" x="-45%" y="-45%" width="190%" height="190%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="0.45" result="soft-alpha"></feGaussianBlur>
-          <feOffset in="soft-alpha" dx="0" dy="0.65" result="offset-alpha"></feOffset>
-          <feFlood flood-color="#ffffff" flood-opacity="0.28" result="frost"></feFlood>
+        <filter id="source-fruit-glass-filter" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="0.55" result="soft-alpha"></feGaussianBlur>
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.16" result="surface-blur"></feGaussianBlur>
+          <feOffset in="soft-alpha" dx="0" dy="0.75" result="offset-alpha"></feOffset>
+          <feFlood flood-color="#ffffff" flood-opacity="0.34" result="frost"></feFlood>
           <feComposite in="frost" in2="soft-alpha" operator="in" result="inner-frost"></feComposite>
-          <feDropShadow dx="0" dy="1.2" stdDeviation="1.1" flood-color="#02111f" flood-opacity="0.32"></feDropShadow>
+          <feSpecularLighting in="soft-alpha" surfaceScale="2.4" specularConstant="0.92" specularExponent="30" lighting-color="#ffffff" result="specular">
+            <fePointLight x="-80" y="-96" z="180"></fePointLight>
+          </feSpecularLighting>
+          <feComposite in="specular" in2="soft-alpha" operator="in" result="specular-mask"></feComposite>
+          <feDropShadow dx="0" dy="1.4" stdDeviation="1.25" flood-color="#02111f" flood-opacity="0.34"></feDropShadow>
           <feMerge>
             <feMergeNode in="offset-alpha"></feMergeNode>
-            <feMergeNode in="SourceGraphic"></feMergeNode>
+            <feMergeNode in="surface-blur"></feMergeNode>
             <feMergeNode in="inner-frost"></feMergeNode>
+            <feMergeNode in="specular-mask"></feMergeNode>
           </feMerge>
         </filter>
         <radialGradient id="source-fruit-positive-gradient" cx="30%" cy="24%" r="82%">
@@ -3920,7 +4043,16 @@ function renderMotionLayer2d() {
   if (samples.length === 0) {
     return '<g data-testid="motion-layer-2d" data-point-count="0"></g>';
   }
-  const visibleSamples = samples.slice(0, state.motion.frameIndex + 1);
+  const motionLayer = motionLayerFrameState2d();
+  return `
+    <g class="motion-layer" data-testid="motion-layer-2d" data-point-count="${motionLayer.pointCount}">
+      ${motionLayerInnerMarkup2d(motionLayer)}
+    </g>
+  `;
+}
+
+function motionLayerFrameState2d() {
+  const visibleSamples = state.motion.samples.slice(0, state.motion.frameIndex + 1);
   const path = visibleSamples
     .map((sample, index) => {
       const point = mapToViewport(sample.position.x, sample.position.y);
@@ -3930,21 +4062,28 @@ function renderMotionLayer2d() {
   const current = visibleSamples[visibleSamples.length - 1];
   const marker = mapToViewport(current.position.x, current.position.y);
   const charge = Number(motionInputs.charge.value);
+  return {
+    chargeClass: charge >= 0 ? "positive" : "negative",
+    marker,
+    path,
+    pointCount: visibleSamples.length,
+  };
+}
+
+function motionLayerInnerMarkup2d(motionLayer) {
   return `
-    <g class="motion-layer" data-testid="motion-layer-2d" data-point-count="${visibleSamples.length}">
-      <path class="motion-trail" fill="none" stroke="#39ff14" stroke-width="0.22" d="${path}"></path>
-      <circle
-        class="motion-particle ${charge >= 0 ? "positive" : "negative"}"
-        data-testid="motion-particle-2d"
-        cx="${marker.x}"
-        cy="${marker.y}"
-        fill="#39ff14"
-        stroke="#39ff14"
-        stroke-width="0.06"
-        r="0.16"
-        style="fill: #39ff14; stroke: #39ff14; stroke-width: 0.06px;"
-      ></circle>
-    </g>
+    <path class="motion-trail" fill="none" stroke="#39ff14" stroke-width="0.22" d="${motionLayer.path}"></path>
+    <circle
+      class="motion-particle ${motionLayer.chargeClass}"
+      data-testid="motion-particle-2d"
+      cx="${motionLayer.marker.x}"
+      cy="${motionLayer.marker.y}"
+      fill="#39ff14"
+      stroke="#39ff14"
+      stroke-width="0.06"
+      r="0.16"
+      style="fill: #39ff14; stroke: #39ff14; stroke-width: 0.06px;"
+    ></circle>
   `;
 }
 
@@ -3954,7 +4093,24 @@ function renderMotionFrame2d() {
     render2d();
     return;
   }
-  layer.outerHTML = renderMotionLayer2d();
+  if (state.motion.samples.length === 0) {
+    layer.dataset.pointCount = "0";
+    layer.innerHTML = "";
+    return;
+  }
+  const motionLayer = motionLayerFrameState2d();
+  layer.classList.add("motion-layer");
+  layer.dataset.pointCount = String(motionLayer.pointCount);
+  const trail = layer.querySelector(".motion-trail");
+  const particle = layer.querySelector("[data-testid='motion-particle-2d']");
+  if (!trail || !particle) {
+    layer.innerHTML = motionLayerInnerMarkup2d(motionLayer);
+    return;
+  }
+  trail.setAttribute("d", motionLayer.path);
+  particle.setAttribute("class", `motion-particle ${motionLayer.chargeClass}`);
+  particle.setAttribute("cx", String(motionLayer.marker.x));
+  particle.setAttribute("cy", String(motionLayer.marker.y));
 }
 
 function impactParameterSeries(count, halfWidthM, centerM = 0) {

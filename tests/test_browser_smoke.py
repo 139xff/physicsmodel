@@ -335,6 +335,12 @@ def test_browser_sources_use_fruit_glass_material(page: Page) -> None:
             causticCount: document.querySelectorAll(
                 '[data-testid^="source-fruit-caustic-2d-"]'
             ).length,
+            rimCount: document.querySelectorAll(
+                '[data-testid^="source-fruit-rim-2d-"]'
+            ).length,
+            refractCount: document.querySelectorAll(
+                '[data-testid^="source-fruit-refract-2d-"]'
+            ).length,
         })
         """
     )
@@ -345,8 +351,11 @@ def test_browser_sources_use_fruit_glass_material(page: Page) -> None:
     for key in ["point", "line", "ring", "disk"]:
         assert material_metadata[key]["material"] == "fruit-glass"
         assert material_metadata[key]["materialFinish"] == "translucent-caustic"
+        assert material_metadata[key]["materialDepth"] == "layered-rind-lens"
     assert material_metadata["highlightCount"] >= 4
     assert material_metadata["causticCount"] >= 4
+    assert material_metadata["rimCount"] >= 4
+    assert material_metadata["refractCount"] >= 3
 
 
 def test_browser_source_library_modules_are_collapsible_parameter_forms(page: Page) -> None:
@@ -856,7 +865,7 @@ def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: P
     )
     assert all(item["method"] == "adaptive-rk4" for item in rendered_metadata)
     assert all(
-        item["pathModel"] == "verified-rk4-sampled-polyline"
+        item["pathModel"] == "verified-rk4-bounded-catmull-rom"
         for item in rendered_metadata
     )
     assert all(
@@ -867,7 +876,7 @@ def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: P
         item["stopReason"] in {"opposite-charge", "view-boundary"}
         for item in rendered_metadata
     )
-    assert all(" L " in item["path"] for item in rendered_metadata)
+    assert all(" C " in item["path"] for item in rendered_metadata)
 
 
 def test_browser_field_lines_are_loaded_from_backend(page: Page) -> None:
@@ -1342,7 +1351,7 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
     )
     assert all(item["method"] == "adaptive-rk4" for item in line_trace_metadata)
     assert all(
-        item["pathModel"] == "verified-rk4-sampled-polyline"
+        item["pathModel"] == "verified-rk4-bounded-catmull-rom"
         for item in line_trace_metadata
     )
     assert all(item["endpointClass"] != "numerical-artifact" for item in line_trace_metadata)
@@ -1351,7 +1360,7 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
         for item in line_trace_metadata
     )
     assert all(item["finitePath"] for item in line_trace_metadata)
-    assert all(" L " in item["path"] for item in line_trace_metadata)
+    assert all(" C " in item["path"] for item in line_trace_metadata)
     assert all(item["markerEnd"] is None for item in line_trace_metadata)
     arrow_metadata = page.get_by_test_id("field-line-arrow-2d").evaluate_all(
         """

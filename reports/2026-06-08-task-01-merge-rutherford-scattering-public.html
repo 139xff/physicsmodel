@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Task 01 - Merge Rutherford Scattering Into Public Branch</title>
+    <style>
+      body {
+        color: #172033;
+        font-family: Arial, sans-serif;
+        line-height: 1.55;
+        margin: 2rem auto;
+        max-width: 960px;
+      }
+      h1,
+      h2 {
+        color: #0f172a;
+      }
+      table {
+        border-collapse: collapse;
+        margin: 1rem 0;
+        width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid #cbd5e1;
+        padding: 0.6rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #e2e8f0;
+      }
+      code {
+        background: #f1f5f9;
+        padding: 0.1rem 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Task 01 - Merge Rutherford Scattering Into Public Branch</h1>
+    <p><strong>Completion timestamp:</strong> 2026-06-08 22:32:45 +08:00</p>
+
+    <h2>Scope Delivered</h2>
+    <ul>
+      <li>Merged <code>origin/codex/rutherford-scattering-module</code> into the public default branch <code>feature/em-workbench-foundation</code>.</li>
+      <li>Used a fast-forward merge because the Rutherford branch was already based on the latest public branch.</li>
+      <li>Pushed <code>feature/em-workbench-foundation</code> to GitHub.</li>
+      <li>Verified both public and Rutherford branches resolve to <code>0db53ef61cd5c29466fac0ddd7a2675ce51105e7</code> after the push.</li>
+    </ul>
+
+    <h2>Scope Deferred</h2>
+    <ul>
+      <li>No pull request was opened because the requested task was a direct upload and merge into the public branch.</li>
+      <li>No additional feature changes were made beyond this merge report.</li>
+    </ul>
+
+    <h2>Changed Files</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Path</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>reports/2026-06-08-task-01-merge-rutherford-scattering-public.html</code></td>
+          <td>Records the public-branch merge, validation commands, push evidence, and remaining risks.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Commands Executed</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Command</th>
+          <th>Outcome</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>git -c http.proxy=http://127.0.0.1:7890 fetch origin --prune</code></td>
+          <td>Passed: updated remote refs and discovered the latest public branch state.</td>
+        </tr>
+        <tr>
+          <td><code>git checkout feature/em-workbench-foundation</code></td>
+          <td>Passed: switched to the local public branch.</td>
+        </tr>
+        <tr>
+          <td><code>git merge --ff-only origin/feature/em-workbench-foundation</code></td>
+          <td>Passed: fast-forwarded the local public branch to remote commit <code>492da38</code>.</td>
+        </tr>
+        <tr>
+          <td><code>git merge --ff-only origin/codex/rutherford-scattering-module</code></td>
+          <td>Passed: fast-forwarded the public branch to <code>0db53ef</code>.</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --project C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish pytest tests\test_scattering.py tests\test_app.py tests\test_desktop_bridge.py -q</code></td>
+          <td>Passed: 21 tests.</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --project C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish pytest tests\test_browser_smoke.py::test_browser_rutherford_scattering_panel_renders_tracks -q</code></td>
+          <td>Passed: browser smoke test for the Rutherford scattering panel.</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --project C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish ruff check --no-cache src tests</code></td>
+          <td>Passed: all checks passed.</td>
+        </tr>
+        <tr>
+          <td><code>node --check web\app.js</code> and <code>node --check web\api-client.js</code></td>
+          <td>Passed: JavaScript syntax checks returned exit code 0.</td>
+        </tr>
+        <tr>
+          <td><code>.\.tools\uv\uv.exe run --project C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish --extra desktop python -m em_workbench.desktop --check</code></td>
+          <td>Passed: <code>desktop runtime ok</code>.</td>
+        </tr>
+        <tr>
+          <td><code>git -c http.proxy=http://127.0.0.1:7890 push origin feature/em-workbench-foundation</code></td>
+          <td>Passed: pushed <code>492da38..0db53ef</code> to the public branch.</td>
+        </tr>
+        <tr>
+          <td><code>git -c http.proxy=http://127.0.0.1:7890 ls-remote origin refs/heads/feature/em-workbench-foundation refs/heads/codex/rutherford-scattering-module</code></td>
+          <td>Passed: both refs resolve to <code>0db53ef61cd5c29466fac0ddd7a2675ce51105e7</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Test and Browser Evidence</h2>
+    <ul>
+      <li>Core API, scattering, and desktop bridge tests passed after the merge.</li>
+      <li>The targeted browser smoke test confirmed the Chinese Rutherford panel, green particles, adjustable beam settings, and progressive path drawing.</li>
+      <li>Ruff and JavaScript syntax checks passed.</li>
+      <li>Desktop runtime availability was confirmed.</li>
+    </ul>
+
+    <h2>Known Risks or Limitations</h2>
+    <ul>
+      <li>The merge was pushed directly rather than through a pull request, following the requested action.</li>
+      <li>The full browser smoke suite was not rerun during this merge task; the targeted Rutherford panel smoke test was run.</li>
+      <li>A separate local checkout at <code>C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com</code> still has unrelated uncommitted changes and was not modified.</li>
+    </ul>
+
+    <h2>Next Scheduled Task</h2>
+    <p>Ask teammates to pull <code>feature/em-workbench-foundation</code> and test the public branch in their local desktop environment.</p>
+  </body>
+</html>

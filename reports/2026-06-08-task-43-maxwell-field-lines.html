@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 43 - Maxwell-Constrained Field Lines</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+      margin: 2rem auto;
+      max-width: 980px;
+      padding: 0 1rem;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #c9d3e0;
+      padding: 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3f8;
+    }
+    code {
+      background: #f3f6fa;
+      border-radius: 4px;
+      padding: 0.1rem 0.25rem;
+    }
+    .status {
+      background: #eefaf1;
+      border-left: 4px solid #278a45;
+      padding: 0.75rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task 43 - Maxwell-Constrained Field Lines</h1>
+  <p class="status"><strong>Completion timestamp:</strong> 2026-06-08 17:44:19 +08:00</p>
+
+  <h2>Scope Delivered</h2>
+  <ul>
+    <li>Reproduced the mixed-source field-line imbalance under stricter criteria.</li>
+    <li>Added a browser regression that samples the final SVG field-line paths and asserts no internal intersections for mixed point, line segment, ring, and disk sources.</li>
+    <li>Fixed line-segment endpoint snapping so rendered field lines anchor to the actual charged segment geometry, not to a circular proxy around the segment start.</li>
+    <li>Changed frontend field-line selection to use per-source round-robin acceptance after quality and conflict preparation.</li>
+    <li>Changed final rendering to use a dense RK4 sampled polyline, so the rendered SVG geometry matches the screened field-line geometry instead of being re-shaped by a second cubic interpolation pass.</li>
+    <li>Changed backend response construction to collect valid candidates first and then select display lines by per-source round-robin, preventing source-order truncation when <code>display_max_count</code> is small.</li>
+  </ul>
+
+  <h2>Scope Deferred</h2>
+  <ul>
+    <li>CUDA-specific field-line visual balancing was not executed because CUDA is unavailable in this environment.</li>
+    <li>No new user-facing density control was added; this task focused on default correctness.</li>
+  </ul>
+
+  <h2>Changed Files</h2>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Change</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>src/em_workbench/physics/compute/field_lines.py</code></td><td>Uniform finite-source seed placement and fair per-source backend response selection.</td></tr>
+      <tr><td><code>src/em_workbench/physics/integration.py</code></td><td>Line segment integration uses the same start-point geometry contract as the UI.</td></tr>
+      <tr><td><code>src/em_workbench/physics/solver.py</code></td><td>Line segment near-source checks use the start-point geometry contract.</td></tr>
+      <tr><td><code>web/app.js</code></td><td>Fair frontend line selection, line-segment surface snapping, backend quality propagation, and verified RK4 sampled polyline rendering.</td></tr>
+      <tr><td><code>web/index.html</code></td><td>Static asset cache version updated to <code>20260608-maxwell-field-lines</code>.</td></tr>
+      <tr><td><code>tests/test_field_lines.py</code></td><td>Backend tests for mixed-source balance, fair truncation, and visible-geometry seed distribution.</td></tr>
+      <tr><td><code>tests/test_browser_smoke.py</code></td><td>Browser tests for mixed-source balance and final SVG path intersection checks.</td></tr>
+      <tr><td><code>tests/test_app.py</code></td><td>Updated static asset version assertions.</td></tr>
+      <tr><td><code>reports/2026-06-08-task-43-maxwell-field-lines.html</code></td><td>Task report.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Commands Executed</h2>
+  <table>
+    <thead>
+      <tr><th>Command</th><th>Outcome</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py::test_cpu_field_lines_truncate_mixed_sources_fairly</code></td>
+        <td>Failed first as expected: 16/16 displayed lines came from <code>point-1</code>, proving source-order truncation.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py::test_cpu_field_lines_truncate_mixed_sources_fairly tests\test_field_lines.py::test_cpu_field_lines_keep_mixed_finite_sources_visually_balanced tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources</code></td>
+        <td>Passed: 3 tests. Two browser dependency deprecation warnings.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources tests\test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets tests\test_browser_smoke.py::test_browser_field_lines_are_loaded_from_backend tests\test_browser_smoke.py::test_browser_field_lines_render_for_integrated_sources</code></td>
+        <td>Passed: 7 tests. Two browser dependency deprecation warnings.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell tests\test_solver.py tests\test_cpu_backend.py tests\test_packed_scene.py ...field-line browser tests...</code></td>
+        <td>Passed: 48 tests. Skipped: 1 CUDA test. Two browser dependency deprecation warnings.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td>
+        <td>Passed.</td>
+      </tr>
+      <tr>
+        <td><code>git diff --check</code></td>
+        <td>Passed. Git reported expected CRLF normalization warnings only.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td>
+        <td>Passed: 129 tests. Skipped: 4 CUDA tests. Two browser dependency deprecation warnings.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Verification Evidence</h2>
+  <ul>
+    <li>Browser DOM diagnostic after the fix showed 42 field lines with per-source counts approximately <code>13/11/11/7</code>, all using <code>verified-rk4-sampled-polyline</code>.</li>
+    <li>Final SVG path sampling test asserts mixed-source paths do not internally intersect.</li>
+    <li>Final rendered path now follows the screened RK4 sample points, avoiding a second cubic interpolation pass that could move lines away from the computed electrostatic field line.</li>
+    <li>Full project test suite and lint passed through project-local uv.</li>
+  </ul>
+
+  <h2>Known Risks Or Limitations</h2>
+  <ul>
+    <li>Field-line correctness is numerical: it follows the computed electrostatic field samples and avoids visual crossing in tested mixed-source scenes, but it is not a formal proof for every possible source layout.</li>
+    <li>Dense polylines prioritize physical fidelity over decorative Bezier smoothing. The line appears smooth because points are densely sampled and strokes use rounded joins.</li>
+    <li>CUDA tests remain skipped because CUDA is unavailable in this environment.</li>
+  </ul>
+
+  <h2>Next Scheduled Task</h2>
+  <p>Open the local workbench for manual inspection of mixed-source field lines and collect any remaining visual edge cases.</p>
+</body>
+</html>

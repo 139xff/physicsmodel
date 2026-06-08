@@ -242,9 +242,14 @@ def _trace_field_lines_kernel(
     shell_positions,
     shell_radii,
     shell_charges,
+    field_line_base_step_m,
+    field_line_min_step_m,
+    field_line_max_step_m,
+    field_line_max_steps,
+    field_line_max_points,
 ):
     candidate_count = seeds.shape[0]
-    points = np.empty((candidate_count, FIELD_LINE_MAX_STEPS + 1, 2), dtype=seeds.dtype)
+    points = np.empty((candidate_count, field_line_max_steps + 1, 2), dtype=seeds.dtype)
     point_counts = np.zeros(candidate_count, dtype=np.int32)
     stop_codes = np.full(candidate_count, STOP_MAX_STEPS, dtype=np.int32)
     terminal_indexes = np.full(candidate_count, -1, dtype=np.int32)
@@ -260,9 +265,9 @@ def _trace_field_lines_kernel(
         previous_x = 0.0
         previous_y = 0.0
         has_previous = False
-        step_size = FIELD_LINE_BASE_STEP_M
+        step_size = field_line_base_step_m
         min_direction_dot = 1.0
-        for _step in range(FIELD_LINE_MAX_STEPS):
+        for _step in range(field_line_max_steps):
             next_valid = False
             blocked_by_reversal = False
             next_x = x
@@ -301,7 +306,7 @@ def _trace_field_lines_kernel(
                 next_y = full_y
                 direction_x = full_direction_x
                 direction_y = full_direction_y
-                if step_size > FIELD_LINE_MIN_STEP_M:
+                if step_size > field_line_min_step_m:
                     half_step = step_size * 0.5
                     valid, half_x, half_y, _half_direction_x, _half_direction_y = (
                         _rk4_field_line_step(
@@ -335,9 +340,9 @@ def _trace_field_lines_kernel(
                                 shell_radii,
                                 shell_charges,
                             )
-                        )
+                    )
                     if not valid:
-                        step_size = max(FIELD_LINE_MIN_STEP_M, step_size * 0.5)
+                        step_size = max(field_line_min_step_m, step_size * 0.5)
                         continue
                     step_error = math.hypot(full_x - second_x, full_y - second_y)
                     allowed_error = max(
@@ -345,12 +350,12 @@ def _trace_field_lines_kernel(
                         step_size * FIELD_LINE_ADAPT_ERROR_FRACTION,
                     )
                     if step_error > allowed_error:
-                        step_size = max(FIELD_LINE_MIN_STEP_M, step_size * 0.5)
+                        step_size = max(field_line_min_step_m, step_size * 0.5)
                         continue
                     next_x = second_x
                     next_y = second_y
-                if direction_dot < FIELD_LINE_ADAPT_RETRY_DOT and step_size > FIELD_LINE_MIN_STEP_M:
-                    step_size = max(FIELD_LINE_MIN_STEP_M, step_size * 0.5)
+                if direction_dot < FIELD_LINE_ADAPT_RETRY_DOT and step_size > field_line_min_step_m:
+                    step_size = max(field_line_min_step_m, step_size * 0.5)
                     continue
                 next_valid = True
                 break
@@ -378,14 +383,14 @@ def _trace_field_lines_kernel(
             previous_y = direction_y
             has_previous = True
             min_direction_dot = min(min_direction_dot, direction_dot)
-            if point_count >= FIELD_LINE_MAX_POINTS:
+            if point_count >= field_line_max_points:
                 stop_codes[candidate_index] = STOP_POINT_BUDGET
                 break
             if direction_dot > FIELD_LINE_ADAPT_GROW_DOT:
-                step_size = min(FIELD_LINE_MAX_STEP_M, step_size * 1.35)
+                step_size = min(field_line_max_step_m, step_size * 1.35)
             elif direction_dot < FIELD_LINE_ADAPT_SHRINK_DOT:
-                step_size = max(FIELD_LINE_MIN_STEP_M, step_size * 0.7)
-            margin = FIELD_LINE_MAX_STEP_M * 2.0
+                step_size = max(field_line_min_step_m, step_size * 0.7)
+            margin = field_line_max_step_m * 2.0
             if (
                 x < bounds[0] - margin
                 or x > bounds[1] + margin
@@ -765,6 +770,11 @@ def evaluate_field_lines_cpu(
             packed.shell_positions,
             packed.shell_radii,
             packed.shell_charges,
+            packed.dtype.type(FIELD_LINE_BASE_STEP_M),
+            packed.dtype.type(FIELD_LINE_MIN_STEP_M),
+            packed.dtype.type(FIELD_LINE_MAX_STEP_M),
+            FIELD_LINE_MAX_STEPS,
+            FIELD_LINE_MAX_POINTS,
         )
     )
     return FieldLineKernelResult(

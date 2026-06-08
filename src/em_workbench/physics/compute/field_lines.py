@@ -22,11 +22,11 @@ FIELD_LINE_MAX_CHARGE_RAYS = 64
 FIELD_LINE_MAX_PAIR_DISPLAY_COUNT = 72
 FIELD_LINE_START_RADIUS_M = 0.005
 FIELD_LINE_ENDPOINT_MARGIN_M = 0.0015
-FIELD_LINE_BASE_STEP_M = 0.01
-FIELD_LINE_MIN_STEP_M = 0.0012
-FIELD_LINE_MAX_STEP_M = 0.025
-FIELD_LINE_MAX_STEPS = 1600
-FIELD_LINE_MAX_POINTS = 1000
+FIELD_LINE_BASE_STEP_M = 0.004
+FIELD_LINE_MIN_STEP_M = 0.0008
+FIELD_LINE_MAX_STEP_M = 0.008
+FIELD_LINE_MAX_STEPS = 2400
+FIELD_LINE_MAX_POINTS = 2200
 FIELD_LINE_MIN_FIELD = 1e-15
 FIELD_LINE_REVERSAL_DOT_LIMIT = -0.2
 FIELD_LINE_ADAPT_RETRY_DOT = 0.985
@@ -146,6 +146,47 @@ def _empty_field_line_inputs(dtype: np.dtype) -> FieldLineInputs:
     )
 
 
+def _point_seed_position(source, seed_index: int, ray_count: int) -> tuple[float, float]:
+    angle = math.tau * seed_index / ray_count
+    return (
+        source.position.x + math.cos(angle) * FIELD_LINE_START_RADIUS_M,
+        source.position.y + math.sin(angle) * FIELD_LINE_START_RADIUS_M,
+    )
+
+
+def _line_segment_seed_position(source, seed_index: int, ray_count: int) -> tuple[float, float]:
+    axis_x = source.orientation.x
+    axis_y = source.orientation.y
+    axis_magnitude = math.hypot(axis_x, axis_y)
+    if axis_magnitude <= 1e-12:
+        return _point_seed_position(source, seed_index, ray_count)
+    unit_x = axis_x / axis_magnitude
+    unit_y = axis_y / axis_magnitude
+    normal_x = -unit_y
+    normal_y = unit_x
+    side_count = max(1, ray_count // 2)
+    slot = min(side_count - 1, seed_index // 2)
+    offset_along_line = ((slot + 0.5) / side_count) * source.length_m
+    side = 1.0 if seed_index % 2 == 0 else -1.0
+    return (
+        source.position.x
+        + unit_x * offset_along_line
+        + normal_x * side * FIELD_LINE_START_RADIUS_M,
+        source.position.y
+        + unit_y * offset_along_line
+        + normal_y * side * FIELD_LINE_START_RADIUS_M,
+    )
+
+
+def _radial_source_seed_position(source, seed_index: int, ray_count: int) -> tuple[float, float]:
+    angle = math.tau * seed_index / ray_count
+    radius = source.radius_m + FIELD_LINE_START_RADIUS_M
+    return (
+        source.position.x + math.cos(angle) * radius,
+        source.position.y + math.sin(angle) * radius,
+    )
+
+
 def _source_seed_position(
     scene: Scene,
     packed: PackedScene,
@@ -157,10 +198,11 @@ def _source_seed_position(
     source = scene.sources[source_index]
     angle = math.tau * seed_index / ray_count
     if source.kind == "point":
-        return (
-            source.position.x + math.cos(angle) * FIELD_LINE_START_RADIUS_M,
-            source.position.y + math.sin(angle) * FIELD_LINE_START_RADIUS_M,
-        )
+        return _point_seed_position(source, seed_index, ray_count)
+    if source.kind == "line_segment":
+        return _line_segment_seed_position(source, seed_index, ray_count)
+    if source.kind in {"ring", "disk"}:
+        return _radial_source_seed_position(source, seed_index, ray_count)
     element_offset = min(
         len(element_indexes) - 1,
         int((seed_index * len(element_indexes)) / ray_count),
@@ -176,18 +218,6 @@ def _source_seed_position(
             return (
                 origin_x + (radial_x / radial_magnitude) * FIELD_LINE_START_RADIUS_M,
                 origin_y + (radial_y / radial_magnitude) * FIELD_LINE_START_RADIUS_M,
-            )
-    if source.kind == "line_segment":
-        axis_x = source.orientation.x
-        axis_y = source.orientation.y
-        axis_magnitude = math.hypot(axis_x, axis_y)
-        if axis_magnitude > 1e-12:
-            side = 1.0 if seed_index % 2 == 0 else -1.0
-            normal_x = -axis_y / axis_magnitude
-            normal_y = axis_x / axis_magnitude
-            return (
-                origin_x + normal_x * side * FIELD_LINE_START_RADIUS_M,
-                origin_y + normal_y * side * FIELD_LINE_START_RADIUS_M,
             )
     return (
         origin_x + math.cos(angle) * FIELD_LINE_START_RADIUS_M,
@@ -295,10 +325,10 @@ def build_field_line_response(
     request_id: str | None,
     display_max_count: int,
 ) -> FieldLineResponse:
-    lines: list[FieldLineResult] = []
+    selected_lines: list[FieldLineResult] = []
+    line_groups: dict[int, list[FieldLineResult]] = {}
     rejected_line_count = 0
     conflict_rejected_line_count = 0
-    pair_counts: dict[tuple[str, str], int] = {}
     for candidate_index in range(inputs.candidate_count):
         stop_code = int(result.stop_codes[candidate_index])
         point_count = int(result.point_counts[candidate_index])
@@ -325,11 +355,6 @@ def build_field_line_response(
             topology: FieldLineTopology = "source-to-source"
             source_id = seed_source.id
             terminal_source_id = terminal_source.id
-            pair_key = tuple(sorted((source_id, terminal_source_id)))
-            if pair_counts.get(pair_key, 0) >= FIELD_LINE_MAX_PAIR_DISPLAY_COUNT:
-                conflict_rejected_line_count += 1
-                continue
-            pair_counts[pair_key] = pair_counts.get(pair_key, 0) + 1
         elif seed_source_charge >= 0.0:
             topology = "source-to-infinity"
             source_id = seed_source.id
@@ -339,7 +364,7 @@ def build_field_line_response(
             source_id = seed_source.id
             terminal_source_id = None
         arrow_anchor, arrow_direction = _arrow(points)
-        lines.append(
+        line_groups.setdefault(seed_source_index, []).append(
             FieldLineResult(
                 seed_index=int(inputs.seed_indexes[candidate_index]),
                 source_id=source_id,
@@ -352,11 +377,36 @@ def build_field_line_response(
                 min_direction_dot=min_direction_dot,
             )
         )
-        if len(lines) >= display_max_count:
-            break
+
+    pair_counts: dict[tuple[str, str], int] = {}
+    group_cursors = {source_index: 0 for source_index in line_groups}
+    source_indexes = [
+        source_index
+        for source_index in range(len(scene.sources))
+        if source_index in line_groups
+    ]
+    searched_any_candidate = True
+    while len(selected_lines) < display_max_count and searched_any_candidate:
+        searched_any_candidate = False
+        for source_index in source_indexes:
+            group = line_groups[source_index]
+            while group_cursors[source_index] < len(group):
+                searched_any_candidate = True
+                line = group[group_cursors[source_index]]
+                group_cursors[source_index] += 1
+                if line.topology == "source-to-source" and line.terminal_source_id:
+                    pair_key = tuple(sorted((line.source_id, line.terminal_source_id)))
+                    if pair_counts.get(pair_key, 0) >= FIELD_LINE_MAX_PAIR_DISPLAY_COUNT:
+                        conflict_rejected_line_count += 1
+                        continue
+                    pair_counts[pair_key] = pair_counts.get(pair_key, 0) + 1
+                selected_lines.append(line)
+                break
+            if len(selected_lines) >= display_max_count:
+                break
     return FieldLineResponse(
         request_id=request_id,
-        lines=lines,
+        lines=selected_lines,
         candidate_line_count=inputs.candidate_count,
         rejected_line_count=rejected_line_count,
         conflict_rejected_line_count=conflict_rejected_line_count,

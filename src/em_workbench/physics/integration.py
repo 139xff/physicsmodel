@@ -71,12 +71,12 @@ def line_segment_elements(
     node_count: int,
 ) -> list[IntegratedChargeElement]:
     total_charge = line_charge_c(source)
-    center = Vector3.from_position(source.position)
+    start = Vector3.from_position(source.position)
     axis = Vector3.from_position(source.orientation).normalized()
     nodes, weights = gauss_legendre_nodes_weights(node_count)
     return [
         IntegratedChargeElement(
-            position=center + axis.scale(0.5 * source.length_m * node),
+            position=start + axis.scale(0.5 * source.length_m * (node + 1.0)),
             charge_c=0.5 * total_charge * weight,
         )
         for node, weight in zip(nodes, weights, strict=True)

@@ -261,7 +261,7 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     )
     assert ring_style["fill"] == "none"
     assert ring_style["fillOpacity"] == "0"
-    assert ring_style["stroke"] == "rgb(217, 45, 32)"
+    assert "source-fruit-positive-gradient" in ring_style["stroke"]
     assert float(
         page.get_by_test_id("source-ring-2d-ring-1").get_attribute("data-stroke-px") or "0"
     ) == pytest.approx(axis_label_size, abs=0.05)
@@ -311,6 +311,42 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("source-count")).to_contain_text("3 个源")
     expect(page.get_by_test_id("probe-position")).to_contain_text("22")
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
+
+
+def test_browser_sources_use_fruit_glass_material(page: Page) -> None:
+    for button_selector in ["#add-point", "#add-line-segment", "#add-ring", "#add-disk"]:
+        page.locator(button_selector).click()
+
+    material_metadata = page.evaluate(
+        """
+        () => ({
+            filter: Boolean(document.querySelector("#source-fruit-glass-filter")),
+            positiveGradient: Boolean(document.querySelector("#source-fruit-positive-gradient")),
+            negativeGradient: Boolean(document.querySelector("#source-fruit-negative-gradient")),
+            point: document.querySelector('[data-testid="source-point-2d-point-1"]')?.dataset,
+            line: document.querySelector(
+                '[data-testid="source-line-segment-2d-line-segment-1"]'
+            )?.dataset,
+            ring: document.querySelector('[data-testid="source-ring-2d-ring-1"]')?.dataset,
+            disk: document.querySelector('[data-testid="source-disk-2d-disk-1"]')?.dataset,
+            highlightCount: document.querySelectorAll(
+                '[data-testid^="source-fruit-highlight-2d-"]'
+            ).length,
+            causticCount: document.querySelectorAll(
+                '[data-testid^="source-fruit-caustic-2d-"]'
+            ).length,
+        })
+        """
+    )
+
+    assert material_metadata["filter"]
+    assert material_metadata["positiveGradient"]
+    assert material_metadata["negativeGradient"]
+    for key in ["point", "line", "ring", "disk"]:
+        assert material_metadata[key]["material"] == "fruit-glass"
+        assert material_metadata[key]["materialFinish"] == "translucent-caustic"
+    assert material_metadata["highlightCount"] >= 4
+    assert material_metadata["causticCount"] >= 4
 
 
 def test_browser_source_library_modules_are_collapsible_parameter_forms(page: Page) -> None:
@@ -819,7 +855,10 @@ def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: P
         """
     )
     assert all(item["method"] == "adaptive-rk4" for item in rendered_metadata)
-    assert all(item["pathModel"] == "field-tangent-cubic" for item in rendered_metadata)
+    assert all(
+        item["pathModel"] == "verified-rk4-sampled-polyline"
+        for item in rendered_metadata
+    )
     assert all(
         item["endpointClass"] in {"opposite-charge", "infinity"}
         for item in rendered_metadata
@@ -828,7 +867,7 @@ def test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs(page: P
         item["stopReason"] in {"opposite-charge", "view-boundary"}
         for item in rendered_metadata
     )
-    assert all(" C " in item["path"] for item in rendered_metadata)
+    assert all(" L " in item["path"] for item in rendered_metadata)
 
 
 def test_browser_field_lines_are_loaded_from_backend(page: Page) -> None:
@@ -895,6 +934,116 @@ def test_browser_field_lines_render_for_integrated_sources(
     )
     assert source_ids == [source_id]
     expect(page.get_by_test_id("field-line-arrow-2d")).to_have_count(display_count)
+
+
+def test_browser_field_lines_remain_balanced_for_mixed_finite_sources(page: Page) -> None:
+    for button_selector in ["#add-point", "#add-line-segment", "#add-ring", "#add-disk"]:
+        page.locator(button_selector).click()
+
+    page.locator("#toggle-field-lines").click()
+    page.wait_for_function(
+        """
+        () => {
+            const layer = document.querySelector('[data-testid="field-line-layer"]');
+            return layer?.dataset.requestCurrent === "true" &&
+                Number(layer.dataset.fieldLineCount || 0) >= 12;
+        }
+        """
+    )
+
+    source_counts = page.get_by_test_id("field-line-2d").evaluate_all(
+        """
+        nodes => nodes.reduce((counts, node) => {
+            const sourceId = node.getAttribute("data-field-start-id") === "infinity"
+                ? node.getAttribute("data-field-end-id")
+                : node.getAttribute("data-field-start-id");
+            counts[sourceId] = (counts[sourceId] || 0) + 1;
+            return counts;
+        }, {})
+        """
+    )
+    expected_source_ids = {"point-1", "line-segment-1", "ring-1", "disk-1"}
+    assert set(source_counts) == expected_source_ids
+    counts = list(source_counts.values())
+    assert min(counts) >= 4
+    assert max(counts) / min(counts) <= 2
+
+    path_geometry = page.evaluate(
+        """
+        () => {
+            const samplePath = (path) => {
+                const totalLength = path.getTotalLength();
+                const sampleCount = Math.max(8, Math.ceil(totalLength / 2));
+                return Array.from({ length: sampleCount + 1 }, (_, index) => {
+                    const point = path.getPointAtLength((totalLength * index) / sampleCount);
+                    return { x: point.x, y: point.y };
+                });
+            };
+            const cross = (a, b) => a.x * b.y - a.y * b.x;
+            const intersection = (a, b, c, d) => {
+                const r = { x: b.x - a.x, y: b.y - a.y };
+                const s = { x: d.x - c.x, y: d.y - c.y };
+                const denominator = cross(r, s);
+                if (Math.abs(denominator) < 1e-9) {
+                    return null;
+                }
+                const ac = { x: c.x - a.x, y: c.y - a.y };
+                const t = cross(ac, s) / denominator;
+                const u = cross(ac, r) / denominator;
+                if (t <= 1e-5 || t >= 1 - 1e-5 || u <= 1e-5 || u >= 1 - 1e-5) {
+                    return null;
+                }
+                return {
+                    x: a.x + (b.x - a.x) * t,
+                    y: a.y + (b.y - a.y) * t,
+                };
+            };
+            const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+            const pathSegments = [...document.querySelectorAll('[data-testid="field-line-2d"]')]
+                .map((path, pathIndex) => {
+                    const points = samplePath(path);
+                    return points.slice(1).map((point, index) => ({
+                        pathIndex,
+                        start: points[index],
+                        end: point,
+                    }));
+                });
+            const intersections = [];
+            for (let lineA = 0; lineA < pathSegments.length; lineA += 1) {
+                for (let lineB = lineA + 1; lineB < pathSegments.length; lineB += 1) {
+                    for (const segmentA of pathSegments[lineA]) {
+                        for (const segmentB of pathSegments[lineB]) {
+                            const point = intersection(
+                                segmentA.start,
+                                segmentA.end,
+                                segmentB.start,
+                                segmentB.end,
+                            );
+                            if (!point) {
+                                continue;
+                            }
+                            const endpointDistance = Math.min(
+                                distance(point, segmentA.start),
+                                distance(point, segmentA.end),
+                                distance(point, segmentB.start),
+                                distance(point, segmentB.end),
+                            );
+                            if (endpointDistance > 1.5) {
+                                intersections.push(point);
+                            }
+                        }
+                    }
+                }
+            }
+            return {
+                intersectionCount: intersections.length,
+                sampledPathCount: pathSegments.length,
+            };
+        }
+        """
+    )
+    assert path_geometry["sampledPathCount"] >= 12
+    assert path_geometry["intersectionCount"] == 0
 
 
 def test_browser_discards_stale_field_line_response_after_zoom(page: Page) -> None:
@@ -1192,14 +1341,17 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
         """
     )
     assert all(item["method"] == "adaptive-rk4" for item in line_trace_metadata)
-    assert all(item["pathModel"] == "field-tangent-cubic" for item in line_trace_metadata)
+    assert all(
+        item["pathModel"] == "verified-rk4-sampled-polyline"
+        for item in line_trace_metadata
+    )
     assert all(item["endpointClass"] != "numerical-artifact" for item in line_trace_metadata)
     assert all(
         item["stopReason"] not in {"direction-reversal", "self-approach"}
         for item in line_trace_metadata
     )
     assert all(item["finitePath"] for item in line_trace_metadata)
-    assert all(" C " in item["path"] for item in line_trace_metadata)
+    assert all(" L " in item["path"] for item in line_trace_metadata)
     assert all(item["markerEnd"] is None for item in line_trace_metadata)
     arrow_metadata = page.get_by_test_id("field-line-arrow-2d").evaluate_all(
         """
@@ -1338,8 +1490,8 @@ def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:
         })
         """
     )
-    assert disk_style["fill"] == "rgb(217, 45, 32)"
-    assert disk_style["fillOpacity"] == "1"
+    assert "source-fruit-positive-gradient" in disk_style["fill"]
+    assert disk_style["fillOpacity"] == "0.82"
     assert disk_style["stroke"] == "rgb(217, 45, 32)"
 
     page.locator("#preset-select").select_option("electric-dipole")

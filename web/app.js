@@ -174,11 +174,11 @@ const FIELD_LINE_DISPLAY_MAX_COUNT = 120;
 const FIELD_LINE_MAX_PAIR_DISPLAY_COUNT = 72;
 const FIELD_LINE_START_RADIUS_M = POINT_VISUAL_RADIUS_CM / 100;
 const FIELD_LINE_ENDPOINT_MARGIN_M = 0.0015;
-const FIELD_LINE_BASE_STEP_M = 0.01;
-const FIELD_LINE_MIN_STEP_M = 0.0012;
-const FIELD_LINE_MAX_STEP_M = 0.025;
-const FIELD_LINE_MAX_STEPS = 1600;
-const FIELD_LINE_MAX_POINTS = 1000;
+const FIELD_LINE_BASE_STEP_M = 0.004;
+const FIELD_LINE_MIN_STEP_M = 0.0008;
+const FIELD_LINE_MAX_STEP_M = 0.008;
+const FIELD_LINE_MAX_STEPS = 2400;
+const FIELD_LINE_MAX_POINTS = 2200;
 const FIELD_LINE_MIN_FIELD = 1e-15;
 const FIELD_LINE_SINGULARITY_RADIUS_M = 1e-6;
 const FIELD_LINE_REVERSAL_DOT_LIMIT = -0.2;
@@ -203,7 +203,7 @@ const FIELD_LINE_CURVE_SAMPLE_SPACING_PX = 4;
 const FIELD_LINE_CURVE_MIN_SAMPLE_SPACING_M = 0.001;
 const FIELD_LINE_CURVE_MAX_SAMPLE_SPACING_M = 0.02;
 const FIELD_LINE_MIN_VISIBLE_LENGTH_PX = 18;
-const FIELD_LINE_BOUNDS_PADDING_PX = 56;
+const FIELD_LINE_BOUNDS_PADDING_PX = 128;
 const FIELD_LINE_ARROW_FRACTION_BASE = 0.42;
 const FIELD_LINE_ARROW_FRACTION_SPREAD = 0.18;
 const FIELD_LINE_ARROW_FRACTION_MIN = 0.22;
@@ -1199,6 +1199,66 @@ function sourceChargeSign(source) {
   return sourceChargeValue(source) >= 0 ? "positive" : "negative";
 }
 
+function sourceFruitGradientId(source) {
+  return `source-fruit-${sourceChargeSign(source)}-gradient`;
+}
+
+function sourceFruitMaterialAttributes() {
+  return 'data-material="fruit-glass" data-material-finish="translucent-caustic"';
+}
+
+function sourceFruitCircleLayers(source, point, radius) {
+  const gradientId = sourceFruitGradientId(source);
+  return `
+    <ellipse
+      class="source-fruit-caustic"
+      data-testid="source-fruit-caustic-2d-${source.id}"
+      cx="${point.x + radius * 0.16}"
+      cy="${point.y + radius * 0.22}"
+      rx="${radius * 0.58}"
+      ry="${radius * 0.18}"
+      fill="url(#${gradientId})"
+    ></ellipse>
+    <ellipse
+      class="source-fruit-highlight"
+      data-testid="source-fruit-highlight-2d-${source.id}"
+      cx="${point.x - radius * 0.28}"
+      cy="${point.y - radius * 0.34}"
+      rx="${Math.max(radius * 0.2, 0.18)}"
+      ry="${Math.max(radius * 0.11, 0.1)}"
+    ></ellipse>
+  `;
+}
+
+function sourceFruitLineLayers(source, point, dx, dy, markerStrokeWidth) {
+  const length = Math.hypot(dx, dy);
+  if (length <= 1e-12) {
+    return "";
+  }
+  const normalX = dy / length;
+  const normalY = dx / length;
+  const highlightOffset = Math.max(markerStrokeWidth * 0.3, 0.18);
+  const causticOffset = Math.max(markerStrokeWidth * 0.42, 0.24);
+  return `
+    <line
+      class="source-fruit-caustic source-fruit-caustic-line"
+      data-testid="source-fruit-caustic-2d-${source.id}"
+      x1="${point.x + normalX * causticOffset}"
+      y1="${point.y - normalY * causticOffset}"
+      x2="${point.x + dx + normalX * causticOffset}"
+      y2="${point.y - dy - normalY * causticOffset}"
+    ></line>
+    <line
+      class="source-fruit-highlight source-fruit-highlight-line"
+      data-testid="source-fruit-highlight-2d-${source.id}"
+      x1="${point.x - normalX * highlightOffset}"
+      y1="${point.y + normalY * highlightOffset}"
+      x2="${point.x + dx * 0.72 - normalX * highlightOffset}"
+      y2="${point.y - dy * 0.72 + normalY * highlightOffset}"
+    ></line>
+  `;
+}
+
 function sourceLabelMarkup(source, label, point, scale) {
   const fontSize = scale.fontPx * scale.yUnitsPerPx;
   const textStrokeWidth = 0.7 * scale.yUnitsPerPx;
@@ -1236,17 +1296,19 @@ function renderSource2d(source, scale) {
         <line
           class="source-line-segment"
           data-testid="source-line-segment-2d-${source.id}"
+          ${sourceFruitMaterialAttributes()}
           data-display-length-cm="${displayLength}"
           data-starts-at-position="true"
           x1="${point.x}"
           y1="${point.y}"
           x2="${point.x + dx}"
           y2="${point.y - dy}"
-          style="stroke-width: ${markerStrokeWidth}px; stroke: ${chargeColor};"
+          style="stroke-width: ${markerStrokeWidth}px; stroke: url(#${sourceFruitGradientId(source)}); filter: url(#source-fruit-glass-filter);"
           data-charge-color="${chargeColor}"
           data-charge-sign="${chargeSign}"
           data-stroke-px="${scale.fontPx.toFixed(2)}"
         ></line>
+        ${sourceFruitLineLayers(source, point, dx, dy, markerStrokeWidth)}
         ${sourceLabelMarkup(source, label, point, scale)}
       </g>
     `;
@@ -1259,17 +1321,19 @@ function renderSource2d(source, scale) {
         <circle
           class="source-ring"
           data-testid="source-ring-2d-${source.id}"
+          ${sourceFruitMaterialAttributes()}
           data-display-diameter-cm="${formatCentimeters(source.radius_m * 2)}"
           data-physical-radius-cm="${physicalRadiusCm}"
           data-visual-model="hollow-ring"
           cx="${point.x}"
           cy="${point.y}"
           r="${radius}"
-          style="stroke-width: ${markerStrokeWidth}px; stroke: ${chargeColor}; fill: none; fill-opacity: 0;"
+          style="stroke-width: ${markerStrokeWidth}px; stroke: url(#${sourceFruitGradientId(source)}); fill: none; fill-opacity: 0; filter: url(#source-fruit-glass-filter);"
           data-charge-color="${chargeColor}"
           data-charge-sign="${chargeSign}"
           data-stroke-px="${scale.fontPx.toFixed(2)}"
         ></circle>
+        ${sourceFruitCircleLayers(source, point, radius)}
         ${sourceLabelMarkup(source, label, point, scale)}
       </g>
     `;
@@ -1278,13 +1342,14 @@ function renderSource2d(source, scale) {
     const className = `source-${source.kind.replaceAll("_", "-")}`;
     const radius = radiusToViewport(source.radius_m, MIN_VISIBLE_MARKER_RADIUS_UNITS);
     const shapeStyle = source.kind === "disk"
-      ? `stroke: ${chargeColor}; fill: ${chargeColor}; fill-opacity: 1;`
+      ? `stroke: ${chargeColor}; fill: url(#${sourceFruitGradientId(source)}); fill-opacity: 0.82; filter: url(#source-fruit-glass-filter);`
       : `stroke: ${chargeColor}; fill: none; fill-opacity: 0;`;
     return `
       <g data-testid="source-${source.kind.replaceAll("_", "-")}-group-2d-${source.id}">
         <circle
           class="${className}"
           data-testid="source-${source.kind.replaceAll("_", "-")}-2d-${source.id}"
+          ${source.kind === "disk" ? sourceFruitMaterialAttributes() : ""}
           cx="${point.x}"
           cy="${point.y}"
           r="${radius}"
@@ -1292,6 +1357,7 @@ function renderSource2d(source, scale) {
           data-charge-color="${chargeColor}"
           data-charge-sign="${chargeSign}"
         ></circle>
+        ${source.kind === "disk" ? sourceFruitCircleLayers(source, point, radius) : ""}
         ${sourceLabelMarkup(source, label, point, scale)}
       </g>
     `;
@@ -1320,6 +1386,7 @@ function renderSource2d(source, scale) {
       <circle
         class="source-point"
         data-testid="source-point-2d-${source.id}"
+        ${sourceFruitMaterialAttributes()}
         data-display-radius-cm="${POINT_VISUAL_RADIUS_CM}"
         data-visual-radius-cm="${POINT_VISUAL_RADIUS_CM}"
         data-physics-model="ideal-point"
@@ -1329,16 +1396,9 @@ function renderSource2d(source, scale) {
         cx="${point.x}"
         cy="${point.y}"
         r="${markerRadius}"
-        style="fill: url(#source-point-${chargeSign}-gradient); stroke: none; stroke-width: 0;"
+        style="fill: url(#${sourceFruitGradientId(source)}); filter: url(#source-fruit-glass-filter); stroke: none; stroke-width: 0;"
       ></circle>
-      <circle
-        class="source-point-highlight"
-        data-testid="source-point-highlight-2d-${source.id}"
-        cx="${point.x - markerRadius * 0.32}"
-        cy="${point.y - markerRadius * 0.34}"
-        r="${markerRadius * 0.24}"
-        style="fill: rgba(255, 255, 255, 0.78); stroke: none; stroke-width: 0;"
-      ></circle>
+      ${sourceFruitCircleLayers(source, point, markerRadius)}
       ${sourceLabelMarkup(source, label, point, scale)}
     </g>
   `;
@@ -2098,6 +2158,30 @@ function fieldLineCurveSamplePoints(points, fieldSamples, sampleSpacing) {
   return samples;
 }
 
+function densifyFieldLinePolyline(points, sampleSpacing) {
+  if (points.length < 2) {
+    return points;
+  }
+  const samples = [{ ...points[0] }];
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const segmentLength = Math.hypot(end.x - start.x, end.y - start.y);
+    if (segmentLength <= 1e-12) {
+      continue;
+    }
+    const sampleCount = Math.max(1, Math.ceil(segmentLength / sampleSpacing));
+    for (let sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex += 1) {
+      const t = sampleIndex / sampleCount;
+      samples.push({
+        x: start.x + (end.x - start.x) * t,
+        y: start.y + (end.y - start.y) * t,
+      });
+    }
+  }
+  return samples;
+}
+
 function fieldLinePolylineLength(points) {
   let length = 0;
   for (let index = 1; index < points.length; index += 1) {
@@ -2106,27 +2190,11 @@ function fieldLinePolylineLength(points) {
   return length;
 }
 
-function fieldLinePath(points, fieldSamples) {
-  const segments = fieldLineCurveSegments(points, fieldSamples);
-  if (segments.length === 0) {
-    const viewportPoints = points.map((point) => mapToViewport(point.x, point.y));
-    return viewportPoints
-      .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(3)} ${point.y.toFixed(3)}`)
-      .join(" ");
-  }
-  const first = mapToViewport(segments[0].start.x, segments[0].start.y);
-  const commands = [`M ${first.x.toFixed(3)} ${first.y.toFixed(3)}`];
-  for (const segment of segments) {
-    const controlStart = mapToViewport(segment.controlStart.x, segment.controlStart.y);
-    const controlEnd = mapToViewport(segment.controlEnd.x, segment.controlEnd.y);
-    const end = mapToViewport(segment.end.x, segment.end.y);
-    commands.push(
-      `C ${controlStart.x.toFixed(3)} ${controlStart.y.toFixed(3)} ` +
-      `${controlEnd.x.toFixed(3)} ${controlEnd.y.toFixed(3)} ` +
-      `${end.x.toFixed(3)} ${end.y.toFixed(3)}`,
-    );
-  }
-  return commands.join(" ");
+function fieldLinePath(points) {
+  const viewportPoints = points.map((point) => mapToViewport(point.x, point.y));
+  return viewportPoints
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(3)} ${point.y.toFixed(3)}`)
+    .join(" ");
 }
 
 function fieldLinePointTangent(points, index) {
@@ -2286,6 +2354,38 @@ function fieldLineDisplayRadiusMeters(source) {
 }
 
 function fieldLinePointOnSourceSurface(source, adjacentPoint) {
+  if (source.kind === "line_segment") {
+    const axisX = source.orientation.x;
+    const axisY = source.orientation.y;
+    const axisMagnitude = Math.hypot(axisX, axisY);
+    if (axisMagnitude > 1e-12 && Number.isFinite(source.length_m)) {
+      const unitX = axisX / axisMagnitude;
+      const unitY = axisY / axisMagnitude;
+      const dx = adjacentPoint.x - source.position.x;
+      const dy = adjacentPoint.y - source.position.y;
+      const projectedDistance = Math.max(
+        0,
+        Math.min(source.length_m, dx * unitX + dy * unitY),
+      );
+      const nearest = {
+        x: source.position.x + unitX * projectedDistance,
+        y: source.position.y + unitY * projectedDistance,
+      };
+      const normalX = adjacentPoint.x - nearest.x;
+      const normalY = adjacentPoint.y - nearest.y;
+      const normalMagnitude = Math.hypot(normalX, normalY);
+      if (normalMagnitude > 1e-12) {
+        return {
+          x: nearest.x + (normalX / normalMagnitude) * FIELD_LINE_START_RADIUS_M,
+          y: nearest.y + (normalY / normalMagnitude) * FIELD_LINE_START_RADIUS_M,
+        };
+      }
+      return {
+        x: nearest.x - unitY * FIELD_LINE_START_RADIUS_M,
+        y: nearest.y + unitX * FIELD_LINE_START_RADIUS_M,
+      };
+    }
+  }
   const radius = fieldLineDisplayRadiusMeters(source);
   const dx = adjacentPoint.x - source.position.x;
   const dy = adjacentPoint.y - source.position.y;
@@ -2368,6 +2468,17 @@ function fieldLineDirectionQuality(points, fieldSamples) {
   };
 }
 
+function fieldLineEntryDirectionQuality(entry, points, fieldSamples) {
+  if (Number.isFinite(entry.backendMinDirectionDot)) {
+    return {
+      valid: entry.backendMinDirectionDot >= FIELD_LINE_DIRECTION_DOT_MIN,
+      score: entry.backendMinDirectionDot,
+      minDot: entry.backendMinDirectionDot,
+    };
+  }
+  return fieldLineDirectionQuality(points, fieldSamples);
+}
+
 function prepareDisplayFieldLineEntry(entry, fieldSamples, stepMetrics) {
   const arrowSource = fieldLineArrowSource(entry);
   if (!arrowSource || !arrowSource.position || entry.topology === "infinity-to-infinity") {
@@ -2377,11 +2488,11 @@ function prepareDisplayFieldLineEntry(entry, fieldSamples, stepMetrics) {
   const arrowFraction = fieldLineArrowFraction(entry);
   const anchoredPoints = fieldLinePointsWithArrowAnchor(snappedPoints, entry);
   const displayPoints = smoothFieldLineDisplayPoints(anchoredPoints, arrowSource);
-  const curvePoints = fieldLineCurveSamplePoints(displayPoints, fieldSamples, stepMetrics.sampleSpacing);
+  const curvePoints = densifyFieldLinePolyline(displayPoints, stepMetrics.sampleSpacing);
   if (fieldLinePolylineLength(curvePoints) / stepMetrics.metersPerPx < FIELD_LINE_MIN_VISIBLE_LENGTH_PX) {
     return null;
   }
-  const directionQuality = fieldLineDirectionQuality(curvePoints, fieldSamples);
+  const directionQuality = fieldLineEntryDirectionQuality(entry, curvePoints, fieldSamples);
   if (!directionQuality.valid) {
     return null;
   }
@@ -2518,6 +2629,25 @@ function sortFieldLineEntriesByUniformAngle(entries) {
   });
 }
 
+function groupFieldLineEntriesBySource(entries) {
+  const groups = new Map();
+  for (const entry of entries) {
+    const group = groups.get(entry.source.id) || {
+      sourceId: entry.source.id,
+      sourceOrder: entry.sourceOrder,
+      entries: [],
+      cursor: 0,
+    };
+    group.entries.push(entry);
+    groups.set(entry.source.id, group);
+  }
+  return [...groups.values()].sort((a, b) => (
+    a.sourceOrder === b.sourceOrder
+      ? a.sourceId.localeCompare(b.sourceId)
+      : a.sourceOrder - b.sourceOrder
+  ));
+}
+
 function selectDisplayFieldLineEntries(rawEntries, fieldSamples, stepMetrics) {
   const acceptedLineIndex = createFieldLineSpatialIndex();
   const selectedEntries = [];
@@ -2536,26 +2666,48 @@ function selectDisplayFieldLineEntries(rawEntries, fieldSamples, stepMetrics) {
     preparedEntries.push(displayEntry);
   }
 
-  const candidateEntries = sortFieldLineEntriesByUniformAngle(preparedEntries);
-  for (const entry of candidateEntries) {
-    if (selectedEntries.length >= FIELD_LINE_DISPLAY_MAX_COUNT) {
-      break;
-    }
-    const pairKey = fieldLineOppositePairKey(entry);
-    if (
-      pairKey &&
-      (pairCounts.get(pairKey) || 0) >= FIELD_LINE_MAX_PAIR_DISPLAY_COUNT
-    ) {
-      dedupedLineCount += 1;
-      continue;
-    }
-    if (tryAcceptDisplayFieldLine(entry, acceptedLineIndex)) {
-      selectedEntries.push(entry);
-      if (pairKey) {
-        pairCounts.set(pairKey, (pairCounts.get(pairKey) || 0) + 1);
+  const sourceGroups = groupFieldLineEntriesBySource(
+    sortFieldLineEntriesByUniformAngle(preparedEntries),
+  );
+  const selectedSourceCounts = new Map(sourceGroups.map((group) => [group.sourceId, 0]));
+  let searchedAnyCandidate = true;
+  while (selectedEntries.length < FIELD_LINE_DISPLAY_MAX_COUNT && searchedAnyCandidate) {
+    searchedAnyCandidate = false;
+    for (const group of sourceGroups) {
+      const sourceCounts = [...selectedSourceCounts.values()];
+      const minSourceCount = Math.min(...sourceCounts);
+      const currentSourceCount = selectedSourceCounts.get(group.sourceId) || 0;
+      if (
+        minSourceCount > 0 &&
+        currentSourceCount >= minSourceCount * 2
+      ) {
+        continue;
       }
-    } else {
-      conflictRejectedLineCount += 1;
+      while (group.cursor < group.entries.length) {
+        searchedAnyCandidate = true;
+        const entry = group.entries[group.cursor];
+        group.cursor += 1;
+        const pairKey = fieldLineOppositePairKey(entry);
+        if (
+          pairKey &&
+          (pairCounts.get(pairKey) || 0) >= FIELD_LINE_MAX_PAIR_DISPLAY_COUNT
+        ) {
+          dedupedLineCount += 1;
+          continue;
+        }
+        if (tryAcceptDisplayFieldLine(entry, acceptedLineIndex)) {
+          selectedEntries.push(entry);
+          selectedSourceCounts.set(group.sourceId, currentSourceCount + 1);
+          if (pairKey) {
+            pairCounts.set(pairKey, (pairCounts.get(pairKey) || 0) + 1);
+          }
+          break;
+        }
+        conflictRejectedLineCount += 1;
+      }
+      if (selectedEntries.length >= FIELD_LINE_DISPLAY_MAX_COUNT) {
+        break;
+      }
     }
   }
 
@@ -2668,6 +2820,7 @@ function backendFieldLineEntry(line) {
     seedKind: "charge",
     stopReason: line.stop_reason,
     terminalSourceId: line.terminal_source_id || "",
+    backendMinDirectionDot: Number(line.min_direction_dot),
   };
 }
 
@@ -3407,8 +3560,8 @@ function renderFieldLines2d(scale) {
           data-field-topology="${entry.topology}"
           data-seed-kind="${entry.seedKind}"
           data-trace-method="adaptive-rk4"
-          data-path-model="field-tangent-cubic"
-          data-display-smoothing="field-tangent"
+          data-path-model="verified-rk4-sampled-polyline"
+          data-display-smoothing="rk4-linear-interpolation"
           data-endpoint-class="${entry.endpointClass}"
           data-terminal-source-id="${entry.terminalSourceId}"
           data-seed-attempt="${entry.seedAttempt}"
@@ -3417,7 +3570,7 @@ function renderFieldLines2d(scale) {
           data-point-count="${renderPoints.length}"
           data-curve-sample-count="${entry.curvePoints.length}"
           data-direction-min-dot="${entry.minDirectionDot.toFixed(3)}"
-          d="${fieldLinePath(renderPoints, fieldSamples)}"
+          d="${fieldLinePath(renderPoints)}"
         ></path>
       `);
     arrows.push(fieldLineArrowMarkup(entry.arrowPoints, entry, fieldSamples, scale));
@@ -3703,6 +3856,32 @@ function render2d() {
       aria-label="Top-down electrostatic scene"
     >
       <defs>
+        <filter id="source-fruit-glass-filter" x="-45%" y="-45%" width="190%" height="190%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="0.45" result="soft-alpha"></feGaussianBlur>
+          <feOffset in="soft-alpha" dx="0" dy="0.65" result="offset-alpha"></feOffset>
+          <feFlood flood-color="#ffffff" flood-opacity="0.28" result="frost"></feFlood>
+          <feComposite in="frost" in2="soft-alpha" operator="in" result="inner-frost"></feComposite>
+          <feDropShadow dx="0" dy="1.2" stdDeviation="1.1" flood-color="#02111f" flood-opacity="0.32"></feDropShadow>
+          <feMerge>
+            <feMergeNode in="offset-alpha"></feMergeNode>
+            <feMergeNode in="SourceGraphic"></feMergeNode>
+            <feMergeNode in="inner-frost"></feMergeNode>
+          </feMerge>
+        </filter>
+        <radialGradient id="source-fruit-positive-gradient" cx="30%" cy="24%" r="82%">
+          <stop offset="0%" stop-color="#fff8ec" stop-opacity="0.98"></stop>
+          <stop offset="18%" stop-color="#ffd1a7" stop-opacity="0.92"></stop>
+          <stop offset="48%" stop-color="#ff5a3d" stop-opacity="0.82"></stop>
+          <stop offset="78%" stop-color="${POSITIVE_SOURCE_COLOR}" stop-opacity="0.9"></stop>
+          <stop offset="100%" stop-color="#6f120c" stop-opacity="0.98"></stop>
+        </radialGradient>
+        <radialGradient id="source-fruit-negative-gradient" cx="30%" cy="24%" r="82%">
+          <stop offset="0%" stop-color="#f7fbff" stop-opacity="0.98"></stop>
+          <stop offset="18%" stop-color="#a7e7ff" stop-opacity="0.92"></stop>
+          <stop offset="48%" stop-color="#4f9bff" stop-opacity="0.82"></stop>
+          <stop offset="78%" stop-color="${NEGATIVE_SOURCE_COLOR}" stop-opacity="0.9"></stop>
+          <stop offset="100%" stop-color="#021f5f" stop-opacity="0.98"></stop>
+        </radialGradient>
         <radialGradient id="source-point-positive-gradient" cx="32%" cy="28%" r="78%">
           <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
           <stop offset="24%" stop-color="#fda29b" stop-opacity="0.98"></stop>

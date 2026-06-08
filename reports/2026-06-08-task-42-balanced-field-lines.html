@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 42 - Balanced Field Lines</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+      margin: 2rem auto;
+      max-width: 980px;
+      padding: 0 1rem;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #c9d3e0;
+      padding: 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3f8;
+    }
+    code {
+      background: #f3f6fa;
+      border-radius: 4px;
+      padding: 0.1rem 0.25rem;
+    }
+    .status {
+      background: #eefaf1;
+      border-left: 4px solid #278a45;
+      padding: 0.75rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task 42 - Balanced Field Lines</h1>
+  <p class="status"><strong>Completion timestamp:</strong> 2026-06-08 17:20:32 +08:00</p>
+
+  <h2>Scope Delivered</h2>
+  <ul>
+    <li>Reproduced mixed-source field-line imbalance where point-only scenes rendered well but mixed finite sources did not.</li>
+    <li>Changed field-line seed placement for finite sources to follow visible geometry instead of internal quadrature element order.</li>
+    <li>Synchronized the charged line segment contract so its <code>position</code> is the visible start point in backend integration, solver near-source checks, and frontend rendering.</li>
+    <li>Allowed backend field-line traces to carry their backend direction-quality metric into frontend display filtering, avoiding false rejection from coarse browser-side source samples.</li>
+    <li>Added backend and browser regression tests for mixed point, line segment, ring, and disk scenes.</li>
+  </ul>
+
+  <h2>Scope Deferred</h2>
+  <ul>
+    <li>No new UI controls were added for manual field-line density tuning.</li>
+    <li>No CUDA-specific visual balancing tests were added because CUDA is unavailable in this environment.</li>
+  </ul>
+
+  <h2>Changed Files</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>src/em_workbench/physics/compute/field_lines.py</code></td><td>Uniform visible-geometry seed placement for point, line segment, ring, and disk field lines.</td></tr>
+      <tr><td><code>src/em_workbench/physics/integration.py</code></td><td>Line segment quadrature now interprets <code>position</code> as segment start.</td></tr>
+      <tr><td><code>src/em_workbench/physics/solver.py</code></td><td>Line segment near-source detection now uses the start-point contract.</td></tr>
+      <tr><td><code>web/app.js</code></td><td>Backend field-line direction quality is used for backend trace display filtering.</td></tr>
+      <tr><td><code>web/index.html</code></td><td>Static asset cache version updated to <code>20260608-balanced-field-lines</code>.</td></tr>
+      <tr><td><code>tests/test_field_lines.py</code></td><td>Added finite-source seed distribution and mixed-source balance tests.</td></tr>
+      <tr><td><code>tests/test_browser_smoke.py</code></td><td>Added browser regression for balanced mixed finite-source field lines.</td></tr>
+      <tr><td><code>tests/test_app.py</code></td><td>Updated static asset version assertions.</td></tr>
+      <tr><td><code>reports/2026-06-08-task-42-balanced-field-lines.html</code></td><td>Task report.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Commands Executed</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Outcome</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py::test_field_line_inputs_seed_line_segments_uniformly_along_visible_geometry tests\test_field_lines.py::test_field_line_inputs_seed_radial_sources_uniformly_on_visible_boundary tests\test_field_lines.py::test_cpu_field_lines_keep_mixed_finite_sources_visually_balanced tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources</code></td>
+        <td>Passed: 5 tests. Two browser dependency deprecation warnings.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell tests\test_browser_smoke.py::test_browser_field_lines_use_global_display_cap_for_same_sign_charges tests\test_browser_smoke.py::test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs tests\test_browser_smoke.py::test_browser_field_lines_are_loaded_from_backend tests\test_browser_smoke.py::test_browser_field_lines_render_for_integrated_sources tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources tests\test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets</code></td>
+        <td>Passed: 20 tests. Skipped: 1 CUDA test. Two browser dependency deprecation warnings.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td>
+        <td>Initial run found three line-length errors; rerun after formatting passed.</td>
+      </tr>
+      <tr>
+        <td><code>git diff --check</code></td>
+        <td>Passed. Git reported expected CRLF normalization warnings only.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_solver.py tests\test_cpu_backend.py tests\test_packed_scene.py</code></td>
+        <td>Passed: 27 tests.</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td>
+        <td>Passed: 128 tests. Skipped: 4 CUDA tests. Two browser dependency deprecation warnings.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Verification Evidence</h2>
+  <ul>
+    <li>Mixed finite-source backend trace test verifies each source keeps at least 16 accepted lines and the max/min source count ratio stays within 1.75.</li>
+    <li>Browser regression verifies point, line segment, ring, and disk all appear in the rendered field-line DOM with at least two lines each and max/min ratio within 4.</li>
+    <li>Full project test suite passed through project-local uv.</li>
+    <li>Lint passed through project-local uv.</li>
+  </ul>
+
+  <h2>Known Risks And Limitations</h2>
+  <ul>
+    <li>CUDA field-line execution was not exercised because CUDA is unavailable in this environment.</li>
+    <li>Backend direction quality is now trusted for backend traces. This is appropriate for authoritative solver traces, while browser fallback traces still use browser-side validation.</li>
+    <li>The line segment <code>position</code> contract is now consistently treated as the start point; any external saved scenes that assumed center-point semantics will render shifted relative to that older interpretation.</li>
+  </ul>
+
+  <h2>Next Scheduled Task</h2>
+  <p>Open the local workbench for manual visual inspection of mixed-source field-line distribution.</p>
+</body>
+</html>

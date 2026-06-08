@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 44 - Fruit Glass Sources and Smooth Field Lines</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+      margin: 2rem auto;
+      max-width: 980px;
+      padding: 0 1rem;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #c9d3e0;
+      padding: 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3f8;
+    }
+    code {
+      background: #f3f6fa;
+      border-radius: 4px;
+      padding: 0.1rem 0.25rem;
+    }
+    .status {
+      background: #eefaf1;
+      border-left: 4px solid #278a45;
+      padding: 0.75rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task 44 - Fruit Glass Sources and Smooth Field Lines</h1>
+  <p class="status"><strong>Completion timestamp:</strong> 2026-06-08 18:08:32 +08:00</p>
+
+  <h2>Scope Delivered</h2>
+  <ul>
+    <li>Reduced backend and frontend field-line step sizes and increased field-line budgets so rendered curves are smoother under mixed-source scenes.</li>
+    <li>Propagated field-line step and point-budget constants into CPU and CUDA compute paths instead of relying on duplicated compile-time values.</li>
+    <li>Kept final field-line SVG rendering as dense RK4 sampled polylines, avoiding an additional cubic smoothing pass that could visually cross screened geometry.</li>
+    <li>Added frontend fair-selection limits so mixed point, line segment, ring, and disk sources keep a balanced visible field-line distribution.</li>
+    <li>Changed source models to a translucent fruit-glass material using SVG gradients, highlights, caustic overlays, and glass filters for point, line segment, ring, and disk sources.</li>
+    <li>Added browser and backend regression coverage for source balance, smooth RK4 step spacing, finite-source seeding, and fruit-glass material attributes.</li>
+  </ul>
+
+  <h2>Scope Deferred</h2>
+  <ul>
+    <li>CUDA browser/runtime verification was not executed because CUDA hardware is unavailable in this environment.</li>
+    <li>No new user-facing control was added for field-line density or source material presets; this task changed the default behavior.</li>
+  </ul>
+
+  <h2>Changed Files</h2>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Change</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>src/em_workbench/physics/compute/cpu_backend.py</code></td><td>Field-line kernel receives runtime step and point-budget parameters.</td></tr>
+      <tr><td><code>src/em_workbench/physics/compute/cuda_backend.py</code></td><td>CUDA field-line kernel receives the same runtime step and point-budget parameters.</td></tr>
+      <tr><td><code>src/em_workbench/physics/compute/field_lines.py</code></td><td>Smoother field-line constants, visible-geometry seeding, and fair backend line selection.</td></tr>
+      <tr><td><code>src/em_workbench/physics/integration.py</code></td><td>Line segment integration uses start-point segment geometry.</td></tr>
+      <tr><td><code>src/em_workbench/physics/solver.py</code></td><td>Line segment contribution and near-source logic use start-point segment geometry.</td></tr>
+      <tr><td><code>web/app.js</code></td><td>Smoother field-line constants, RK4 polyline display, fair mixed-source selection, and fruit-glass source rendering.</td></tr>
+      <tr><td><code>web/index.html</code></td><td>Static asset version updated to <code>20260608-fruit-glass-smooth-lines</code>.</td></tr>
+      <tr><td><code>web/styles.css</code></td><td>Fruit-glass highlight and caustic source styling.</td></tr>
+      <tr><td><code>tests/test_app.py</code></td><td>Updated static asset version assertion.</td></tr>
+      <tr><td><code>tests/test_browser_smoke.py</code></td><td>Browser checks for balanced mixed-source field lines and fruit-glass material attributes.</td></tr>
+      <tr><td><code>tests/test_field_lines.py</code></td><td>Backend checks for smooth field-line steps, mixed-source balance, fair truncation, and finite-source seeding.</td></tr>
+      <tr><td><code>reports/2026-06-08-task-44-fruit-glass-smooth-lines.html</code></td><td>Task report.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Commands Executed</h2>
+  <table>
+    <thead>
+      <tr><th>Command</th><th>Outcome</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py::test_cpu_field_lines_use_smooth_rk4_step_spacing_for_point_charge tests\test_browser_smoke.py::test_browser_interaction_slice_keeps_state_across_2d_3d_toggle tests\test_browser_smoke.py::test_browser_sources_use_fruit_glass_material tests\test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>Passed: 5 passed, 2 warnings.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources</code></td><td>Passed: 1 passed, 2 warnings.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td><td>Passed: all checks passed.</td></tr>
+      <tr><td><code>git diff --check</code></td><td>Passed with existing CRLF warnings only.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_field_lines.py tests\test_browser_smoke.py::test_browser_field_lines_geogebra_like_dedupes_opposite_charge_pairs tests\test_browser_smoke.py::test_browser_field_lines_remain_balanced_for_mixed_finite_sources tests\test_browser_smoke.py::test_browser_field_lines_render_for_integrated_sources tests\test_browser_smoke.py::test_browser_interaction_slice_keeps_state_across_2d_3d_toggle tests\test_browser_smoke.py::test_browser_sources_use_fruit_glass_material tests\test_browser_smoke.py::test_browser_static_source_editing_overlays_and_presets tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell</code></td><td>Passed: 22 passed, 1 skipped, 2 warnings.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td><td>Passed: 131 passed, 4 skipped, 2 warnings. Skipped tests require unavailable CUDA hardware.</td></tr>
+      <tr><td><code>git -c http.proxy=socks5h://127.0.0.1:10808 fetch origin feature/em-workbench-foundation</code></td><td>Passed: fetched remote updates through the local xray SOCKS5 proxy.</td></tr>
+      <tr><td><code>git rebase origin/feature/em-workbench-foundation</code></td><td>Passed: local field-line commit rebased on remote Rutherford updates.</td></tr>
+      <tr><td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td><td>Passed after rebase: 136 passed, 4 skipped, 2 warnings. Skipped tests require unavailable CUDA hardware.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Verification Evidence</h2>
+  <ul>
+    <li>Backend tests verify smooth RK4 point spacing and fair mixed-source line truncation.</li>
+    <li>Browser tests verify final field lines remain balanced across point, line segment, ring, and disk sources and do not internally intersect in the sampled SVG paths.</li>
+    <li>Browser tests verify source shapes expose fruit-glass material markers and gradient/filter styling.</li>
+    <li>Full repository tests and lint passed through the uv-managed toolchain.</li>
+  </ul>
+
+  <h2>Known Risks or Limitations</h2>
+  <ul>
+    <li>Dense RK4 sampled polylines improve geometric fidelity, but very dense scenes can still require additional adaptive display throttling for performance.</li>
+    <li>Fruit-glass material is implemented as SVG styling for the 2D workbench surface; 3D material parity remains a future visual task.</li>
+    <li>CUDA kernel parameterization was updated but not hardware-validated in this environment.</li>
+  </ul>
+
+  <h2>Next Scheduled Task</h2>
+  <p>Run full repository validation, commit the current completed changes, push the branch to GitHub, then continue only after confirming the remote state.</p>
+</body>
+</html>

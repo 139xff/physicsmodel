@@ -301,7 +301,7 @@ def _line_segment_contribution(
     sample: Vector3,
     segment_count: int,
 ) -> SourceContribution:
-    center = Vector3.from_position(source.position)
+    start = Vector3.from_position(source.position)
     axis = Vector3.from_position(source.orientation).normalized()
     potential = 0.0
     field = ZERO_VECTOR
@@ -312,7 +312,7 @@ def _line_segment_contribution(
             "near the charged segment is intentionally left steep."
         )
     ]
-    if _sample_is_near_line_segment(source, sample, center, axis):
+    if _sample_is_near_line_segment(source, sample, start, axis):
         warnings.append(
             f"Sample is near source {source.id} line_segment geometry; quadrature result "
             "is near singular and should be treated as a limitation."
@@ -477,19 +477,16 @@ def _sample_is_near_ring(
 def _sample_is_near_line_segment(
     source: LineSegmentSource,
     sample: Vector3,
-    center: Vector3,
+    start: Vector3,
     axis: Vector3,
 ) -> bool:
-    displacement = sample - center
+    displacement = sample - start
     projected_distance = displacement.dot(axis)
-    nearest_axis_point = center + axis.scale(projected_distance)
+    nearest_axis_point = start + axis.scale(projected_distance)
     perpendicular_distance = (sample - nearest_axis_point).magnitude()
-    half_length = 0.5 * source.length_m
     return (
         perpendicular_distance <= MIN_SOURCE_DISTANCE_M
-        and -half_length - MIN_SOURCE_DISTANCE_M
-        <= projected_distance
-        <= half_length + MIN_SOURCE_DISTANCE_M
+        and -MIN_SOURCE_DISTANCE_M <= projected_distance <= source.length_m + MIN_SOURCE_DISTANCE_M
     )
 
 

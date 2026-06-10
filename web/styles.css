@@ -738,9 +738,39 @@ summary:focus-visible {
 }
 
 .source-point {
-  fill: var(--accent);
-  stroke: none;
-  stroke-width: 0;
+  stroke: rgba(255, 244, 232, 0.88);
+  stroke-width: 0.055;
+}
+
+.source-point-negative {
+  stroke: rgba(207, 248, 255, 0.9);
+}
+
+.source-point-rim,
+.motion-particle-rim {
+  fill: none;
+  opacity: 0.86;
+  pointer-events: none;
+  stroke: rgba(255, 255, 255, 0.74);
+  stroke-width: 0.035;
+}
+
+.source-point-highlight,
+.motion-particle-highlight {
+  fill: rgba(255, 255, 255, 0.82);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.source-point-symbol {
+  fill: none;
+  pointer-events: none;
+}
+
+.source-point-symbol-stroke {
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .source-fruit-highlight,
@@ -919,16 +949,17 @@ summary:focus-visible {
 }
 
 .motion-particle {
-  stroke: #39ff14;
-  stroke-width: 0.06;
+  stroke: rgba(255, 244, 232, 0.88);
+  stroke-width: 0.012;
 }
 
 .motion-particle.positive {
-  fill: #39ff14;
+  fill: url(#source-point-positive-gradient);
 }
 
 .motion-particle.negative {
-  fill: #39ff14;
+  fill: url(#source-point-negative-gradient);
+  stroke: rgba(207, 248, 255, 0.9);
 }
 
 .scattering-layer {

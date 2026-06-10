@@ -204,9 +204,36 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
         "#d92d20",
     )
     point_fill = page.get_by_test_id("source-point-2d-point-1").evaluate(
-        "element => getComputedStyle(element).fill"
+        """
+        element => ({
+            fill: getComputedStyle(element).fill,
+            filter: getComputedStyle(element).filter,
+            material: element.getAttribute("data-material"),
+            finish: element.getAttribute("data-material-finish"),
+        })
+        """
     )
-    assert "gradient" in point_fill
+    assert "source-point-positive-gradient" in point_fill["fill"]
+    assert point_fill["filter"] == "none"
+    assert point_fill["material"] == "charge-orb"
+    assert point_fill["finish"] == "internal-radial-glow"
+    point_symbol = page.get_by_test_id("source-point-symbol-2d-point-1").evaluate(
+        """
+        node => ({
+            symbol: node.getAttribute("data-charge-symbol"),
+            centerX: Number(node.getAttribute("data-symbol-center-x")),
+            centerY: Number(node.getAttribute("data-symbol-center-y")),
+            halfLength: Number(node.getAttribute("data-symbol-half-length")),
+            lineCount: node.querySelectorAll("line").length,
+        })
+        """
+    )
+    assert point_symbol["symbol"] == "+"
+    assert point_symbol["centerX"] == pytest.approx(point_x)
+    assert point_symbol["centerY"] == pytest.approx(point_y)
+    assert point_symbol["halfLength"] == pytest.approx(point_radius * 0.32)
+    assert point_symbol["halfLength"] < point_radius
+    assert point_symbol["lineCount"] == 2
     _assert_inside_viewbox(point_x - point_radius)
     _assert_inside_viewbox(point_x + point_radius)
     _assert_inside_viewbox(point_y - point_radius)
@@ -324,6 +351,12 @@ def test_browser_sources_use_fruit_glass_material(page: Page) -> None:
             filter: Boolean(document.querySelector("#source-fruit-glass-filter")),
             positiveGradient: Boolean(document.querySelector("#source-fruit-positive-gradient")),
             negativeGradient: Boolean(document.querySelector("#source-fruit-negative-gradient")),
+            pointPositiveGradient: Boolean(
+                document.querySelector("#source-point-positive-gradient")
+            ),
+            pointNegativeGradient: Boolean(
+                document.querySelector("#source-point-negative-gradient")
+            ),
             point: document.querySelector('[data-testid="source-point-2d-point-1"]')?.dataset,
             line: document.querySelector(
                 '[data-testid="source-line-segment-2d-line-segment-1"]'
@@ -349,14 +382,18 @@ def test_browser_sources_use_fruit_glass_material(page: Page) -> None:
     assert material_metadata["filter"]
     assert material_metadata["positiveGradient"]
     assert material_metadata["negativeGradient"]
-    for key in ["point", "line", "ring", "disk"]:
+    assert material_metadata["pointPositiveGradient"]
+    assert material_metadata["pointNegativeGradient"]
+    assert material_metadata["point"]["material"] == "charge-orb"
+    assert material_metadata["point"]["materialFinish"] == "internal-radial-glow"
+    for key in ["line", "ring", "disk"]:
         assert material_metadata[key]["material"] == "fruit-glass"
         assert material_metadata[key]["materialFinish"] == "translucent-caustic"
         assert material_metadata[key]["materialDepth"] == "layered-rind-lens"
-    assert material_metadata["highlightCount"] >= 4
-    assert material_metadata["causticCount"] >= 4
-    assert material_metadata["rimCount"] >= 4
-    assert material_metadata["refractCount"] >= 3
+    assert material_metadata["highlightCount"] >= 3
+    assert material_metadata["causticCount"] >= 3
+    assert material_metadata["rimCount"] >= 3
+    assert material_metadata["refractCount"] >= 2
 
 
 def test_browser_source_library_modules_are_collapsible_parameter_forms(page: Page) -> None:
@@ -1212,27 +1249,38 @@ def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) 
         """
         node => {
             const trail = document.querySelector('.motion-trail');
+            const group = document.querySelector('[data-testid="motion-particle-group-2d"]');
             const particleStyle = getComputedStyle(node);
             const trailStyle = getComputedStyle(trail);
             return {
                 particleFill: particleStyle.fill,
                 particleStroke: particleStyle.stroke,
                 particleRadius: node.getAttribute('r'),
+                particleVisualRadius: node.getAttribute('data-visual-radius-cm'),
                 particleStrokeWidth: particleStyle.strokeWidth,
+                particleFilter: particleStyle.filter,
+                particleMaterial: node.getAttribute('data-material'),
+                hasParticleSymbol: Boolean(
+                    document.querySelector('[data-testid="motion-particle-symbol-2d"]')
+                ),
+                particleGroupRatio: group.getAttribute('data-radius-ratio-to-static'),
                 trailStroke: trailStyle.stroke,
                 trailWidth: trailStyle.strokeWidth,
             };
         }
         """
     )
-    assert motion_style == {
-        "particleFill": "rgb(57, 255, 20)",
-        "particleStroke": "rgb(57, 255, 20)",
-        "particleRadius": "0.16",
-        "particleStrokeWidth": "0.06px",
-        "trailStroke": "rgb(57, 255, 20)",
-        "trailWidth": "0.22px",
-    }
+    assert "source-point-negative-gradient" in motion_style["particleFill"]
+    assert motion_style["particleStroke"] == "rgba(207, 248, 255, 0.9)"
+    assert float(motion_style["particleRadius"]) == pytest.approx(0.1)
+    assert float(motion_style["particleVisualRadius"]) == pytest.approx(0.1)
+    assert motion_style["particleStrokeWidth"] == "0.012px"
+    assert motion_style["particleFilter"] == "none"
+    assert motion_style["particleMaterial"] == "charge-orb"
+    assert motion_style["hasParticleSymbol"] is False
+    assert motion_style["particleGroupRatio"] == "0.2"
+    assert motion_style["trailStroke"] == "rgb(57, 255, 20)"
+    assert motion_style["trailWidth"] == "0.22px"
 
 
 def test_browser_rutherford_scattering_panel_renders_tracks(page: Page) -> None:

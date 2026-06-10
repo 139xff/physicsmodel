@@ -150,6 +150,7 @@ const VIEWPORT_SIZE_UNITS = VIEWPORT_AXIS_LIMIT_M * VIEWPORT_METERS_TO_UNITS * 2
 const VIEWPORT_MIN_ZOOM = 1;
 const DEFAULT_VIEW_ZOOM = 100;
 const POINT_VISUAL_RADIUS_CM = 0.5;
+const MOTION_CHARGE_VISUAL_RADIUS_CM = POINT_VISUAL_RADIUS_CM / 5;
 const COULOMB_CONSTANT = 8.9875517923e9;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const MAX_AXIS_TICKS = 36;
@@ -1231,6 +1232,51 @@ function sourceFruitGradientId(source) {
   return `source-fruit-${sourceChargeSign(source)}-gradient`;
 }
 
+function sourcePointGradientId(source) {
+  return `source-point-${sourceChargeSign(source)}-gradient`;
+}
+
+function chargeSymbolForSign(chargeSign) {
+  return chargeSign === "positive" ? "+" : "-";
+}
+
+function sourcePointSymbolMarkup(source, point, radius, chargeSign) {
+  const symbol = chargeSymbolForSign(chargeSign);
+  const halfLength = radius * 0.32;
+  const strokeWidth = radius * 0.075;
+  const verticalStroke = chargeSign === "positive"
+    ? `
+      <line
+        class="source-point-symbol-stroke"
+        x1="${point.x}"
+        y1="${point.y - halfLength}"
+        x2="${point.x}"
+        y2="${point.y + halfLength}"
+        stroke-width="${strokeWidth}"
+      ></line>`
+    : "";
+  return `
+    <g
+      class="source-point-symbol"
+      data-testid="source-point-symbol-2d-${source.id}"
+      data-charge-symbol="${symbol}"
+      data-symbol-center-x="${point.x}"
+      data-symbol-center-y="${point.y}"
+      data-symbol-half-length="${halfLength}"
+    >
+      <line
+        class="source-point-symbol-stroke"
+        x1="${point.x - halfLength}"
+        y1="${point.y}"
+        x2="${point.x + halfLength}"
+        y2="${point.y}"
+        stroke-width="${strokeWidth}"
+      ></line>
+      ${verticalStroke}
+    </g>
+  `;
+}
+
 function sourceFruitMaterialAttributes() {
   return 'data-material="fruit-glass" data-material-finish="translucent-caustic" data-material-depth="layered-rind-lens"';
 }
@@ -1436,9 +1482,10 @@ function renderSource2d(source, scale) {
   return `
     <g data-testid="source-point-group-2d-${source.id}">
       <circle
-        class="source-point"
+        class="source-point source-point-${chargeSign}"
         data-testid="source-point-2d-${source.id}"
-        ${sourceFruitMaterialAttributes()}
+        data-material="charge-orb"
+        data-material-finish="internal-radial-glow"
         data-display-radius-cm="${POINT_VISUAL_RADIUS_CM}"
         data-visual-radius-cm="${POINT_VISUAL_RADIUS_CM}"
         data-physics-model="ideal-point"
@@ -1448,9 +1495,24 @@ function renderSource2d(source, scale) {
         cx="${point.x}"
         cy="${point.y}"
         r="${markerRadius}"
-        style="fill: url(#${sourceFruitGradientId(source)}); filter: url(#source-fruit-glass-filter); stroke: none; stroke-width: 0;"
+        style="fill: url(#${sourcePointGradientId(source)});"
       ></circle>
-      ${sourceFruitCircleLayers(source, point, markerRadius)}
+      <circle
+        class="source-point-rim"
+        data-testid="source-point-rim-2d-${source.id}"
+        cx="${point.x}"
+        cy="${point.y}"
+        r="${markerRadius * 0.94}"
+      ></circle>
+      <ellipse
+        class="source-point-highlight"
+        data-testid="source-point-highlight-2d-${source.id}"
+        cx="${point.x - markerRadius * 0.22}"
+        cy="${point.y - markerRadius * 0.24}"
+        rx="${markerRadius * 0.2}"
+        ry="${markerRadius * 0.12}"
+      ></ellipse>
+      ${sourcePointSymbolMarkup(source, point, markerRadius, chargeSign)}
       ${sourceLabelMarkup(source, label, point, scale)}
     </g>
   `;
@@ -4008,16 +4070,16 @@ function render2d() {
           <stop offset="100%" stop-color="#021f5f" stop-opacity="0.98"></stop>
         </radialGradient>
         <radialGradient id="source-point-positive-gradient" cx="32%" cy="28%" r="78%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
-          <stop offset="24%" stop-color="#fda29b" stop-opacity="0.98"></stop>
-          <stop offset="62%" stop-color="${POSITIVE_SOURCE_COLOR}" stop-opacity="1"></stop>
-          <stop offset="100%" stop-color="#7a170f" stop-opacity="1"></stop>
+          <stop offset="0%" stop-color="#fff7e8" stop-opacity="1"></stop>
+          <stop offset="24%" stop-color="#ffb07a" stop-opacity="1"></stop>
+          <stop offset="62%" stop-color="#f04a2c" stop-opacity="1"></stop>
+          <stop offset="100%" stop-color="#8f1408" stop-opacity="1"></stop>
         </radialGradient>
         <radialGradient id="source-point-negative-gradient" cx="32%" cy="28%" r="78%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
-          <stop offset="24%" stop-color="#8ec5ff" stop-opacity="0.98"></stop>
-          <stop offset="62%" stop-color="${NEGATIVE_SOURCE_COLOR}" stop-opacity="1"></stop>
-          <stop offset="100%" stop-color="#003f8c" stop-opacity="1"></stop>
+          <stop offset="0%" stop-color="#f8fdff" stop-opacity="1"></stop>
+          <stop offset="24%" stop-color="#b8f4ff" stop-opacity="1"></stop>
+          <stop offset="62%" stop-color="#55c7ea" stop-opacity="1"></stop>
+          <stop offset="100%" stop-color="#1572a5" stop-opacity="1"></stop>
         </radialGradient>
         <pattern id="grid" width="${VIEWPORT_GRID_STEP_UNITS}" height="${VIEWPORT_GRID_STEP_UNITS}" patternUnits="userSpaceOnUse">
           <path d="M ${VIEWPORT_GRID_STEP_UNITS} 0 L 0 0 0 ${VIEWPORT_GRID_STEP_UNITS}" fill="none"></path>
@@ -4064,28 +4126,46 @@ function motionLayerFrameState2d() {
   const current = visibleSamples[visibleSamples.length - 1];
   const marker = mapToViewport(current.position.x, current.position.y);
   const charge = Number(motionInputs.charge.value);
+  const chargeClass = charge >= 0 ? "positive" : "negative";
   return {
-    chargeClass: charge >= 0 ? "positive" : "negative",
+    chargeClass,
     marker,
     path,
     pointCount: visibleSamples.length,
+    radius: MOTION_CHARGE_VISUAL_RADIUS_CM,
   };
 }
 
 function motionLayerInnerMarkup2d(motionLayer) {
   return `
     <path class="motion-trail" fill="none" stroke="#39ff14" stroke-width="0.22" d="${motionLayer.path}"></path>
-    <circle
-      class="motion-particle ${motionLayer.chargeClass}"
-      data-testid="motion-particle-2d"
-      cx="${motionLayer.marker.x}"
-      cy="${motionLayer.marker.y}"
-      fill="#39ff14"
-      stroke="#39ff14"
-      stroke-width="0.06"
-      r="0.16"
-      style="fill: #39ff14; stroke: #39ff14; stroke-width: 0.06px;"
-    ></circle>
+    <g
+      class="motion-particle-group ${motionLayer.chargeClass}"
+      data-testid="motion-particle-group-2d"
+      data-visual-radius-cm="${MOTION_CHARGE_VISUAL_RADIUS_CM}"
+      data-radius-ratio-to-static="0.2"
+      transform="translate(${motionLayer.marker.x} ${motionLayer.marker.y})"
+    >
+      <circle
+        class="motion-particle ${motionLayer.chargeClass}"
+        data-testid="motion-particle-2d"
+        cx="0"
+        cy="0"
+        data-material="charge-orb"
+        data-material-finish="internal-radial-glow"
+        data-charge-sign="${motionLayer.chargeClass}"
+        data-visual-radius-cm="${MOTION_CHARGE_VISUAL_RADIUS_CM}"
+        r="${motionLayer.radius}"
+      ></circle>
+      <circle class="motion-particle-rim" cx="0" cy="0" r="${motionLayer.radius * 0.94}"></circle>
+      <ellipse
+        class="motion-particle-highlight"
+        cx="${-motionLayer.radius * 0.22}"
+        cy="${-motionLayer.radius * 0.24}"
+        rx="${motionLayer.radius * 0.2}"
+        ry="${motionLayer.radius * 0.12}"
+      ></ellipse>
+    </g>
   `;
 }
 
@@ -4103,16 +4183,7 @@ function renderMotionFrame2d() {
   const motionLayer = motionLayerFrameState2d();
   layer.classList.add("motion-layer");
   layer.dataset.pointCount = String(motionLayer.pointCount);
-  const trail = layer.querySelector(".motion-trail");
-  const particle = layer.querySelector("[data-testid='motion-particle-2d']");
-  if (!trail || !particle) {
-    layer.innerHTML = motionLayerInnerMarkup2d(motionLayer);
-    return;
-  }
-  trail.setAttribute("d", motionLayer.path);
-  particle.setAttribute("class", `motion-particle ${motionLayer.chargeClass}`);
-  particle.setAttribute("cx", String(motionLayer.marker.x));
-  particle.setAttribute("cy", String(motionLayer.marker.y));
+  layer.innerHTML = motionLayerInnerMarkup2d(motionLayer);
 }
 
 function impactParameterSeries(count, halfWidthM, centerM = 0) {

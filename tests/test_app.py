@@ -63,8 +63,8 @@ def test_root_serves_the_explicitly_scoped_workbench_shell():
         assert expected_copy in html
     assert '<script type="importmap">' in html
     assert '"three": "./vendor/three.module.js"' in html
-    assert 'href="./styles.css?v=20260610-scene-scattering-sources"' in html
-    assert 'src="./app.js?v=20260610-scene-scattering-sources"' in html
+    assert 'href="./styles.css?v=20260611-field-line-pan-zoom-perf"' in html
+    assert 'src="./app.js?v=20260611-field-line-pan-zoom-perf"' in html
 
 
 def test_static_assets_and_vendor_modules_are_served_locally():

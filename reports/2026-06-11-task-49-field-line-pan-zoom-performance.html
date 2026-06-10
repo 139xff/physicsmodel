@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 49 - Field Line Pan Zoom Performance</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      color: #172033;
+      background: #f7f9fc;
+    }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      color: #0f172a;
+    }
+    h1 {
+      margin-bottom: 4px;
+    }
+    section {
+      margin-top: 24px;
+      padding: 20px;
+      background: #ffffff;
+      border: 1px solid #d9e2ef;
+      border-radius: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid #d9e2ef;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef4ff;
+    }
+    code {
+      font-family: Consolas, monospace;
+      font-size: 0.95em;
+    }
+    .meta {
+      color: #475569;
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 49 - Field Line Pan Zoom Performance</h1>
+    <p class="meta">Completed: 2026-06-11 01:20:47 +08:00</p>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Reduced pan and zoom stutter while electric field lines are visible.</li>
+        <li>Changed 2D wheel and pan interaction to update the existing SVG <code>viewBox</code> directly instead of rebuilding all field line paths on every input event.</li>
+        <li>Deferred field line layer rebuild and backend field line refresh until 160 ms after interaction settles.</li>
+        <li>Invalidated stale in-flight field line requests during view interaction so delayed responses do not force an immediate heavy redraw.</li>
+        <li>Added browser regression coverage for deferred field line layer rerendering.</li>
+        <li>Updated static asset cache keys so browsers load the performance fix.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>This task optimizes the 2D DOM/SVG interaction path. It does not change field line physics or backend tracing.</li>
+        <li>Further optimization could cache generated field line path strings per request and only remap labels/arrows, but the current fix removes the input-event redraw bottleneck.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>web/app.js</code></td>
+            <td>Added viewBox-only interaction updates and deferred electric field line refresh.</td>
+          </tr>
+          <tr>
+            <td><code>web/index.html</code></td>
+            <td>Updated static asset version strings.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_browser_smoke.py</code></td>
+            <td>Added regression coverage proving field line layer rerendering is deferred during zoom bursts.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_app.py</code></td>
+            <td>Updated static asset version assertions.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Commands and Outcomes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_field_line_view_interaction_defers_layer_rerender</code></td>
+            <td>Red phase failed against the old implementation with 12 field line layer mutations after six wheel events; after implementation the test passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell tests\test_browser_smoke.py::test_browser_2d_view_zooms_with_origin_fixed_at_center tests\test_browser_smoke.py::test_browser_pan_tool_moves_view_without_moving_axes tests\test_browser_smoke.py::test_browser_field_lines_are_loaded_from_backend tests\test_browser_smoke.py::test_browser_field_line_view_interaction_defers_layer_rerender tests\test_browser_smoke.py::test_browser_discards_stale_field_line_response_after_zoom</code></td>
+            <td>Passed: 6 tests, 2 third-party websocket deprecation warnings.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>git diff --check</code></td>
+            <td>Passed with only Git line-ending conversion warnings for modified files.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync python -</code></td>
+            <td>Playwright interaction passed on <code>http://127.0.0.1:8000/?v=20260611-field-line-pan-zoom-perf</code>. Immediate wheel-burst mutation count was 0; after idle refresh mutation count was 2 and the field line request was current.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td>
+            <td>Passed: 147 tests, 4 skipped because CUDA is unavailable, 2 third-party websocket deprecation warnings.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Browser Evidence</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Browser plugin availability</td>
+            <td>Browser plugin was not exposed in the available tools; validation used project Playwright tests through uv.</td>
+          </tr>
+          <tr>
+            <td>Page identity</td>
+            <td>Title was <code>电磁工作台 | 静电场</code>.</td>
+          </tr>
+          <tr>
+            <td>Initial field lines</td>
+            <td>One point source produced 64 field lines before interaction.</td>
+          </tr>
+          <tr>
+            <td>Wheel burst</td>
+            <td>Eight wheel events changed zoom from <code>100</code> to <code>464.5969176920425</code> without replacing the field line layer in the first 60 ms.</td>
+          </tr>
+          <tr>
+            <td>Idle refresh</td>
+            <td>After the deferred refresh, the field line layer reported <code>data-request-current="true"</code> with 64 field lines.</td>
+          </tr>
+          <tr>
+            <td>Console health</td>
+            <td>No console messages were captured during the Playwright interaction.</td>
+          </tr>
+          <tr>
+            <td>Screenshot</td>
+            <td><code>C:\Users\Administrator\AppData\Local\Temp\em-workbench-field-line-pan-zoom-perf.png</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Known Risks and Limitations</h2>
+      <ul>
+        <li>During the active pan or zoom burst, axes and field line samples are temporarily scaled by the current SVG viewBox; final regenerated field lines arrive after interaction settles.</li>
+        <li>Extremely large mixed-source scenes may still benefit from additional path-string caching, but repeated input-event DOM rebuilds are removed for the field-line case.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p>If panning still feels heavy on very large scenes, extend the same viewBox-only interaction path to equipotential overlays and animated motion layers.</p>
+    </section>
+  </main>
+</body>
+</html>

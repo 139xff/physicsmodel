@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 47 - Current Source Scattering UI</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      color: #172033;
+      background: #f7f9fc;
+    }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      color: #0f172a;
+    }
+    h1 {
+      margin-bottom: 4px;
+    }
+    section {
+      margin-top: 24px;
+      padding: 20px;
+      background: #ffffff;
+      border: 1px solid #d9e2ef;
+      border-radius: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid #d9e2ef;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef4ff;
+    }
+    code {
+      font-family: Consolas, monospace;
+      font-size: 0.95em;
+    }
+    .meta {
+      color: #475569;
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 47 - Current Source Scattering UI</h1>
+    <p class="meta">Completed: 2026-06-11 00:54:52 +08:00</p>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Changed the browser scattering panel from point-nucleus wording to current-source wording.</li>
+        <li>Removed the visible <code>scatter-target-charge</code> point nucleus input from the scattering panel.</li>
+        <li>Stopped the browser from creating a hidden default point nucleus when no scene sources exist.</li>
+        <li>Added a no-source guard that asks the user to add at least one current field-source charge model before running scattering.</li>
+        <li>Kept backend/API point-nucleus scattering compatibility for direct API and existing analytic tests.</li>
+        <li>Updated static asset cache keys so browsers load the changed module.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>No backend physics change was needed; this task corrected the browser target-selection behavior.</li>
+        <li>No GitHub upload or branch merge was requested in this task.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>web/app.js</code></td>
+            <td>Removed hidden point-nucleus fallback from the browser scattering flow and updated readout wording.</td>
+          </tr>
+          <tr>
+            <td><code>web/index.html</code></td>
+            <td>Updated static asset version strings.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_browser_smoke.py</code></td>
+            <td>Covered no-source guard behavior and current-scene source scattering behavior.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_app.py</code></td>
+            <td>Updated static asset version assertions.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Commands and Outcomes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_scattering_requires_current_scene_source tests\test_browser_smoke.py::test_browser_scattering_uses_current_scene_sources</code></td>
+            <td>Red phase failed against the old UI, then passed after removing point-nucleus fallback.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell tests\test_browser_smoke.py::test_browser_scattering_requires_current_scene_source tests\test_browser_smoke.py::test_browser_scattering_uses_current_scene_sources</code></td>
+            <td>Passed: 3 tests, 2 third-party websocket deprecation warnings.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>git diff --check</code></td>
+            <td>Passed with only Git line-ending conversion warnings for modified files.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td>
+            <td>Passed: 146 tests, 4 skipped because CUDA is unavailable, 2 third-party websocket deprecation warnings.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Browser Verification</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Browser plugin availability</td>
+            <td>Browser plugin was not exposed in the available tools; validation used project Playwright tests through uv.</td>
+          </tr>
+          <tr>
+            <td>No-source state</td>
+            <td>Playwright verified no <code>scatter-target-charge</code> control, no scattering API request, and a visible add-source prompt.</td>
+          </tr>
+          <tr>
+            <td>Current-source state</td>
+            <td>Playwright verified ring source scattering sends <code>scene</code>, not <code>nucleus</code>, and the overlay reports <code>scene-sources</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Known Risks and Limitations</h2>
+      <ul>
+        <li>Users must now add or load at least one field source before browser scattering can run.</li>
+        <li>The direct API still supports point-nucleus scattering for analytic compatibility; this is intentionally separate from browser UI behavior.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p>If requested, upload this UI correction to GitHub and merge it into the target branch.</p>
+    </section>
+  </main>
+</body>
+</html>

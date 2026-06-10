@@ -898,6 +898,58 @@ def test_browser_field_lines_are_loaded_from_backend(page: Page) -> None:
     assert any(url.endswith("/api/field/lines") for url in requests)
 
 
+def test_browser_field_line_view_interaction_defers_layer_rerender(page: Page) -> None:
+    _add_point_charge(page)
+    page.locator("#toggle-field-lines").click()
+    page.wait_for_function(
+        """
+        () => {
+            const layer = document.querySelector('[data-testid="field-line-layer"]');
+            return layer?.dataset.requestCurrent === "true" &&
+                Number(layer.dataset.fieldLineCount || 0) > 0;
+        }
+        """
+    )
+    initial_viewbox = _svg_viewbox(page)
+    page.evaluate(
+        """
+        () => {
+            window.__fieldLineLayerMutationCount = 0;
+            window.__fieldLineLayerObserver?.disconnect?.();
+            const view = document.querySelector('[data-testid="view-2d"]');
+            window.__fieldLineLayerObserver = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    const nodes = [...mutation.addedNodes, ...mutation.removedNodes];
+                    if (nodes.some((node) => (
+                        node.nodeType === Node.ELEMENT_NODE &&
+                        (
+                            node.matches?.('[data-testid="field-line-layer"]') ||
+                            node.querySelector?.('[data-testid="field-line-layer"]')
+                        )
+                    ))) {
+                        window.__fieldLineLayerMutationCount += 1;
+                    }
+                }
+            });
+            window.__fieldLineLayerObserver.observe(view, { childList: true, subtree: true });
+        }
+        """
+    )
+
+    surface = page.get_by_test_id("view-2d")
+    box = surface.bounding_box()
+    assert box is not None
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    for _ in range(6):
+        page.mouse.wheel(0, -160)
+
+    zoomed_viewbox = _svg_viewbox(page)
+    assert zoomed_viewbox[2] < initial_viewbox[2]
+    page.wait_for_timeout(60)
+    assert page.evaluate("() => window.__fieldLineLayerMutationCount") == 0
+    page.wait_for_function("() => window.__fieldLineLayerMutationCount > 0")
+
+
 @pytest.mark.parametrize(
     ("button_selector", "source_id"),
     [
@@ -1235,68 +1287,29 @@ def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) 
     }
 
 
-def test_browser_rutherford_scattering_panel_renders_tracks(page: Page) -> None:
-    expect(page.get_by_role("heading", name="卢瑟福散射实验")).to_be_visible()
+def test_browser_scattering_requires_current_scene_source(page: Page) -> None:
+    expect(page.get_by_role("heading", name="场源散射实验")).to_be_visible()
     expect(page.get_by_test_id("scattering-state")).to_contain_text("待命")
     expect(page.locator("#scatter-run")).to_contain_text("运行散射")
     expect(page.locator("#scatter-center-y")).to_have_value("0")
+    expect(page.locator("#scatter-target-charge")).to_have_count(0)
 
-    page.locator("#scatter-particles").fill("5")
-    page.locator("#scatter-half-width").fill("4")
-    page.locator("#scatter-center-y").fill("2")
+    scattering_requests = []
+    page.on(
+        "request",
+        lambda request: scattering_requests.append(request.url)
+        if request.url.endswith("/api/scattering/evaluate")
+        else None,
+    )
     page.locator("#scatter-run").click()
-    page.wait_for_function(
-        """
-        () => {
-            const layer = document.querySelector('[data-testid="scattering-layer-2d"]');
-            return Number(layer?.dataset.trackCount || 0) === 5 &&
-                document.querySelectorAll('[data-testid="scattering-particle-2d"]').length === 5;
-        }
-        """
-    )
 
+    expect(page.get_by_test_id("scattering-state")).to_contain_text("需要场源")
+    expect(page.get_by_test_id("scattering-readout")).to_contain_text("请先添加")
+    page.wait_for_timeout(250)
+    assert scattering_requests == []
     layer = page.get_by_test_id("scattering-layer-2d")
-    expect(layer).to_have_attribute("data-track-count", "5")
-    expect(page.get_by_test_id("scattering-nucleus-2d")).to_be_visible()
-    expect(page.locator(".scattering-nucleus-label")).to_have_count(0)
-    expect(page.get_by_test_id("scattering-particle-2d")).to_have_count(5)
-    expect(page.get_by_test_id("scattering-track-2d")).to_have_count(0)
-    particle_frame_index = int(
-        page.get_by_test_id("scattering-particle-layer-2d").get_attribute(
-            "data-frame-index"
-        )
-        or "-1"
-    )
-    assert particle_frame_index >= 0
-    page.wait_for_function(
-        """
-        () => document.querySelectorAll('[data-testid="scattering-track-2d"]').length === 5
-        """
-    )
-    expect(page.get_by_test_id("scattering-track-2d").nth(0)).to_have_attribute(
-        "data-impact-cm",
-        "-2.000",
-    )
-    expect(page.get_by_test_id("scattering-track-2d").nth(4)).to_have_attribute(
-        "data-impact-cm",
-        "6.000",
-    )
-    particle_fill = page.get_by_test_id("scattering-particle-2d").first.evaluate(
-        "element => getComputedStyle(element).fill"
-    )
-    assert particle_fill == "rgb(22, 163, 74)"
-    assert float(layer.get_attribute("data-max-angle-deg") or "0") > 90
-    assert int(layer.get_attribute("data-backscatter-count") or "0") >= 1
-    expect(page.get_by_test_id("scattering-readout")).to_contain_text("个粒子")
-
-    initial_path = page.get_by_test_id("scattering-track-2d").first.get_attribute("d")
-    page.wait_for_function(
-        """
-        (initialPath) => document.querySelector('[data-testid="scattering-track-2d"]')
-            ?.getAttribute('d') !== initialPath
-        """,
-        arg=initial_path,
-    )
+    expect(layer).to_have_attribute("data-track-count", "0")
+    expect(page.get_by_test_id("scattering-nucleus-2d")).to_have_count(0)
 
 
 def test_browser_scattering_uses_current_scene_sources(page: Page) -> None:
@@ -1327,6 +1340,30 @@ def test_browser_scattering_uses_current_scene_sources(page: Page) -> None:
     expect(layer).to_have_attribute("data-field-model", "scene-sources")
     expect(layer).to_have_attribute("data-target-source-count", "1")
     expect(page.get_by_test_id("scattering-nucleus-2d")).to_have_count(0)
+    expect(page.get_by_test_id("scattering-particle-2d")).to_have_count(3)
+    page.wait_for_function(
+        """
+        () => {
+            const tracks = [...document.querySelectorAll('[data-testid="scattering-track-2d"]')];
+            return tracks.length === 3 &&
+                tracks.every((track) => track.getAttribute("d")?.includes(" C "));
+        }
+        """
+    )
+    track_metadata = page.get_by_test_id("scattering-track-2d").evaluate_all(
+        """
+        nodes => nodes.map((node) => ({
+            pathModel: node.getAttribute("data-path-model"),
+            path: node.getAttribute("d"),
+        }))
+        """
+    )
+    assert all(
+        item["pathModel"] == "bounded-centripetal-catmull-rom"
+        for item in track_metadata
+    )
+    assert all(" C " in item["path"] for item in track_metadata)
+    expect(page.get_by_test_id("scattering-readout")).to_contain_text("场源 1 个")
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:

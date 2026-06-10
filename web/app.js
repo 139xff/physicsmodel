@@ -99,11 +99,10 @@ motionReadout.closest(".status-block")?.insertAdjacentHTML(
   `
     <section class="status-block scattering-block">
       <div class="motion-heading">
-        <h3>卢瑟福散射实验</h3>
+        <h3>场源散射实验</h3>
         <span data-testid="scattering-state">待命</span>
       </div>
       <div class="scattering-grid">
-        <label>原子核电荷 Q (nC)<input id="scatter-target-charge" type="number" step="0.1" value="1"></label>
         <label>α 粒子电荷 q (nC)<input id="scatter-alpha-charge" type="number" step="0.1" value="1"></label>
         <label>α 粒子质量 m (mg)<input id="scatter-alpha-mass" type="number" step="0.1" min="0.01" value="1"></label>
         <label>入射速度 v (m/s)<input id="scatter-speed" type="number" step="0.1" min="0.01" value="1.5"></label>
@@ -125,7 +124,6 @@ motionReadout.closest(".status-block")?.insertAdjacentHTML(
 const scatteringState = document.querySelector("[data-testid='scattering-state']");
 const scatteringReadout = document.querySelector("[data-testid='scattering-readout']");
 const scatteringInputs = {
-  targetCharge: document.querySelector("#scatter-target-charge"),
   alphaCharge: document.querySelector("#scatter-alpha-charge"),
   alphaMass: document.querySelector("#scatter-alpha-mass"),
   speed: document.querySelector("#scatter-speed"),
@@ -238,6 +236,7 @@ const EQUIPOTENTIAL_LABEL_DOUBLE_FRACTIONS = [
   [0.66, 0.7, 0.62, 0.74],
 ];
 const SCATTERING_ANIMATION_INTERVAL_MS = 90;
+const VIEW2D_INTERACTION_REFRESH_DELAY_MS = 160;
 const SCATTERING_PARTICLE_COLOR = "#16a34a";
 
 const state = {
@@ -280,7 +279,7 @@ const state = {
     animationId: null,
     running: false,
     characteristicDistanceM: null,
-    fieldModel: "point-nucleus",
+    fieldModel: "scene-sources",
     targetSourceCount: 0,
   },
 };
@@ -350,6 +349,7 @@ let fieldLineRequestSerial = 0;
 let fieldLineEvaluationTimer = null;
 let computeStatusRefreshTimer = null;
 let active2dPan = null;
+let view2dInteractionRefreshTimer = null;
 
 function saveModeState(mode = state.mode) {
   modeStates[mode] = {
@@ -4024,6 +4024,7 @@ function render2d() {
         </pattern>
       </defs>
       <rect
+        data-testid="view-2d-background"
         x="${viewBox.minX}"
         y="${viewBox.minY}"
         width="${viewBox.width}"
@@ -4038,6 +4039,58 @@ function render2d() {
       ${sourceMarkup}
     </svg>
   `;
+}
+
+function apply2dViewBoxOnly() {
+  const svg = view2d.querySelector("svg.plane-svg");
+  if (!svg) {
+    return false;
+  }
+  const viewBox = compute2dViewBox();
+  svg.setAttribute("viewBox", `${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`);
+  svg.dataset.zoom = String(state.view2d.zoom);
+  const background = svg.querySelector("[data-testid='view-2d-background']");
+  if (background) {
+    background.setAttribute("x", String(viewBox.minX));
+    background.setAttribute("y", String(viewBox.minY));
+    background.setAttribute("width", String(viewBox.width));
+    background.setAttribute("height", String(viewBox.height));
+  }
+  return true;
+}
+
+function invalidateFieldLineRequestDuringViewInteraction() {
+  fieldLineRequestSerial += 1;
+  state.fieldLineRequestId = `ui-field-lines-${fieldLineRequestSerial}`;
+  const layer = view2d.querySelector("[data-testid='field-line-layer']");
+  if (layer) {
+    layer.dataset.requestCurrent = "false";
+  }
+  if (fieldLineEvaluationTimer) {
+    window.clearTimeout(fieldLineEvaluationTimer);
+    fieldLineEvaluationTimer = null;
+  }
+}
+
+function scheduleDeferred2dViewRefresh() {
+  invalidateFieldLineRequestDuringViewInteraction();
+  if (view2dInteractionRefreshTimer) {
+    window.clearTimeout(view2dInteractionRefreshTimer);
+  }
+  view2dInteractionRefreshTimer = window.setTimeout(() => {
+    view2dInteractionRefreshTimer = null;
+    scheduleFieldLineEvaluation();
+    renderOverlaySummary();
+  }, VIEW2D_INTERACTION_REFRESH_DELAY_MS);
+}
+
+function update2dViewForInteraction() {
+  if (state.mode === "2D" && state.showFieldLines && apply2dViewBoxOnly()) {
+    scheduleDeferred2dViewRefresh();
+    return;
+  }
+  render2d();
+  scheduleFieldLineEvaluation();
 }
 
 function renderMotionLayer2d() {
@@ -4151,12 +4204,7 @@ function scatteringTrackPath(track) {
   if (visibleSamples.length < 2) {
     return "";
   }
-  return visibleSamples
-    .map((sample, sampleIndex) => {
-      const point = mapToViewport(sample.x, sample.y);
-      return `${sampleIndex === 0 ? "M" : "L"} ${point.x} ${point.y}`;
-    })
-    .join(" ");
+  return fieldLinePath(visibleSamples);
 }
 
 function renderScatteringTracks2d() {
@@ -4180,6 +4228,7 @@ function renderScatteringTracks2d() {
               data-impact-cm="${(track.impact_parameter_m * 100).toFixed(3)}"
               data-angle-deg="${track.scattering_angle_deg.toFixed(3)}"
               data-theory-angle-deg="${track.rutherford_angle_deg.toFixed(3)}"
+              data-path-model="bounded-centripetal-catmull-rom"
               d="${path}"
               style="stroke: ${scatteringColor(track.scattering_angle_deg)};"
             ></path>
@@ -4220,12 +4269,19 @@ function renderScatteringParticles2d() {
 
 function renderScatteringLayer2d() {
   const tracks = state.scattering.tracks;
+  const fieldModel = state.scattering.fieldModel || "scene-sources";
   if (tracks.length === 0) {
-    return '<g data-testid="scattering-layer-2d" data-track-count="0"></g>';
+    return `
+      <g
+        data-testid="scattering-layer-2d"
+        data-track-count="0"
+        data-field-model="${fieldModel}"
+        data-target-source-count="${state.scattering.targetSourceCount}"
+      ></g>
+    `;
   }
   const maxAngle = Math.max(...tracks.map((track) => Math.abs(track.scattering_angle_deg)));
   const backscatterCount = tracks.filter((track) => Math.abs(track.scattering_angle_deg) > 90).length;
-  const fieldModel = state.scattering.fieldModel || "point-nucleus";
   const nucleus = fieldModel === "point-nucleus" ? mapToViewport(0, 0) : null;
   return `
     <g
@@ -4290,11 +4346,14 @@ function updateScatteringReadout() {
   }
   const maxAngle = Math.max(...tracks.map((track) => Math.abs(track.scattering_angle_deg)));
   const backscatterCount = tracks.filter((track) => Math.abs(track.scattering_angle_deg) > 90).length;
+  const targetSummary = state.scattering.fieldModel === "scene-sources"
+    ? `场源 ${state.scattering.targetSourceCount} 个`
+    : `d=${formatNumber((state.scattering.characteristicDistanceM || 0) * 100, 4)} cm`;
   scatteringReadout.textContent =
     `${tracks.length} 个粒子；` +
     `最大散射角 ${maxAngle.toFixed(1)}°；` +
     `大角度反弹 ${backscatterCount} 个；` +
-    `d=${formatNumber((state.scattering.characteristicDistanceM || 0) * 100, 4)} cm`;
+    targetSummary;
 }
 
 function clearScatteringSimulation() {
@@ -4302,7 +4361,7 @@ function clearScatteringSimulation() {
   state.scattering.tracks = [];
   state.scattering.frameIndex = 0;
   state.scattering.characteristicDistanceM = null;
-  state.scattering.fieldModel = "point-nucleus";
+  state.scattering.fieldModel = "scene-sources";
   state.scattering.targetSourceCount = 0;
   scatteringState.textContent = "待命";
   updateScatteringReadout();
@@ -4352,13 +4411,24 @@ async function runScatteringSimulation() {
   cancelScatteringAnimation();
   clearMotionTrajectory();
   setMode("2D");
+  if (state.scene.sources.length === 0) {
+    state.scattering.tracks = [];
+    state.scattering.frameIndex = 0;
+    state.scattering.characteristicDistanceM = null;
+    state.scattering.fieldModel = "scene-sources";
+    state.scattering.targetSourceCount = 0;
+    scatteringState.textContent = "需要场源";
+    scatteringReadout.textContent = "请先添加至少一个当前场源电荷模型，再运行散射实验。";
+    render2d();
+    return;
+  }
   scatteringState.textContent = "计算中";
   const particleCount = clampInteger(scatteringInputs.particles.value, 1, 61, 21);
   const halfWidthM = Math.max(0, centimetersToMeters(Number(scatteringInputs.halfWidth.value)));
   const centerYM = centimetersToMeters(Number(scatteringInputs.centerY.value));
-  const useSceneSources = state.scene.sources.length > 0;
   const request = {
     request_id: `ui-scatter-${Date.now()}`,
+    scene: state.scene,
     beam: {
       charge_c: Number(scatteringInputs.alphaCharge.value) * 1e-9,
       mass_kg: Number(scatteringInputs.alphaMass.value) * 1e-6,
@@ -4372,18 +4442,10 @@ async function runScatteringSimulation() {
     quality: state.quality,
     backend: "auto",
   };
-  if (useSceneSources) {
-    request.scene = state.scene;
-  } else {
-    request.nucleus = {
-      charge_c: Number(scatteringInputs.targetCharge.value) * 1e-9,
-      position: { x: 0, y: 0, z: 0, unit: "m" },
-    };
-  }
   const result = await evaluateScattering(request);
   state.scattering.tracks = result.tracks;
   state.scattering.characteristicDistanceM = result.characteristic_distance_m;
-  state.scattering.fieldModel = result.field_model || (useSceneSources ? "scene-sources" : "point-nucleus");
+  state.scattering.fieldModel = result.field_model || "scene-sources";
   state.scattering.targetSourceCount = state.scattering.fieldModel === "scene-sources"
     ? state.scene.sources.length
     : 0;
@@ -4498,8 +4560,7 @@ function zoom2d(deltaY) {
   const nextZoom = state.view2d.zoom * Math.exp(-deltaY * 0.0012);
   state.view2d.zoom = nextZoom;
   clamp2dView();
-  render2d();
-  scheduleFieldLineEvaluation();
+  update2dViewForInteraction();
 }
 
 function start2dPan(event) {
@@ -4533,8 +4594,7 @@ function move2dPan(event) {
   state.view2d.centerX = active2dPan.centerX - deltaX;
   state.view2d.centerY = active2dPan.centerY - deltaY;
   clamp2dView();
-  render2d();
-  scheduleFieldLineEvaluation();
+  update2dViewForInteraction();
 }
 
 function end2dPan(event) {
@@ -4771,6 +4831,9 @@ async function evaluateFieldLinesForView(requestId) {
   }
   state.fieldLineResult = result;
   renderExecutionStatus(result.execution);
+  if (view2dInteractionRefreshTimer) {
+    return;
+  }
   render2d();
   renderOverlaySummary();
 }

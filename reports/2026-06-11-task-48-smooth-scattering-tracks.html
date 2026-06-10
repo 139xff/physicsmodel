@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 48 - Smooth Scattering Tracks</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      color: #172033;
+      background: #f7f9fc;
+    }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      color: #0f172a;
+    }
+    h1 {
+      margin-bottom: 4px;
+    }
+    section {
+      margin-top: 24px;
+      padding: 20px;
+      background: #ffffff;
+      border: 1px solid #d9e2ef;
+      border-radius: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid #d9e2ef;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef4ff;
+    }
+    code {
+      font-family: Consolas, monospace;
+      font-size: 0.95em;
+    }
+    .meta {
+      color: #475569;
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 48 - Smooth Scattering Tracks</h1>
+    <p class="meta">Completed: 2026-06-11 01:08:31 +08:00</p>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Changed rendered scattering tracks from SVG line segments to bounded centripetal Catmull-Rom curves converted to cubic Bezier commands.</li>
+        <li>Kept the underlying trajectory samples and physics integration unchanged.</li>
+        <li>Added browser regression coverage requiring scattering paths to declare the smooth path model and contain cubic curve commands.</li>
+        <li>Updated static asset cache keys so browsers load the changed renderer.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>Particle marker interpolation between samples was not changed; this task smooths the visible trajectory trail.</li>
+        <li>No backend physics or scattering solver changes were needed.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>web/app.js</code></td>
+            <td>Reused the bounded smooth path renderer for scattering trails and added path metadata.</td>
+          </tr>
+          <tr>
+            <td><code>web/index.html</code></td>
+            <td>Updated static asset version strings.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_browser_smoke.py</code></td>
+            <td>Asserted that scene scattering tracks use the smooth curve model and Bezier path commands.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_app.py</code></td>
+            <td>Updated static asset version assertions.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Commands and Outcomes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_scattering_uses_current_scene_sources</code></td>
+            <td>Red phase failed against the old line-segment renderer; after implementation it passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell tests\test_browser_smoke.py::test_browser_scattering_requires_current_scene_source tests\test_browser_smoke.py::test_browser_scattering_uses_current_scene_sources</code></td>
+            <td>Passed: 3 tests, 2 third-party websocket deprecation warnings.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td>
+            <td>Passed.</td>
+          </tr>
+          <tr>
+            <td><code>git diff --check</code></td>
+            <td>Passed with only Git line-ending conversion warnings for modified files.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync python -</code></td>
+            <td>Playwright interaction passed on <code>http://127.0.0.1:8000/?v=20260611-smooth-scattering-tracks</code>; three scattering tracks used <code>bounded-centripetal-catmull-rom</code>, each path contained <code>C</code> commands, and console messages were empty.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td>
+            <td>Passed: 146 tests, 4 skipped because CUDA is unavailable, 2 third-party websocket deprecation warnings.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Browser Evidence</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Page identity</td>
+            <td>Title was <code>电磁工作台 | 静电场</code>; scattering panel heading was <code>场源散射实验</code>.</td>
+          </tr>
+          <tr>
+            <td>Interaction</td>
+            <td>Added a ring source, ran three-particle scattering, and observed three rendered track paths.</td>
+          </tr>
+          <tr>
+            <td>Smooth path model</td>
+            <td>All rendered scattering tracks reported <code>bounded-centripetal-catmull-rom</code> and contained cubic Bezier commands.</td>
+          </tr>
+          <tr>
+            <td>Console health</td>
+            <td>No console messages were captured during the Playwright interaction.</td>
+          </tr>
+          <tr>
+            <td>Screenshot</td>
+            <td><code>C:\Users\Administrator\AppData\Local\Temp\em-workbench-smooth-scattering.png</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Known Risks and Limitations</h2>
+      <ul>
+        <li>The trail is visually smoothed, but individual particle markers still advance sample-by-sample.</li>
+        <li>The curve renderer is bounded to reduce overshoot, but extreme sparse samples can still show less detail than increasing simulation sample density.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p>If marker motion still appears jumpy, add fractional interpolation for scattering particle positions between recorded samples.</p>
+    </section>
+  </main>
+</body>
+</html>

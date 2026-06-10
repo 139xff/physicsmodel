@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 46 - Scene Source Scattering</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      color: #172033;
+      background: #f7f9fc;
+    }
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      color: #0f172a;
+    }
+    h1 {
+      margin-bottom: 4px;
+    }
+    section {
+      margin-top: 24px;
+      padding: 20px;
+      background: #ffffff;
+      border: 1px solid #d9e2ef;
+      border-radius: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid #d9e2ef;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef4ff;
+    }
+    code {
+      font-family: Consolas, monospace;
+      font-size: 0.95em;
+    }
+    .meta {
+      color: #475569;
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 46 - Scene Source Scattering</h1>
+    <p class="meta">Completed: 2026-06-10 20:37:43 +08:00</p>
+
+    <section>
+      <h2>Scope Delivered</h2>
+      <ul>
+        <li>Extended scattering simulation from point-nucleus-only mode to current-scene source mode.</li>
+        <li>Supported scene scattering for point charge, line segment, ring, disk, infinite plane, and spherical shell sources through the existing compute service.</li>
+        <li>Added API and desktop bridge request support for either <code>nucleus</code> or <code>scene</code>.</li>
+        <li>Updated the browser scattering action to send the current scene when sources exist, while preserving legacy point nucleus behavior for empty scenes.</li>
+        <li>Updated the 2D scattering overlay so the point nucleus marker is hidden when scene sources are used.</li>
+        <li>Bumped static asset cache keys for the changed browser module.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Scope Deferred</h2>
+      <ul>
+        <li>Scene-source scattering is numeric trajectory integration, not a closed-form Rutherford comparison for extended sources.</li>
+        <li>CUDA verification is deferred because CUDA is unavailable in this environment.</li>
+        <li>Further UI copy can clarify that target nucleus charge is only used when no scene sources exist.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Changed Files</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>src/em_workbench/physics/scattering.py</code></td>
+            <td>Added scene-source scattering path, response metadata, and source geometry distance calculations.</td>
+          </tr>
+          <tr>
+            <td><code>src/em_workbench/app.py</code></td>
+            <td>Accepted scattering requests against either a nucleus or a scene.</td>
+          </tr>
+          <tr>
+            <td><code>src/em_workbench/desktop_bridge.py</code></td>
+            <td>Forwarded scene, quality, and backend fields to the scattering solver.</td>
+          </tr>
+          <tr>
+            <td><code>web/app.js</code></td>
+            <td>Sent scene payloads from the browser when sources exist and rendered scene-mode scattering state.</td>
+          </tr>
+          <tr>
+            <td><code>web/index.html</code></td>
+            <td>Updated static asset version strings.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_scattering.py</code></td>
+            <td>Covered scene scattering and every electrostatic source kind.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_app.py</code></td>
+            <td>Covered API scene scattering and updated static asset assertions.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_desktop_bridge.py</code></td>
+            <td>Covered desktop bridge scene scattering without HTTP.</td>
+          </tr>
+          <tr>
+            <td><code>tests/test_browser_smoke.py</code></td>
+            <td>Covered browser scene payload behavior and scene-mode overlay state.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Commands and Outcomes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_scattering.py::test_scattering_can_use_integrated_scene_sources</code></td>
+            <td>Red phase failed with <code>TypeError: simulate_scattering() got an unexpected keyword argument 'scene'</code>; after implementation the test passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_app.py::test_scattering_endpoint_can_use_current_scene_sources</code></td>
+            <td>Red phase failed with HTTP 422 before API schema support; after implementation the test passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_browser_smoke.py::test_browser_scattering_uses_current_scene_sources</code></td>
+            <td>Red phase showed the browser still sent <code>nucleus</code>; after browser update the test passed.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_scattering.py</code></td>
+            <td>Passed: 9 tests.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_scattering.py tests\test_app.py::test_index_serves_cache_busted_static_assets ...</code></td>
+            <td>No tests ran because the selected test name was incorrect. Corrected command used the real static asset test name.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync ruff check .</code></td>
+            <td>Initial run found one E501 line-length issue in <code>tests/test_browser_smoke.py</code>; rerun passed after line wrap.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest tests\test_scattering.py tests\test_app.py::test_static_assets_and_vendor_modules_are_served_locally tests\test_app.py::test_scattering_endpoint_simulates_rutherford_beam tests\test_app.py::test_scattering_endpoint_can_use_current_scene_sources tests\test_desktop_bridge.py::test_desktop_bridge_simulates_scattering_without_http_server tests\test_desktop_bridge.py::test_desktop_bridge_simulates_scene_scattering_without_http_server tests\test_browser_smoke.py::test_browser_rutherford_scattering_panel_renders_tracks tests\test_browser_smoke.py::test_browser_scattering_uses_current_scene_sources</code></td>
+            <td>Passed: 16 tests, 2 deprecation warnings from third-party websocket packages.</td>
+          </tr>
+          <tr>
+            <td><code>.\.tools\uv\uv.exe run --locked --no-sync pytest</code></td>
+            <td>Passed: 146 tests, 4 skipped because CUDA is unavailable, 2 third-party websocket deprecation warnings.</td>
+          </tr>
+          <tr>
+            <td><code>git diff --check</code></td>
+            <td>Passed with only Git line-ending conversion warnings for modified files.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Known Risks and Limitations</h2>
+      <ul>
+        <li>The current scene-mode scattering angle is derived from the final numeric velocity, so accuracy depends on time step, maximum steps, and backend quality.</li>
+        <li>For multi-source scenes, the displayed closest approach is the minimum geometric distance to any source, not a source-weighted physical cross-section.</li>
+        <li>The browser preserves point-nucleus mode only when the scene has no electrostatic sources.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Next Scheduled Task</h2>
+      <p>Clarify scattering panel controls for scene-mode versus point-nucleus mode, then validate with browser evidence if the UI copy changes.</p>
+    </section>
+  </main>
+</body>
+</html>

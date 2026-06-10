@@ -280,6 +280,8 @@ const state = {
     animationId: null,
     running: false,
     characteristicDistanceM: null,
+    fieldModel: "point-nucleus",
+    targetSourceCount: 0,
   },
 };
 
@@ -4223,12 +4225,15 @@ function renderScatteringLayer2d() {
   }
   const maxAngle = Math.max(...tracks.map((track) => Math.abs(track.scattering_angle_deg)));
   const backscatterCount = tracks.filter((track) => Math.abs(track.scattering_angle_deg) > 90).length;
-  const nucleus = mapToViewport(0, 0);
+  const fieldModel = state.scattering.fieldModel || "point-nucleus";
+  const nucleus = fieldModel === "point-nucleus" ? mapToViewport(0, 0) : null;
   return `
     <g
       class="scattering-layer"
       data-testid="scattering-layer-2d"
       data-track-count="${tracks.length}"
+      data-field-model="${fieldModel}"
+      data-target-source-count="${state.scattering.targetSourceCount}"
       data-frame-index="${state.scattering.frameIndex}"
       data-max-frame-count="${scatteringMaxFrameCount()}"
       data-backscatter-count="${backscatterCount}"
@@ -4237,13 +4242,15 @@ function renderScatteringLayer2d() {
         (state.scattering.characteristicDistanceM || 0) * 100
       ).toFixed(4)}"
     >
-      <circle
-        class="scattering-nucleus"
-        data-testid="scattering-nucleus-2d"
-        cx="${nucleus.x}"
-        cy="${nucleus.y}"
-        r="0.45"
-      ></circle>
+      ${nucleus
+        ? `<circle
+            class="scattering-nucleus"
+            data-testid="scattering-nucleus-2d"
+            cx="${nucleus.x}"
+            cy="${nucleus.y}"
+            r="0.45"
+          ></circle>`
+        : ""}
       ${renderScatteringTracks2d()}
       ${renderScatteringParticles2d()}
     </g>
@@ -4295,6 +4302,8 @@ function clearScatteringSimulation() {
   state.scattering.tracks = [];
   state.scattering.frameIndex = 0;
   state.scattering.characteristicDistanceM = null;
+  state.scattering.fieldModel = "point-nucleus";
+  state.scattering.targetSourceCount = 0;
   scatteringState.textContent = "待命";
   updateScatteringReadout();
   render2d();
@@ -4347,12 +4356,9 @@ async function runScatteringSimulation() {
   const particleCount = clampInteger(scatteringInputs.particles.value, 1, 61, 21);
   const halfWidthM = Math.max(0, centimetersToMeters(Number(scatteringInputs.halfWidth.value)));
   const centerYM = centimetersToMeters(Number(scatteringInputs.centerY.value));
-  const result = await evaluateScattering({
+  const useSceneSources = state.scene.sources.length > 0;
+  const request = {
     request_id: `ui-scatter-${Date.now()}`,
-    nucleus: {
-      charge_c: Number(scatteringInputs.targetCharge.value) * 1e-9,
-      position: { x: 0, y: 0, z: 0, unit: "m" },
-    },
     beam: {
       charge_c: Number(scatteringInputs.alphaCharge.value) * 1e-9,
       mass_kg: Number(scatteringInputs.alphaMass.value) * 1e-6,
@@ -4363,9 +4369,24 @@ async function runScatteringSimulation() {
     dt_s: Number(scatteringInputs.dt.value),
     max_steps: clampInteger(scatteringInputs.maxSteps.value, 1, 50000, 4000),
     record_every: 10,
-  });
+    quality: state.quality,
+    backend: "auto",
+  };
+  if (useSceneSources) {
+    request.scene = state.scene;
+  } else {
+    request.nucleus = {
+      charge_c: Number(scatteringInputs.targetCharge.value) * 1e-9,
+      position: { x: 0, y: 0, z: 0, unit: "m" },
+    };
+  }
+  const result = await evaluateScattering(request);
   state.scattering.tracks = result.tracks;
   state.scattering.characteristicDistanceM = result.characteristic_distance_m;
+  state.scattering.fieldModel = result.field_model || (useSceneSources ? "scene-sources" : "point-nucleus");
+  state.scattering.targetSourceCount = state.scattering.fieldModel === "scene-sources"
+    ? state.scene.sources.length
+    : 0;
   state.scattering.frameIndex = 0;
   scatteringState.textContent = `已计算 ${result.tracks.length} 个`;
   render2d();

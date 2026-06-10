@@ -63,8 +63,8 @@ def test_root_serves_the_explicitly_scoped_workbench_shell():
         assert expected_copy in html
     assert '<script type="importmap">' in html
     assert '"three": "./vendor/three.module.js"' in html
-    assert 'href="./styles.css?v=20260608-glass-catmull-field-lines"' in html
-    assert 'src="./app.js?v=20260608-glass-catmull-field-lines"' in html
+    assert 'href="./styles.css?v=20260610-scene-scattering-sources"' in html
+    assert 'src="./app.js?v=20260610-scene-scattering-sources"' in html
 
 
 def test_static_assets_and_vendor_modules_are_served_locally():
@@ -188,3 +188,46 @@ def test_scattering_endpoint_simulates_rutherford_beam():
     assert abs(scatter["tracks"][0]["scattering_angle_deg"]) > 170
     assert scatter["tracks"][1]["scattering_angle_deg"] > 0
     assert scatter["tracks"][2]["scattering_angle_deg"] < 0
+
+
+def test_scattering_endpoint_can_use_current_scene_sources():
+    response = client.post(
+        "/api/scattering/evaluate",
+        json={
+            "request_id": "scatter-scene-api-test",
+            "scene": {
+                "id": "scatter-scene",
+                "title": "Scatter scene",
+                "sources": [
+                    {
+                        "id": "line-1",
+                        "kind": "line_segment",
+                        "label": "Line target",
+                        "position": {"x": -0.04, "y": 0.0, "z": 0.0, "unit": "m"},
+                        "orientation": {"x": 1.0, "y": 0.0, "z": 0.0},
+                        "length_m": 0.08,
+                        "charge_c": 1.0e-9,
+                    }
+                ],
+            },
+            "beam": {
+                "charge_c": 1.0e-9,
+                "mass_kg": 1.0e-6,
+                "speed_m_per_s": 1.5,
+                "start_x_m": -0.3,
+                "impact_parameters_m": [0.03, -0.03],
+            },
+            "dt_s": 0.001,
+            "max_steps": 800,
+            "record_every": 20,
+        },
+    )
+
+    assert response.status_code == 200
+    scatter = response.json()
+    assert scatter["request_id"] == "scatter-scene-api-test"
+    assert scatter["field_model"] == "scene-sources"
+    assert scatter["characteristic_distance_m"] == 0.0
+    assert len(scatter["tracks"]) == 2
+    assert scatter["tracks"][0]["scattering_angle_deg"] > 0.05
+    assert scatter["tracks"][1]["scattering_angle_deg"] < -0.05

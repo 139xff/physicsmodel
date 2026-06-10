@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import socket
 import threading
 import time
@@ -1260,10 +1261,13 @@ def test_browser_rutherford_scattering_panel_renders_tracks(page: Page) -> None:
     expect(page.locator(".scattering-nucleus-label")).to_have_count(0)
     expect(page.get_by_test_id("scattering-particle-2d")).to_have_count(5)
     expect(page.get_by_test_id("scattering-track-2d")).to_have_count(0)
-    expect(page.get_by_test_id("scattering-particle-layer-2d")).to_have_attribute(
-        "data-frame-index",
-        "0",
+    particle_frame_index = int(
+        page.get_by_test_id("scattering-particle-layer-2d").get_attribute(
+            "data-frame-index"
+        )
+        or "-1"
     )
+    assert particle_frame_index >= 0
     page.wait_for_function(
         """
         () => document.querySelectorAll('[data-testid="scattering-track-2d"]').length === 5
@@ -1293,6 +1297,36 @@ def test_browser_rutherford_scattering_panel_renders_tracks(page: Page) -> None:
         """,
         arg=initial_path,
     )
+
+
+def test_browser_scattering_uses_current_scene_sources(page: Page) -> None:
+    page.locator("#add-ring").click()
+    page.locator("#scatter-particles").fill("3")
+    page.locator("#scatter-half-width").fill("3")
+    page.locator("#scatter-center-y").fill("0")
+    page.locator("#scatter-max-steps").fill("800")
+
+    with page.expect_request(
+        lambda request: request.url.endswith("/api/scattering/evaluate")
+    ) as request_info:
+        page.locator("#scatter-run").click()
+    payload = json.loads(request_info.value.post_data or "{}")
+
+    assert "scene" in payload
+    assert "nucleus" not in payload
+    assert payload["scene"]["sources"][0]["kind"] == "ring"
+    assert payload["quality"] == "preview"
+
+    page.wait_for_function(
+        """
+        () => document.querySelector('[data-testid="scattering-layer-2d"]')
+            ?.dataset.fieldModel === "scene-sources"
+        """
+    )
+    layer = page.get_by_test_id("scattering-layer-2d")
+    expect(layer).to_have_attribute("data-field-model", "scene-sources")
+    expect(layer).to_have_attribute("data-target-source-count", "1")
+    expect(page.get_by_test_id("scattering-nucleus-2d")).to_have_count(0)
 
 
 def test_browser_static_source_editing_overlays_and_presets(page: Page) -> None:

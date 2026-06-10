@@ -87,11 +87,14 @@ def _evaluate_scattering_json(payload: str) -> str:
     result = simulate_scattering(
         request.nucleus,
         request.beam,
+        scene=request.scene,
         dt_s=request.dt_s,
         max_steps=request.max_steps,
         exit_radius_m=request.exit_radius_m,
         record_every=request.record_every,
         request_id=request.request_id,
+        quality=request.quality,
+        backend=request.backend,
     )
     return result.model_dump_json()
 

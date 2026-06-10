@@ -140,6 +140,51 @@ def test_desktop_bridge_simulates_scattering_without_http_server() -> None:
     assert abs(result["tracks"][0]["scattering_angle_deg"]) > 170
 
 
+def test_desktop_bridge_simulates_scene_scattering_without_http_server() -> None:
+    bridge = WorkbenchDesktopBridge()
+
+    result = json.loads(
+        bridge.evaluate_scattering(
+            json.dumps(
+                {
+                    "request_id": "desktop-scatter-scene-test",
+                    "scene": {
+                        "id": "desktop-scatter-scene",
+                        "title": "Desktop scatter scene",
+                        "sources": [
+                            {
+                                "id": "disk-1",
+                                "kind": "disk",
+                                "label": "Disk target",
+                                "position": {"x": 0.0, "y": 0.0, "z": 0.0, "unit": "m"},
+                                "normal": {"x": 0.0, "y": 0.0, "z": 1.0},
+                                "radius_m": 0.04,
+                                "charge_c": 1.0e-9,
+                            }
+                        ],
+                    },
+                    "beam": {
+                        "charge_c": 1.0e-9,
+                        "mass_kg": 1.0e-6,
+                        "speed_m_per_s": 1.5,
+                        "start_x_m": -0.3,
+                        "impact_parameters_m": [0.03, -0.03],
+                    },
+                    "dt_s": 0.001,
+                    "max_steps": 800,
+                    "record_every": 20,
+                }
+            )
+        )
+    )
+
+    assert result["request_id"] == "desktop-scatter-scene-test"
+    assert result["field_model"] == "scene-sources"
+    assert len(result["tracks"]) == 2
+    assert result["tracks"][0]["scattering_angle_deg"] > 0.05
+    assert result["tracks"][1]["scattering_angle_deg"] < -0.05
+
+
 def test_desktop_bridge_bootstrap_waits_for_document_root() -> None:
     script = _bridge_bootstrap_script()
 

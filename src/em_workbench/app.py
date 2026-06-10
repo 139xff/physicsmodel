@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from em_workbench.models import Position, Preset, PresetSummary, Scene, SceneValidationResponse
 from em_workbench.physics.compute.contracts import BackendPolicy, ComputeStatus
@@ -115,15 +115,24 @@ class FieldLineEvaluateRequest(BaseModel):
 
 
 class ScatteringEvaluateRequest(BaseModel):
-    """Rutherford scattering request from the static client."""
+    """Scattering request against either a point nucleus or the current scene."""
 
     request_id: str = Field(min_length=1)
-    nucleus: Nucleus
+    nucleus: Nucleus | None = None
+    scene: Scene | None = None
     beam: AlphaBeam
     dt_s: float = Field(gt=0)
     max_steps: int = Field(default=20000, ge=1, le=50000)
     exit_radius_m: float | None = Field(default=None, gt=0)
     record_every: int = Field(default=10, ge=1)
+    quality: SolverQuality = "preview"
+    backend: BackendPolicy = "auto"
+
+    @model_validator(mode="after")
+    def validate_scatter_target(self) -> ScatteringEvaluateRequest:
+        if self.nucleus is None and self.scene is None:
+            raise ValueError("Scattering requires either nucleus or scene.")
+        return self
 
 
 def _vendor_version() -> str:
@@ -249,15 +258,18 @@ def evaluate_field_lines(request: FieldLineEvaluateRequest) -> FieldLineResponse
 
 @app.post("/api/scattering/evaluate", response_model=ScatterResponse)
 def evaluate_scattering(request: ScatteringEvaluateRequest) -> ScatterResponse:
-    """Simulate a Rutherford alpha-particle beam against a fixed target nucleus."""
+    """Simulate an alpha-particle beam against a point nucleus or scene sources."""
     return simulate_scattering(
         request.nucleus,
         request.beam,
+        scene=request.scene,
         dt_s=request.dt_s,
         max_steps=request.max_steps,
         exit_radius_m=request.exit_radius_m,
         record_every=request.record_every,
         request_id=request.request_id,
+        quality=request.quality,
+        backend=request.backend,
     )
 
 

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 58 - Electrostatics Design Report</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      line-height: 1.65;
+      margin: 32px auto;
+      max-width: 960px;
+      padding: 0 24px;
+    }
+    h1,
+    h2 {
+      color: #102047;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th,
+    td {
+      border: 1px solid #d9deea;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #e8eefc;
+    }
+    code {
+      background: #eef2ff;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task 58 - 静电场设计报告生成</h1>
+  <p><strong>完成时间：</strong>2026-06-12</p>
+
+  <h2>任务范围</h2>
+  <p>
+    根据用户提供的考核要点，生成一份可打开和打印的静电场仿真与可视化平台设计报告。报告明确排除磁场模块、电磁感应模块以及完整 Maxwell 方程组数值求解平台。
+  </p>
+
+  <h2>交付内容</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>文件</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>reports/2026-06-12-electrostatics-design-report.html</code></td>
+        <td>参赛/展示用途的独立设计报告，覆盖选题意义、物理原理、流程图、实现技术、使用方法、结果分析、配置要求和结论。</td>
+      </tr>
+      <tr>
+        <td><code>reports/2026-06-12-task-58-electrostatics-design-report.html</code></td>
+        <td>本次文档任务的工程记录。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>参考和核对范围</h2>
+  <ul>
+    <li><code>README.md</code></li>
+    <li><code>REQUIREMENTS.md</code></li>
+    <li><code>docs/superpowers/specs/2026-05-27-em-workbench-electrostatics-design.md</code></li>
+    <li><code>src/em_workbench/models.py</code></li>
+    <li><code>src/em_workbench/physics/solver.py</code></li>
+    <li><code>src/em_workbench/physics/integration.py</code></li>
+    <li><code>src/em_workbench/physics/compute/field_lines.py</code></li>
+    <li><code>src/em_workbench/physics/dynamics.py</code></li>
+    <li><code>src/em_workbench/physics/scattering.py</code></li>
+    <li><code>src/em_workbench/app.py</code></li>
+    <li><code>web/index.html</code>、<code>web/app.js</code>、<code>web/styles.css</code></li>
+    <li>相关测试文件：<code>tests/test_solver.py</code>、<code>tests/test_models.py</code>、<code>tests/test_field_lines.py</code>、<code>tests/test_scattering.py</code>、<code>tests/test_dynamics.py</code>、<code>tests/test_app.py</code></li>
+  </ul>
+
+  <h2>执行命令与结果</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>命令</th>
+        <th>结果</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>Get-Content ...</code> / <code>Select-String ...</code></td>
+        <td>成功读取项目说明、静电场规格、模型、求解器、API、前端和测试信息。</td>
+      </tr>
+      <tr>
+        <td><code>rg ...</code></td>
+        <td>本环境返回 Access is denied，因此改用 PowerShell 原生命令完成检索。</td>
+      </tr>
+      <tr>
+        <td>测试命令</td>
+        <td>本次只生成文档，未修改运行代码，未执行完整测试套件。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>已交付范围</h2>
+  <ul>
+    <li>按考核要点组织的设计报告。</li>
+    <li>报告中保留静电场、试探电荷运动和散射实验内容。</li>
+    <li>报告中明确排除磁场模块和完整 Maxwell 平台。</li>
+    <li>报告中补充制作过程中遇到的问题、解决方法、使用的工具和写作方式。</li>
+    <li>报告未包含校名、指导教师或学生个人信息。</li>
+  </ul>
+
+  <h2>暂未处理</h2>
+  <ul>
+    <li>未生成 PPT。</li>
+    <li>未生成介绍视频脚本。</li>
+    <li>未把报告转换为 Word 或 PDF。</li>
+  </ul>
+
+  <h2>风险与限制</h2>
+  <ul>
+    <li>当前代码库中已经存在磁场和 Maxwell 相关入口；报告已按用户要求排除，但实际界面展示时仍需注意不要把这些扩展模块作为本报告展示内容。</li>
+    <li>报告为 HTML 格式，如需提交 Word/PDF，后续应再做格式转换和版式检查。</li>
+  </ul>
+
+  <h2>下一步</h2>
+  <p>如需要，可基于该 HTML 报告继续生成 PPT 大纲、讲解稿或 PDF 版。</p>
+</body>
+</html>

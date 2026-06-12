@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 59 - Word Export</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      line-height: 1.65;
+      margin: 32px auto;
+      max-width: 960px;
+      padding: 0 24px;
+    }
+    h1,
+    h2 {
+      color: #102047;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th,
+    td {
+      border: 1px solid #d9deea;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #e8eefc;
+    }
+    code {
+      background: #eef2ff;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task 59 - 设计报告 Word 文档导出</h1>
+  <p><strong>完成时间：</strong>2026-06-12</p>
+
+  <h2>任务范围</h2>
+  <p>
+    将 <code>reports/2026-06-12-electrostatics-design-report.html</code> 转换为可由 Word 打开的 <code>.docx</code> 文档。
+  </p>
+
+  <h2>交付内容</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>文件</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>reports/2026-06-12-electrostatics-design-report.docx</code></td>
+        <td>由静电场设计报告 HTML 生成的 Word 文档，大小 13,989 bytes。</td>
+      </tr>
+      <tr>
+        <td><code>scripts/html_report_to_docx.py</code></td>
+        <td>依赖 Python 标准库的 HTML 到 DOCX 转换脚本，直接生成 Office Open XML 压缩包。</td>
+      </tr>
+      <tr>
+        <td><code>reports/2026-06-12-task-59-word-export.html</code></td>
+        <td>本次 Word 导出任务记录。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>执行命令与结果</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>命令</th>
+        <th>结果</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run python scripts\html_report_to_docx.py reports\2026-06-12-electrostatics-design-report.html reports\2026-06-12-electrostatics-design-report.docx</code></td>
+        <td>成功生成 <code>reports\2026-06-12-electrostatics-design-report.docx</code>。</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run python -m zipfile -t reports\2026-06-12-electrostatics-design-report.docx</code></td>
+        <td>通过，输出 <code>Done testing</code>。</td>
+      </tr>
+      <tr>
+        <td><code>.\.tools\uv\uv.exe run ruff check scripts\html_report_to_docx.py</code></td>
+        <td>初次发现导入排序和长 XML 字符串行宽问题；修正后通过，输出 <code>All checks passed!</code>。</td>
+      </tr>
+      <tr>
+        <td>DOCX 内部文本抽检</td>
+        <td>确认 <code>word/document.xml</code> 存在，标题、公式内容和正文文本可从 DOCX 内部 XML 中抽取。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>制作过程中遇到的问题与解决方法</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>问题</th>
+        <th>解决方法</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>不能依赖全局 Python、npm、pandoc 或 Word 自动化。</td>
+        <td>使用项目本地 <code>uv</code> 调用 Python 标准库，直接生成 DOCX 所需 XML 文件并压缩成 Office Open XML 包。</td>
+      </tr>
+      <tr>
+        <td>第一次内容抽检使用 Bash heredoc 写法，PowerShell 不支持 <code>&lt;&lt;</code>。</td>
+        <td>改用 PowerShell here-string 管道：<code>@' ... '@ | .\.tools\uv\uv.exe run python -</code>。</td>
+      </tr>
+      <tr>
+        <td>转换脚本最初只解析标题、段落、列表、表格和代码块，漏掉 HTML 中 <code>div.formula</code> 里的公式。</td>
+        <td>扩展解析器，额外捕获公式块和范围说明块，再重新生成 DOCX。</td>
+      </tr>
+      <tr>
+        <td>ruff 对长 XML 字符串报 E501。</td>
+        <td>对该转换脚本添加文件级 <code># ruff: noqa: E501</code>，保留 Office XML 字符串的可读性，同时修正导入排序。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>验证证据</h2>
+  <ul>
+    <li><code>zipfile -t</code> 检查通过，DOCX 压缩包结构完整。</li>
+    <li>必需部件存在：<code>[Content_Types].xml</code>、<code>_rels/.rels</code>、<code>word/document.xml</code>、<code>word/styles.xml</code>、<code>word/numbering.xml</code>。</li>
+    <li>脚本 lint 通过。</li>
+    <li>最终 DOCX 文件路径：<code>D:\physicsmodel_real-backup-20260531-012014\reports\2026-06-12-electrostatics-design-report.docx</code>。</li>
+  </ul>
+
+  <h2>暂未处理</h2>
+  <ul>
+    <li>未人工用 Microsoft Word 打开检查版式。</li>
+    <li>未导出 PDF。</li>
+    <li>未生成 PPT 或讲解视频脚本。</li>
+  </ul>
+</body>
+</html>

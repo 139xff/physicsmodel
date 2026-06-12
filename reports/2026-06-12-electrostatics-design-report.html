@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>静电场仿真与可视化平台设计报告</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #5d667a;
+      --line: #d9deea;
+      --panel: #f7f9fc;
+      --accent: #1e40af;
+      --accent-soft: #e8eefc;
+      --warn: #92400e;
+      --warn-soft: #fff7ed;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      background: #eef2f8;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+      line-height: 1.72;
+      margin: 0;
+    }
+    main {
+      background: #fff;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+      margin: 32px auto;
+      max-width: 1080px;
+      padding: 56px 64px;
+    }
+    h1,
+    h2,
+    h3 {
+      line-height: 1.35;
+      margin: 0;
+    }
+    h1 {
+      color: #0f172a;
+      font-size: 2.1rem;
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+    h2 {
+      border-left: 5px solid var(--accent);
+      color: #102047;
+      font-size: 1.35rem;
+      margin-top: 36px;
+      padding-left: 12px;
+    }
+    h3 {
+      color: #22315d;
+      font-size: 1.05rem;
+      margin-top: 22px;
+    }
+    p {
+      margin: 10px 0;
+    }
+    .subtitle {
+      color: var(--muted);
+      margin-top: 12px;
+      text-align: center;
+    }
+    .scope-note {
+      background: var(--warn-soft);
+      border: 1px solid #fed7aa;
+      border-radius: 12px;
+      color: var(--warn);
+      margin: 28px 0;
+      padding: 16px 18px;
+    }
+    .abstract {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      margin-top: 28px;
+      padding: 18px 20px;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 14px 0 22px;
+      width: 100%;
+    }
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--accent-soft);
+      color: #13245a;
+      font-weight: 700;
+    }
+    code {
+      background: #eef2ff;
+      border-radius: 4px;
+      color: #1e3a8a;
+      padding: 1px 5px;
+    }
+    pre {
+      background: #0f172a;
+      border-radius: 12px;
+      color: #dbeafe;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      overflow-x: auto;
+      padding: 16px;
+    }
+    .diagram {
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      color: #1e293b;
+    }
+    .formula {
+      background: #f8fafc;
+      border-left: 4px solid #93c5fd;
+      margin: 12px 0;
+      padding: 10px 14px;
+    }
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin: 14px 0;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .small {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    @media print {
+      body {
+        background: #fff;
+      }
+      main {
+        box-shadow: none;
+        margin: 0;
+        max-width: none;
+        padding: 20mm;
+      }
+      h2 {
+        page-break-after: avoid;
+      }
+      pre,
+      table,
+      .card {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>静电场仿真与可视化平台设计报告</h1>
+  <p class="subtitle">面向大学电磁学学习的交互式静电场建模、计算与可视化系统</p>
+
+  <div class="scope-note">
+    <strong>报告范围说明：</strong>本文只讨论静电场仿真与可视化，包括点电荷、带电线段、带电圆环、带电圆盘、无限带电平面、带电球壳、探针测量、电场线、等势线、试探电荷运动和散射实验。磁场模块、电磁感应模块以及完整 Maxwell 方程组数值求解平台不纳入本报告内容。
+  </div>
+
+  <section class="abstract">
+    <h2>摘要</h2>
+    <p>
+      本作品是一个可由操作者自由改变参数的静电场仿真与可视化平台。平台允许用户在同一场景中组合多种电荷模型，实时观察电场、电势、电场线、等势线和试探电荷轨迹，并通过探针读取定量结果。系统以库仑定律、电势叠加原理和连续带电体积分为物理基础，使用 Python 后端完成权威数值计算，前端负责场景编辑、二维和三维展示。其目标不是替代严格推导，而是把抽象公式转化为可操作、可比较、可验证的物理图像。
+    </p>
+  </section>
+
+  <h2>1. 选题意义与目标定位</h2>
+  <p>
+    静电场是大学电磁学中的基础内容。学生通常先从点电荷、电偶极子、均匀带电线段、带电圆环、带电圆盘、无限平面和球壳等模型入手，再学习叠加原理、对称性分析和电势概念。传统学习方式容易把公式和空间图像割裂：公式可计算，但场线、等势线和三维结构不够直观；图像可观察，但往往缺少可调参数和定量验证。
+  </p>
+  <p>
+    本平台的目标是构建一个开放式静电场工作台，使操作者能够自主设置电荷源类型、位置、尺寸和电荷量，并可视化输出仿真结果。平台强调三个目标：
+  </p>
+  <ul>
+    <li><strong>自主建模：</strong>用户从源库中选择模型，自由组合不同电荷分布，而不是只能观看固定演示。</li>
+    <li><strong>可视化理解：</strong>通过二维切片、三维视图、电场线、等势线和轨迹动画形成空间直觉。</li>
+    <li><strong>定量验证：</strong>使用探针、贡献分解和散射结果，将图像观察与物理数值联系起来。</li>
+  </ul>
+
+  <h2>2. 物理原理</h2>
+  <h3>2.1 点电荷、库仑定律与电势</h3>
+  <p>
+    对于位于 <code>r0</code> 的点电荷 <code>q</code>，采样点 <code>r</code> 处的电势和电场为：
+  </p>
+  <div class="formula">
+    V(r) = k q / |r - r0|<br>
+    E(r) = k q (r - r0) / |r - r0|<sup>3</sup><br>
+    k = 1 / (4π ε0)
+  </div>
+  <p>
+    多个电荷源同时存在时，系统使用叠加原理，将每个源的电势和电场矢量贡献相加：
+  </p>
+  <div class="formula">
+    Vtotal = Σ Vi，Etotal = Σ Ei
+  </div>
+
+  <h3>2.2 连续带电体的积分思想</h3>
+  <p>
+    带电线段、带电圆环和带电圆盘不能简单视为一个点电荷，系统将它们离散为多个小电荷元，并对每个电荷元的库仑贡献求和。其数学思想是：
+  </p>
+  <div class="formula">
+    V(r) = ∫ k dq / |r - r'|<br>
+    E(r) = ∫ k (r - r') dq / |r - r'|<sup>3</sup>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>模型</th>
+        <th>计算方法</th>
+        <th>物理含义</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>带电线段</td>
+        <td>沿线段方向使用 Gauss-Legendre 积分节点。</td>
+        <td>把均匀线电荷分解为一系列小电荷元。</td>
+      </tr>
+      <tr>
+        <td>带电圆环</td>
+        <td>按方位角均匀分段积分。</td>
+        <td>每个小弧段贡献一个等效电荷元。</td>
+      </tr>
+      <tr>
+        <td>带电圆盘</td>
+        <td>径向使用 Gauss-Legendre 节点，角向均匀分段。</td>
+        <td>在极坐标下对圆盘面积元积分。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2.3 高对称模型</h3>
+  <p>
+    对于无限带电平面和均匀带电球壳，系统使用解析模型。无限平面的电场大小为 <code>|E| = |σ| / (2 ε0)</code>，方向沿平面法向两侧相反。球壳内部电场为零，外部等效为位于球心的点电荷；内部电势等于壳面电势。
+  </p>
+
+  <h3>2.4 电场线、等势线与试探电荷</h3>
+  <p>
+    电场线方向与局部电场方向一致，正电荷发出、负电荷终止；等势线表示电势相同的点集合，并与电场方向正交。平台在二维视图中计算场线轨迹，并在电势采样网格上提取等势线。
+  </p>
+  <p>
+    试探电荷运动使用 <code>F = qE</code> 与牛顿第二定律 <code>a = F/m</code>。轨迹积分使用四阶 Runge-Kutta 方法，以减小普通 Euler 方法在非均匀场中的累积误差。散射实验则以库仑斥力和 Rutherford 散射关系为依据，用来展示带电粒子在电场中的偏转。
+  </p>
+
+  <h2>3. 总体设计与技术路线</h2>
+  <h3>3.1 系统结构</h3>
+  <pre class="diagram">用户操作
+  │
+  ▼
+前端工作台：源库、参数输入、2D/3D 视图、探针、图层开关
+  │  JSON 场景
+  ▼
+FastAPI 接口层：校验请求、分发计算、返回序列化结果
+  │
+  ▼
+物理求解层：库仑定律、积分电荷元、场线追踪、轨迹积分、散射计算
+  │
+  ▼
+计算后端：标量求解、CPU JIT、可选 CUDA 加速、场景缓存、预热状态
+  │
+  ▼
+前端渲染：电场/电势数值、贡献列表、电场线、等势线、轨迹动画、3D 几何</pre>
+
+  <h3>3.2 核心实现技术</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>模块</th>
+        <th>技术选择</th>
+        <th>作用</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>运行环境</td>
+        <td>Python 3.12、本地 uv、FastAPI、Uvicorn</td>
+        <td>提供可复现的本地服务和接口。</td>
+      </tr>
+      <tr>
+        <td>数据契约</td>
+        <td>Pydantic 严格模型</td>
+        <td>约束场景、参数、采样点和计算结果格式。</td>
+      </tr>
+      <tr>
+        <td>数值计算</td>
+        <td>NumPy、Numba、纯 Python 物理模块</td>
+        <td>完成静电场、电势、场线、轨迹和散射计算。</td>
+      </tr>
+      <tr>
+        <td>可选加速</td>
+        <td>CPU JIT 与可选 CUDA 后端</td>
+        <td>对大量采样点、电场线和轨迹计算提高性能。</td>
+      </tr>
+      <tr>
+        <td>前端界面</td>
+        <td>HTML、CSS、原生 ES modules</td>
+        <td>实现无需 npm 的静态浏览器工作台。</td>
+      </tr>
+      <tr>
+        <td>三维渲染</td>
+        <td>本地固定版本 Three.js 与 OrbitControls</td>
+        <td>渲染三维电荷源和空间观察视图。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.3 静电求解流程</h3>
+  <pre class="diagram">输入：场景源列表 + 采样点 + 计算质量
+  │
+  ├─ 校验源类型、位置、方向、长度、半径、电荷量等参数
+  │
+  ├─ 根据源类型选择计算方式
+  │    ├─ 点电荷：解析库仑公式
+  │    ├─ 线段：Gauss-Legendre 线积分
+  │    ├─ 圆环：角向离散积分
+  │    ├─ 圆盘：径向积分 + 角向离散
+  │    ├─ 无限平面：解析场
+  │    └─ 球壳：壳层解析结果
+  │
+  ├─ 对每个采样点累加各源贡献
+  │
+  ├─ 输出 V、E、|E|、每个源的贡献和警告信息
+  │
+  └─ 前端将结果用于探针、图层、场线、等势线和轨迹显示</pre>
+
+  <h2>4. 功能设计</h2>
+  <h3>4.1 场源库</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>场源</th>
+        <th>主要参数</th>
+        <th>用途</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>点电荷</td>
+        <td>位置 x/y/z，电荷量 q</td>
+        <td>理解库仑场、单源径向分布、电偶极基础。</td>
+      </tr>
+      <tr>
+        <td>带电线段</td>
+        <td>位置、方向、长度、总电荷或线密度</td>
+        <td>展示连续线电荷和有限长度边界效应。</td>
+      </tr>
+      <tr>
+        <td>带电圆环</td>
+        <td>圆心、法向、半径、总电荷或线密度</td>
+        <td>分析环轴线上场强、电势和对称性。</td>
+      </tr>
+      <tr>
+        <td>带电圆盘</td>
+        <td>圆心、法向、半径、总电荷或面密度</td>
+        <td>比较有限圆盘与无限平面的近似关系。</td>
+      </tr>
+      <tr>
+        <td>无限带电平面</td>
+        <td>位置、法向、显示范围、面密度</td>
+        <td>验证高斯定律得到的均匀电场结论。</td>
+      </tr>
+      <tr>
+        <td>带电球壳</td>
+        <td>球心、半径、总电荷或面密度</td>
+        <td>展示壳内电场为零、壳外等效点电荷。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>4.2 可视化与交互</h3>
+  <div class="grid">
+    <div class="card">
+      <strong>2D 视图</strong>
+      <p>用于平面分析，显示源模型、电场线、等势线、探针和试探电荷轨迹。适合观察对称性、零场区域和局部变化。</p>
+    </div>
+    <div class="card">
+      <strong>3D 视图</strong>
+      <p>用于空间理解，显示点、线段、圆环、圆盘、平面和球壳等几何形态，并支持视角旋转观察。</p>
+    </div>
+    <div class="card">
+      <strong>探针测量</strong>
+      <p>用户输入探针坐标后，平台返回该点的电场向量、电场强度、电势以及各源贡献。</p>
+    </div>
+    <div class="card">
+      <strong>计算质量</strong>
+      <p>快速预览用于交互响应，精细计算提高积分节点数量和结果质量，便于对比精度。</p>
+    </div>
+  </div>
+
+  <h3>4.3 典型应用场景</h3>
+  <ul>
+    <li>构造电偶极子，观察电场线从正电荷出发并终止于负电荷。</li>
+    <li>改变圆环半径和探针位置，比较轴线上电势与场强变化。</li>
+    <li>将圆盘半径逐渐增大，观察其场分布向无限平面结果逼近。</li>
+    <li>把探针放入球壳内部，验证内部电场为零但电势不一定为零。</li>
+    <li>发射试探电荷，观察电荷符号、质量、初速度对运动轨迹的影响。</li>
+    <li>运行散射实验，比较冲量参数与散射角之间的关系。</li>
+  </ul>
+
+  <h2>5. 使用方法与参数设置</h2>
+  <h3>5.1 启动方式</h3>
+  <p>开发环境中使用项目本地 uv 启动：</p>
+  <pre>.\.tools\uv\uv.exe sync
+.\.tools\uv\uv.exe run uvicorn em_workbench.app:app --reload</pre>
+  <p>启动后在浏览器打开本地服务地址。打包版本可通过 Windows 便携包运行，无需用户手动启动服务器。</p>
+
+  <h3>5.2 基本操作流程</h3>
+  <ol>
+    <li>从源库选择点电荷、带电线段、带电圆环、带电圆盘、无限平面或球壳。</li>
+    <li>设置位置、方向、半径、长度、电荷量或电荷密度等参数。</li>
+    <li>在 2D 或 3D 视图中观察场源形状和空间分布。</li>
+    <li>开启电场线或等势线图层，观察场结构。</li>
+    <li>移动探针并读取 <code>V</code>、<code>E</code>、<code>|E|</code> 以及各源贡献。</li>
+    <li>切换快速预览和精细计算，比较复杂连续源附近的结果差异。</li>
+    <li>根据需要运行试探电荷运动或散射实验。</li>
+  </ol>
+
+  <h3>5.3 参数单位</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>参数</th>
+        <th>界面输入单位</th>
+        <th>后端计算单位</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>位置、长度、半径</td>
+        <td>厘米 cm</td>
+        <td>米 m</td>
+      </tr>
+      <tr>
+        <td>电荷量</td>
+        <td>库仑 C 或纳库仑 nC</td>
+        <td>库仑 C</td>
+      </tr>
+      <tr>
+        <td>质量</td>
+        <td>毫克 mg</td>
+        <td>千克 kg</td>
+      </tr>
+      <tr>
+        <td>速度</td>
+        <td>厘米/秒 cm/s</td>
+        <td>米/秒 m/s</td>
+      </tr>
+      <tr>
+        <td>电场、电势</td>
+        <td>结果显示</td>
+        <td>V/m 与 V</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>6. 结果的物理意义与有效性分析</h2>
+  <h3>6.1 结果含义</h3>
+  <p>
+    平台输出的电场向量表示单位正试探电荷在该点受到的电力方向和大小；电势表示单位正电荷在该点具有的静电势能。电场线反映电场方向结构，线的密集程度可作为场强大小的直观参考；等势线反映电势分布，同一条等势线上电势相同。
+  </p>
+
+  <h3>6.2 合理性验证</h3>
+  <p>项目测试中已经覆盖下列物理一致性：</p>
+  <ul>
+    <li>单点电荷结果符合解析库仑公式。</li>
+    <li>多点电荷满足线性叠加。</li>
+    <li>对称电荷系统在对称方向上的分量符合预期。</li>
+    <li>带电圆环轴线结果与已知解析趋势一致。</li>
+    <li>连续带电体积分节点数量随预览/精细模式改变。</li>
+    <li>点电荷奇点、线段和圆环近几何位置会返回警告而不是静默给出误导性结果。</li>
+    <li>电场线种子分布、平滑性、截断数量和源间连接有专门测试。</li>
+    <li>Rutherford 散射角方向和冲量参数关系有数值验证。</li>
+  </ul>
+
+  <h3>6.3 有效性</h3>
+  <p>
+    对于课堂学习和自主探索，本系统可以有效展示静电场中“源参数改变 -> 场分布改变 -> 探针数值改变 -> 轨迹响应改变”的因果链。它尤其适合解释叠加原理、连续带电体积分、高对称模型和散射偏转等内容。
+  </p>
+
+  <h3>6.4 局限与改进思路</h3>
+  <ul>
+    <li>点电荷和连续带电体几何位置附近存在理论发散，平台只能给出警告和数值截断，不能消除物理奇点。</li>
+    <li>线段、圆环、圆盘采用数值积分，离散节点越多越准确，但计算成本也增加。</li>
+    <li>二维视图是平面采样，不代表所有三维场线都真实限制在该平面内。</li>
+    <li>电场线和等势线是教学可视化结果，不等同于严格误差可控的科研绘图。</li>
+    <li>当前报告不覆盖磁场、电磁感应和完整 Maxwell 方程组数值求解，这些属于后续扩展方向。</li>
+  </ul>
+
+  <h2>7. 可拓展性设计</h2>
+  <p>
+    项目将场景契约、求解器、计算后端、API 和前端渲染分层。静电求解模块独立于 FastAPI 与界面，便于测试和替换；前端通过 JSON API 获取结果，不直接承担权威物理计算。这样的架构使后续可以继续增加新的静电源、采样工具、导出功能或更高性能后端。
+  </p>
+  <pre class="diagram">场景模型 Scene
+  ├─ 源参数：位置、方向、尺寸、电荷
+  ├─ API 契约：请求和响应均可序列化
+  ├─ 物理求解：独立模块，可单元测试
+  ├─ 计算后端：CPU/CUDA/标量策略可切换
+  └─ 前端渲染：只消费计算结果，不改写物理模型</pre>
+
+  <h2>8. 运行配置要求</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>项目</th>
+        <th>要求</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>操作系统</td>
+        <td>Windows 环境优先；Web 服务本身可在支持 Python 3.12 的环境中运行。</td>
+      </tr>
+      <tr>
+        <td>Python</td>
+        <td>Python 3.12，通过项目本地 <code>.\.tools\uv\uv.exe</code> 管理和执行。</td>
+      </tr>
+      <tr>
+        <td>浏览器</td>
+        <td>支持现代 ES modules、SVG、Canvas 和 WebGL 的浏览器。</td>
+      </tr>
+      <tr>
+        <td>CPU</td>
+        <td>普通多核 CPU 可运行；大量采样、电场线或轨迹计算会受 CPU 性能影响。</td>
+      </tr>
+      <tr>
+        <td>内存</td>
+        <td>建议 8 GB 及以上，复杂场景和浏览器测试会占用更多内存。</td>
+      </tr>
+      <tr>
+        <td>GPU</td>
+        <td>可选。具备 NVIDIA CUDA 环境时可用于部分静电场批量计算加速；无 CUDA 时自动回退到 CPU。</td>
+      </tr>
+      <tr>
+        <td>网络</td>
+        <td>运行时不依赖 CDN；Three.js 等前端资源使用本地固定版本文件。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>9. 制作过程中的问题、解决方法与工具</h2>
+  <h3>9.1 遇到的问题与解决方法</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>问题</th>
+        <th>影响</th>
+        <th>解决方法</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>当前项目代码中已经包含磁场模块和 Maxwell FDTD 面板。</td>
+        <td>如果直接按完整项目写报告，会超出本次报告要求。</td>
+        <td>在报告开头明确限定范围，只保留静电场、试探电荷运动和散射实验内容；磁场、电磁感应和完整 Maxwell 方程组数值求解平台均作为排除范围处理。</td>
+      </tr>
+      <tr>
+        <td>部分源代码文件在终端中直接显示时出现中文和特殊符号乱码。</td>
+        <td>可能导致误读界面中文标签或符号含义。</td>
+        <td>重新使用 UTF-8 编码读取关键文件，并以代码中的字段名、物理函数和测试用例为主要依据，不依赖乱码输出判断。</td>
+      </tr>
+      <tr>
+        <td>常用全文检索工具 <code>rg</code> 在当前环境中返回 Access is denied。</td>
+        <td>无法使用最快的文本检索方式快速定位所有关键词。</td>
+        <td>改用 PowerShell 原生命令 <code>Select-String</code>、<code>Get-Content</code> 和 <code>Get-ChildItem</code> 完成源码、文档和测试文件检索。</td>
+      </tr>
+      <tr>
+        <td>报告需要符合竞赛/考核材料要求，且不能出现校名、指导教师和学生个人信息。</td>
+        <td>报告内容既要完整，又要避免不符合提交规范的信息。</td>
+        <td>按图片中的考核要点组织章节，并在最终报告中只保留项目技术、物理原理、使用方法和结果分析，不写任何个人或学校信息。</td>
+      </tr>
+      <tr>
+        <td>项目中 <code>dynamics.py</code> 已包含后续扩展的磁力和洛伦兹力字段。</td>
+        <td>如果全部写入，会与“除去磁场模块”的要求冲突。</td>
+        <td>报告中只引用试探电荷在静电力 <code>F=qE</code> 下的运动，不描述磁力项和洛伦兹力扩展。</td>
+      </tr>
+      <tr>
+        <td>连续带电体附近存在理论发散趋势，数值结果容易被误解为精确解析解。</td>
+        <td>可能影响报告对结果有效性的判断。</td>
+        <td>在物理原理和局限性部分说明线段、圆环、圆盘采用积分近似，并强调奇点和近场结果需要结合警告信息理解。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>9.2 使用的工具与方式</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>工具或方式</th>
+        <th>用途</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>项目文档阅读</td>
+        <td>读取 <code>README.md</code>、<code>REQUIREMENTS.md</code> 和静电场设计规格，确认项目定位、功能范围、技术栈和运行约束。</td>
+      </tr>
+      <tr>
+        <td>源码核对</td>
+        <td>查看 <code>models.py</code>、<code>solver.py</code>、<code>integration.py</code>、<code>field_lines.py</code>、<code>dynamics.py</code>、<code>scattering.py</code> 和 <code>app.py</code>，保证报告内容与实际实现一致。</td>
+      </tr>
+      <tr>
+        <td>测试文件核对</td>
+        <td>通过 <code>tests/test_solver.py</code>、<code>tests/test_models.py</code>、<code>tests/test_field_lines.py</code>、<code>tests/test_scattering.py</code> 等文件确认已验证的物理行为和边界情况。</td>
+      </tr>
+      <tr>
+        <td>PowerShell 检索</td>
+        <td>使用 <code>Get-Content</code>、<code>Select-String</code> 和 <code>Get-ChildItem</code> 读取和定位项目文件。</td>
+      </tr>
+      <tr>
+        <td>文档生成方式</td>
+        <td>采用独立 HTML 报告格式，内置样式，便于直接打开、打印或后续转换为 PDF。</td>
+      </tr>
+      <tr>
+        <td>补丁编辑</td>
+        <td>使用补丁方式新增和修改 HTML 文件，避免影响项目运行代码。</td>
+      </tr>
+      <tr>
+        <td>结构化写作方法</td>
+        <td>按“选题意义、物理原理、实现流程、使用方法、结果分析、配置要求、问题解决、结论”的顺序组织内容，对应用户提供图片中的考核要点。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>10. 结论</h2>
+  <p>
+    本平台围绕静电场核心知识建立了可操作的仿真/模拟程序。它允许用户改变参数，观察并测量电场、电势、场线、等势线和带电粒子运动，使抽象公式转化为可验证的交互实验。作品的主要价值在于把库仑定律、叠加原理、连续积分和对称性结论统一到同一个工作台中，既保留数值计算的严谨性，也提供直观的教学效果。
+  </p>
+  <p>
+    从当前实现看，本系统已经具备静电场自主建模、数值求解、二维/三维展示、探针测量、轨迹模拟、散射实验和性能后端状态显示等能力。其局限主要来自奇点处理、连续体离散误差和教学可视化精度边界。后续可在保持静电模块稳定的基础上，进一步完善数据导出、误差估计、更多预设场景和更细致的用户交互。
+  </p>
+
+  <h2>附录：报告依据的主要项目文件</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>文件</th>
+        <th>作用</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>src/em_workbench/models.py</code></td>
+        <td>场景、位置、方向、静电源和预设的数据契约。</td>
+      </tr>
+      <tr>
+        <td><code>src/em_workbench/physics/solver.py</code></td>
+        <td>静电势和电场求解。</td>
+      </tr>
+      <tr>
+        <td><code>src/em_workbench/physics/integration.py</code></td>
+        <td>线段、圆环、圆盘的积分电荷元生成。</td>
+      </tr>
+      <tr>
+        <td><code>src/em_workbench/physics/compute/field_lines.py</code></td>
+        <td>二维电场线种子、追踪、筛选和响应契约。</td>
+      </tr>
+      <tr>
+        <td><code>src/em_workbench/physics/dynamics.py</code></td>
+        <td>试探电荷轨迹积分；本文只引用静电力部分。</td>
+      </tr>
+      <tr>
+        <td><code>src/em_workbench/physics/scattering.py</code></td>
+        <td>带电粒子散射实验。</td>
+      </tr>
+      <tr>
+        <td><code>src/em_workbench/app.py</code></td>
+        <td>Web API 与静态页面服务。</td>
+      </tr>
+      <tr>
+        <td><code>web/index.html</code>、<code>web/app.js</code>、<code>web/styles.css</code></td>
+        <td>浏览器工作台界面、交互和可视化渲染。</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="small">本报告不包含任何校名、指导教师或学生个人信息。</p>
+</main>
+</body>
+</html>

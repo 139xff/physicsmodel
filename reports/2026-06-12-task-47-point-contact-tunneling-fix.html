@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 47 - Point Contact Tunneling Fix</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+      margin: 2rem auto;
+      max-width: 980px;
+      padding: 0 1rem;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #cfd6e4;
+      padding: 0.55rem 0.7rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3fb;
+    }
+    code {
+      background: #f5f7fb;
+      border-radius: 4px;
+      padding: 0.1rem 0.25rem;
+    }
+    pre {
+      background: #f5f7fb;
+      border: 1px solid #d8deea;
+      border-radius: 6px;
+      overflow-x: auto;
+      padding: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task 47 - Point Contact Tunneling Fix</h1>
+  <p><strong>Completed:</strong> 2026-06-12 22:27:05 +08:00</p>
+
+  <h2>Scope Delivered</h2>
+  <ul>
+    <li>Fixed the large-time-step point-charge tunneling case that prevented a test charge from returning to its start side.</li>
+    <li>Changed scalar and CPU-JIT contact detection from final-position-only checks to segment-sphere intersection checks.</li>
+    <li>Kept the existing motion playback/UI code untouched; <code>web/app.js</code> was not modified.</li>
+    <li>Kept the existing contact-only mechanical energy correction behavior; no per-frame or per-step frontend playback changes were introduced.</li>
+    <li>Added a regression test for the far-start point-charge case.</li>
+  </ul>
+
+  <h2>Scope Deferred</h2>
+  <ul>
+    <li>No changes were made to animation timing, visual rendering, or desktop CSS.</li>
+    <li>No upload, commit, merge, or pull request was performed.</li>
+  </ul>
+
+  <h2>Changed Files</h2>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>src/em_workbench/physics/dynamics.py</code></td><td>Segment-based point charge contact detection for the scalar trajectory path.</td></tr>
+      <tr><td><code>src/em_workbench/physics/compute/cpu_backend.py</code></td><td>Segment-based point charge contact detection for the CPU-JIT trajectory path used by the app.</td></tr>
+      <tr><td><code>tests/test_dynamics.py</code></td><td>Regression coverage for the far-start tunneling case.</td></tr>
+      <tr><td><code>reports/2026-06-12-task-47-point-contact-tunneling-fix.html</code></td><td>This engineering task record.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Commands and Outcomes</h2>
+  <table>
+    <thead>
+      <tr><th>Command</th><th>Outcome</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><pre>& 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish' python -</pre></td>
+        <td>Before the fix, reproduced the issue: scalar and CPU-JIT both crossed to positive x and did not return. After the fix, both paths stopped at x = -0.006 m, the configured contact radius, and returned to the start side.</td>
+      </tr>
+      <tr>
+        <td><pre>& 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish' pytest tests\test_dynamics.py tests\test_app.py::test_trajectory_endpoint_prevents_point_charge_contact_penetration -q</pre></td>
+        <td>Passed: <code>6 passed</code>.</td>
+      </tr>
+      <tr>
+        <td><pre>& 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish' ruff check src tests</pre></td>
+        <td>Passed: <code>All checks passed!</code>.</td>
+      </tr>
+      <tr>
+        <td><pre>& 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish' python -</pre></td>
+        <td>Performance check: after CPU-JIT warmup, 1000 steps computed in about 2.5 ms and 5000 steps in about 12.3 ms.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Verification Evidence</h2>
+  <ul>
+    <li>Far-start case after fix: CPU-JIT max x was about <code>-0.00600000005</code>, scalar max x was <code>-0.006</code>.</li>
+    <li>Both CPU-JIT and scalar paths returned to the start side with negative velocity after contact.</li>
+    <li>Changed-file check showed only physics backend files and dynamics tests changed; frontend playback code was untouched.</li>
+  </ul>
+
+  <h2>Known Risks and Limitations</h2>
+  <ul>
+    <li>This fix prevents the nonphysical tunneling caused by a large step crossing the contact sphere. It does not redesign the app's existing animation playback.</li>
+    <li>A browser smoke test failed on an unrelated existing computed-style assertion for SVG stroke width, even though the motion particle was visible. No frontend style change was made for this task.</li>
+  </ul>
+
+  <h2>Next Scheduled Task</h2>
+  <p>Restart the desktop app and have the user verify that the test charge remains smooth while returning correctly in the far-start point-charge case.</p>
+</body>
+</html>

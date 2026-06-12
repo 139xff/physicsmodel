@@ -148,6 +148,35 @@ def test_desktop_bridge_bootstrap_waits_for_document_root(page: Page) -> None:
     assert page_errors == []
 
 
+def test_browser_position_defaults_start_at_origin(page: Page) -> None:
+    for selector in [
+        "#point-source-x",
+        "#point-source-y",
+        "#point-source-z",
+        "#line-segment-source-x",
+        "#line-segment-source-y",
+        "#line-segment-source-z",
+        "#ring-source-x",
+        "#ring-source-y",
+        "#ring-source-z",
+        "#disk-source-x",
+        "#disk-source-y",
+        "#disk-source-z",
+        "#probe-x",
+        "#probe-y",
+        "#motion-x",
+        "#motion-y",
+        "#scatter-start-x",
+        "#scatter-center-y",
+    ]:
+        expect(page.locator(selector)).to_have_value("0")
+
+    expect(page.get_by_test_id("probe-position")).to_contain_text("0")
+    page.get_by_role("button", name="3D").click()
+    expect(page.locator("#probe-z")).to_have_value("0")
+    expect(page.get_by_test_id("probe-position")).to_contain_text("0")
+
+
 def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -> None:
     expect(page.get_by_role("heading", name="电磁工作台")).to_be_visible()
     expect(page.get_by_test_id("runtime-status")).to_contain_text("Three.js")
@@ -244,10 +273,10 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     line_y1 = _number_attr(page, "source-line-segment-2d-line-segment-1", "y1")
     line_y2 = _number_attr(page, "source-line-segment-2d-line-segment-1", "y2")
     line_length = ((line_x2 - line_x1) ** 2 + (line_y2 - line_y1) ** 2) ** 0.5
-    assert line_x1 == pytest.approx(-8)
-    assert line_y1 == pytest.approx(-8)
-    assert line_x2 == pytest.approx(8)
-    assert line_y2 == pytest.approx(-8)
+    assert line_x1 == pytest.approx(0)
+    assert line_y1 == pytest.approx(0)
+    assert line_x2 == pytest.approx(16)
+    assert line_y2 == pytest.approx(0)
     assert line_length == pytest.approx(16)
     expect(page.get_by_test_id("source-line-segment-2d-line-segment-1")).to_have_attribute(
         "data-starts-at-position",
@@ -289,7 +318,7 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     )
     assert ring_style["fill"] == "none"
     assert ring_style["fillOpacity"] == "0"
-    assert "source-fruit-positive-gradient" in ring_style["stroke"]
+    assert "source-point-positive-gradient" in ring_style["stroke"]
     assert float(
         page.get_by_test_id("source-ring-2d-ring-1").get_attribute("data-stroke-px") or "0"
     ) == pytest.approx(axis_label_size, abs=0.05)
@@ -331,7 +360,7 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("mode-label")).to_contain_text("3D")
     expect(page.locator("#point-source-z-field")).to_be_visible()
     expect(page.get_by_test_id("source-count")).to_contain_text("0 个源")
-    expect(page.get_by_test_id("probe-position")).to_contain_text("20")
+    expect(page.get_by_test_id("probe-position")).to_contain_text("0")
 
     page.get_by_role("button", name="2D").click()
     expect(page.get_by_test_id("view-2d")).to_be_visible()

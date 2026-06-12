@@ -134,3 +134,45 @@ def test_attractive_point_charge_contact_preserves_mechanical_energy() -> None:
             abs=1.0e-7,
         )
         assert max(abs(energy(sample) - initial_energy) for sample in result.samples) < 1.0e-10
+
+
+def test_far_point_charge_contact_does_not_tunnel_through_source() -> None:
+    scene = Scene(
+        id="far-contact-scene",
+        title="Far contact scene",
+        sources=[
+            PointChargeSource(
+                id="positive-source",
+                kind="point",
+                label="Positive source",
+                position=Position(x=0.0, y=0.0, z=0.0),
+                charge_c=1.0e-9,
+            )
+        ],
+    )
+    particle = Particle(
+        charge_c=-1.0e-9,
+        mass_kg=1.0e-6,
+        position=Position(x=-0.2, y=0.0, z=0.0),
+        velocity=Position(x=0.35, y=0.0, z=0.0),
+    )
+
+    for simulate in [simulate_trajectory_scalar, simulate_trajectory]:
+        result = simulate(
+            scene,
+            particle,
+            dt_s=0.005,
+            steps=400,
+            quality="preview",
+            record_every=1,
+        )
+        samples_after_start = result.samples[1:]
+
+        assert max(sample.position.x for sample in result.samples) == pytest.approx(
+            -POINT_CHARGE_CONTACT_RADIUS_M,
+            abs=1.0e-7,
+        )
+        assert any(
+            sample.position.x <= particle.position.x and sample.velocity.x < 0.0
+            for sample in samples_after_start
+        )

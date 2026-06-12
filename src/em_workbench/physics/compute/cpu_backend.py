@@ -38,20 +38,78 @@ MIN_SOURCE_DISTANCE_SQ = MIN_SOURCE_DISTANCE_M**2
 
 
 @njit(cache=True)
-def _enforce_hard_sphere_contacts(position, velocity, hard_sphere_positions, hard_sphere_radii):
+def _enforce_hard_sphere_contacts(
+    previous_position,
+    position,
+    velocity,
+    hard_sphere_positions,
+    hard_sphere_radii,
+):
     contacted = False
     for sphere_index in range(hard_sphere_positions.shape[0]):
         radius = hard_sphere_radii[sphere_index]
-        dx = position[0] - hard_sphere_positions[sphere_index, 0]
-        dy = position[1] - hard_sphere_positions[sphere_index, 1]
-        dz = position[2] - hard_sphere_positions[sphere_index, 2]
-        distance_sq = dx * dx + dy * dy + dz * dz
+        center_x = hard_sphere_positions[sphere_index, 0]
+        center_y = hard_sphere_positions[sphere_index, 1]
+        center_z = hard_sphere_positions[sphere_index, 2]
+        dx = position[0] - center_x
+        dy = position[1] - center_y
+        dz = position[2] - center_z
         radius_sq = radius * radius
-        if distance_sq >= radius_sq:
+        distance_sq = dx * dx + dy * dy + dz * dz
+        contact_x = position[0]
+        contact_y = position[1]
+        contact_z = position[2]
+        has_contact = False
+
+        motion_x = position[0] - previous_position[0]
+        motion_y = position[1] - previous_position[1]
+        motion_z = position[2] - previous_position[2]
+        motion_sq = motion_x * motion_x + motion_y * motion_y + motion_z * motion_z
+        if motion_sq > 1.0e-30:
+            previous_dx = previous_position[0] - center_x
+            previous_dy = previous_position[1] - center_y
+            previous_dz = previous_position[2] - center_z
+            previous_distance_offset = (
+                previous_dx * previous_dx
+                + previous_dy * previous_dy
+                + previous_dz * previous_dz
+                - radius_sq
+            )
+            b = 2.0 * (previous_dx * motion_x + previous_dy * motion_y + previous_dz * motion_z)
+            discriminant = b * b - 4.0 * motion_sq * previous_distance_offset
+            if discriminant >= 0.0:
+                root = math.sqrt(discriminant)
+                first = (-b - root) / (2.0 * motion_sq)
+                second = (-b + root) / (2.0 * motion_sq)
+                contact_t = -1.0
+                if first >= 0.0 and first <= 1.0:
+                    contact_t = first
+                elif (
+                    previous_distance_offset < 0.0
+                    and second >= 0.0
+                    and second <= 1.0
+                ):
+                    contact_t = second
+                if contact_t >= 0.0:
+                    contact_x = previous_position[0] + motion_x * contact_t
+                    contact_y = previous_position[1] + motion_y * contact_t
+                    contact_z = previous_position[2] + motion_z * contact_t
+                    has_contact = True
+
+        if not has_contact and distance_sq < radius_sq:
+            has_contact = True
+
+        if not has_contact:
             continue
         contacted = True
 
-        if distance_sq <= MIN_SOURCE_DISTANCE_SQ:
+        contact_dx = contact_x - center_x
+        contact_dy = contact_y - center_y
+        contact_dz = contact_z - center_z
+        contact_distance_sq = (
+            contact_dx * contact_dx + contact_dy * contact_dy + contact_dz * contact_dz
+        )
+        if contact_distance_sq <= MIN_SOURCE_DISTANCE_SQ:
             velocity_magnitude = math.sqrt(
                 velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2]
             )
@@ -64,14 +122,14 @@ def _enforce_hard_sphere_contacts(position, velocity, hard_sphere_positions, har
                 ny = 0.0
                 nz = 0.0
         else:
-            distance = math.sqrt(distance_sq)
-            nx = dx / distance
-            ny = dy / distance
-            nz = dz / distance
+            contact_distance = math.sqrt(contact_distance_sq)
+            nx = contact_dx / contact_distance
+            ny = contact_dy / contact_distance
+            nz = contact_dz / contact_distance
 
-        position[0] = hard_sphere_positions[sphere_index, 0] + nx * radius
-        position[1] = hard_sphere_positions[sphere_index, 1] + ny * radius
-        position[2] = hard_sphere_positions[sphere_index, 2] + nz * radius
+        position[0] = center_x + nx * radius
+        position[1] = center_y + ny * radius
+        position[2] = center_z + nz * radius
 
         normal_velocity = velocity[0] * nx + velocity[1] * ny + velocity[2] * nz
         if normal_velocity < 0.0:
@@ -718,9 +776,11 @@ def _trajectory_kernel(
         )
         k4x = velocity + k3v * dt_s
         k4v = field * charge_over_mass
+        previous_position = position.copy()
         position = position + (k1x + two * k2x + two * k3x + k4x) * sixth_dt_s
         velocity = velocity + (k1v + two * k2v + two * k3v + k4v) * sixth_dt_s
         contacted = _enforce_hard_sphere_contacts(
+            previous_position,
             position,
             velocity,
             hard_sphere_positions,

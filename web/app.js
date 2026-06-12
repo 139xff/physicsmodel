@@ -107,7 +107,7 @@ motionReadout.closest(".status-block")?.insertAdjacentHTML(
         <label>α 粒子电荷 q (nC)<input id="scatter-alpha-charge" type="number" step="0.1" value="1"></label>
         <label>α 粒子质量 m (mg)<input id="scatter-alpha-mass" type="number" step="0.1" min="0.01" value="1"></label>
         <label>入射速度 v (m/s)<input id="scatter-speed" type="number" step="0.1" min="0.01" value="1.5"></label>
-        <label>起始 x (cm)<input id="scatter-start-x" type="number" step="1" value="-50"></label>
+        <label>起始 x (cm)<input id="scatter-start-x" type="number" step="1" value="0"></label>
         <label>束流中心 y (cm)<input id="scatter-center-y" type="number" step="0.5" value="0"></label>
         <label>入射半宽 b (cm)<input id="scatter-half-width" type="number" step="0.5" min="0" value="5"></label>
         <label>粒子数<input id="scatter-particles" type="number" step="2" min="1" max="61" value="21"></label>
@@ -260,7 +260,7 @@ const state = {
     title: "Browser interaction scene",
     sources: [],
   },
-  probe: { x: 0.2, y: 0.03, z: 0.05 },
+  probe: { x: 0, y: 0, z: 0 },
   view2d: { centerX: 0, centerY: 0, zoom: DEFAULT_VIEW_ZOOM },
   panMode: false,
   showHeatmap: false,
@@ -328,7 +328,7 @@ const modeStates = {
       title: "Browser interaction scene 3D",
       sources: [],
     },
-    probe: { x: 0.2, y: 0.03, z: 0.05 },
+    probe: { x: 0, y: 0, z: 0 },
     lastResult: null,
     overlayResult: null,
     overlaySamples: [],
@@ -477,7 +477,7 @@ function sourceDefaults(kind, overrides = {}) {
       ...base,
       label: `点电荷 ${index}`,
       position: {
-        x: Number(overridePosition.x ?? -0.16),
+        x: Number(overridePosition.x ?? 0),
         y: Number(overridePosition.y ?? 0),
         z: Number(overridePosition.z ?? 0),
         unit: "m",
@@ -490,8 +490,8 @@ function sourceDefaults(kind, overrides = {}) {
       ...base,
       label: `带电线段 ${index}`,
       position: {
-        x: Number(overridePosition.x ?? -0.08),
-        y: Number(overridePosition.y ?? 0.08),
+        x: Number(overridePosition.x ?? 0),
+        y: Number(overridePosition.y ?? 0),
         z: Number(overridePosition.z ?? 0),
         unit: "m",
       },
@@ -509,7 +509,7 @@ function sourceDefaults(kind, overrides = {}) {
       ...base,
       label: `带电圆环 ${index}`,
       position: {
-        x: Number(overridePosition.x ?? 0.12),
+        x: Number(overridePosition.x ?? 0),
         y: Number(overridePosition.y ?? 0),
         z: Number(overridePosition.z ?? 0),
         unit: "m",
@@ -529,7 +529,7 @@ function sourceDefaults(kind, overrides = {}) {
       label: `带电圆盘 ${index}`,
       position: {
         x: Number(overridePosition.x ?? 0),
-        y: Number(overridePosition.y ?? -0.11),
+        y: Number(overridePosition.y ?? 0),
         z: Number(overridePosition.z ?? 0),
         unit: "m",
       },
@@ -546,7 +546,7 @@ function sourceDefaults(kind, overrides = {}) {
     return {
       ...base,
       label: `无限平面 ${index}`,
-      position: { x: 0.14, y: 0.11, z: 0, unit: "m" },
+      position: { x: 0, y: 0, z: 0, unit: "m" },
       normal: { x: 0, y: 0, z: 1 },
       display_extent_m: 0.24,
       surface_charge_density_c_per_m2: 2e-9,
@@ -556,7 +556,7 @@ function sourceDefaults(kind, overrides = {}) {
   return {
     ...base,
     label: `球壳 ${index}`,
-    position: { x: -0.14, y: -0.11, z: 0, unit: "m" },
+    position: { x: 0, y: 0, z: 0, unit: "m" },
     radius_m: 0.08,
     charge_c: 3e-9,
   };

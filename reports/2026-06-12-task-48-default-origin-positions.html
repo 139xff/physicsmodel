@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 48 - Default Origin Positions</title>
+  <style>
+    body {
+      color: #172033;
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.55;
+      margin: 2rem auto;
+      max-width: 980px;
+      padding: 0 1rem;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid #cfd6e4;
+      padding: 0.55rem 0.7rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef3fb;
+    }
+    code {
+      background: #f5f7fb;
+      border-radius: 4px;
+      padding: 0.1rem 0.25rem;
+    }
+    pre {
+      background: #f5f7fb;
+      border: 1px solid #d8deea;
+      border-radius: 6px;
+      overflow-x: auto;
+      padding: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Task 48 - Default Origin Positions</h1>
+  <p><strong>Completed:</strong> 2026-06-12 22:38:01 +08:00</p>
+
+  <h2>Scope Delivered</h2>
+  <ul>
+    <li>Changed opening defaults for source position inputs to <code>(0, 0, 0)</code> where applicable.</li>
+    <li>Changed probe defaults in both 2D and 3D mode state to the origin.</li>
+    <li>Changed test-charge initial position defaults to <code>(0, 0)</code>.</li>
+    <li>Changed Rutherford scattering beam start x and beam center y defaults to <code>0</code>.</li>
+    <li>Updated source factory fallback positions so button-created sources also start at the origin.</li>
+    <li>Added browser regression coverage for opening-position defaults.</li>
+  </ul>
+
+  <h2>Scope Deferred</h2>
+  <ul>
+    <li>Non-position defaults such as charge, speed, length, radius, direction, particle count, time step, and step count were left unchanged.</li>
+    <li>No upload, commit, merge, or pull request was performed.</li>
+  </ul>
+
+  <h2>Changed Files</h2>
+  <table>
+    <thead>
+      <tr><th>File</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>web/index.html</code></td><td>Opening form defaults for source, probe, and motion positions.</td></tr>
+      <tr><td><code>web/app.js</code></td><td>Runtime defaults for probe state, scattering start position, and source factory positions.</td></tr>
+      <tr><td><code>tests/test_browser_smoke.py</code></td><td>Browser checks for default origin positions and updated 2D/3D expectations.</td></tr>
+      <tr><td><code>reports/2026-06-12-task-48-default-origin-positions.html</code></td><td>This engineering task record.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Commands and Outcomes</h2>
+  <table>
+    <thead>
+      <tr><th>Command</th><th>Outcome</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><pre>& 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish' pytest tests\test_app.py::test_root_serves_the_explicitly_scoped_workbench_shell tests\test_browser_smoke.py::test_browser_position_defaults_start_at_origin -q</pre></td>
+        <td>Passed after adjusting the probe-z assertion to run in 3D mode.</td>
+      </tr>
+      <tr>
+        <td><pre>& 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish' pytest tests\test_dynamics.py tests\test_browser_smoke.py::test_browser_position_defaults_start_at_origin tests\test_browser_smoke.py::test_browser_interaction_slice_keeps_state_across_2d_3d_toggle -q</pre></td>
+        <td>Passed: <code>7 passed</code>. Only websocket deprecation warnings were reported.</td>
+      </tr>
+      <tr>
+        <td><pre>& 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish' pytest tests\test_app.py -q</pre></td>
+        <td>Passed: <code>13 passed</code>.</td>
+      </tr>
+      <tr>
+        <td><pre>& 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\二王刘柳\Documents\Codex\2026-05-29\desktop-stability-publish' ruff check src tests</pre></td>
+        <td>Passed: <code>All checks passed!</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Verification Evidence</h2>
+  <ul>
+    <li>The browser default-position test checks source x/y/z fields, probe x/y/z, test-charge x/y, scattering start x, and scattering center y.</li>
+    <li>The 2D/3D state-preservation test passes with the 3D probe default now at the origin.</li>
+    <li>The existing point-contact tunneling dynamics tests still pass after this UI default change.</li>
+  </ul>
+
+  <h2>Known Risks and Limitations</h2>
+  <ul>
+    <li>With several default sources placed at the origin, adding multiple sources without adjusting their coordinates will overlap visually until the user edits them.</li>
+    <li>Rutherford scattering with beam start x at zero may require the user to set a negative start position for a conventional left-to-right beam experiment.</li>
+  </ul>
+
+  <h2>Next Scheduled Task</h2>
+  <p>Restart the desktop app and let the user verify that opening defaults are at the origin.</p>
+</body>
+</html>

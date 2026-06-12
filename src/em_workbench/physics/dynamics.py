@@ -20,6 +20,7 @@ sources that create the field (the standard "test charge" idealisation).
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
@@ -78,6 +79,7 @@ def _pos(v: Vector3) -> Position:
 
 def _apply_point_charge_contact(
     scene: Scene,
+    previous_position: Vector3,
     position: Vector3,
     velocity: Vector3,
 ) -> tuple[Vector3, Vector3, bool]:
@@ -86,13 +88,34 @@ def _apply_point_charge_contact(
         if source.kind != "point":
             continue
         center = Vector3.from_position(source.position)
+        motion = position - previous_position
+        motion_sq = motion.magnitude_squared()
+        radius_sq = POINT_CHARGE_CONTACT_RADIUS_M * POINT_CHARGE_CONTACT_RADIUS_M
         displacement = position - center
-        distance = displacement.magnitude()
-        if distance >= POINT_CHARGE_CONTACT_RADIUS_M:
+        distance_sq = displacement.magnitude_squared()
+        contact_position: Vector3 | None = None
+        if motion_sq > 1e-30:
+            previous_displacement = previous_position - center
+            b = 2.0 * previous_displacement.dot(motion)
+            c = previous_displacement.magnitude_squared() - radius_sq
+            discriminant = b * b - 4.0 * motion_sq * c
+            if discriminant >= 0.0:
+                root = math.sqrt(discriminant)
+                first = (-b - root) / (2.0 * motion_sq)
+                second = (-b + root) / (2.0 * motion_sq)
+                if 0.0 <= first <= 1.0:
+                    contact_position = previous_position + motion.scale(first)
+                elif c < 0.0 and 0.0 <= second <= 1.0:
+                    contact_position = previous_position + motion.scale(second)
+        if contact_position is None and distance_sq < radius_sq:
+            contact_position = position
+        if contact_position is None:
             continue
         contacted = True
+        contact_displacement = contact_position - center
+        distance = contact_displacement.magnitude()
         if distance > 1e-15:
-            normal = displacement.scale(1.0 / distance)
+            normal = contact_displacement.scale(1.0 / distance)
         else:
             speed = velocity.magnitude()
             normal = (-velocity).scale(1.0 / speed) if speed > 0 else Vector3(1.0, 0.0, 0.0)
@@ -255,9 +278,10 @@ def simulate_trajectory_scalar(
         k4x = v + k3v.scale(dt_s)
         k4v = accel(x + k3x.scale(dt_s))
 
+        previous_x = x
         x = x + (k1x + k2x.scale(2.0) + k3x.scale(2.0) + k4x).scale(dt_s / 6.0)
         v = v + (k1v + k2v.scale(2.0) + k3v.scale(2.0) + k4v).scale(dt_s / 6.0)
-        x, v, contacted = _apply_point_charge_contact(scene, x, v)
+        x, v, contacted = _apply_point_charge_contact(scene, previous_x, x, v)
         if contacted:
             v = _correct_velocity_for_energy(scene, x, v, q, m, quality, target_energy_j)
         t += dt_s
@@ -301,9 +325,10 @@ def iter_states(
         k2x, k2v = v + k1v.scale(dt_s / 2.0), accel(x + k1x.scale(dt_s / 2.0))
         k3x, k3v = v + k2v.scale(dt_s / 2.0), accel(x + k2x.scale(dt_s / 2.0))
         k4x, k4v = v + k3v.scale(dt_s), accel(x + k3x.scale(dt_s))
+        previous_x = x
         x = x + (k1x + k2x.scale(2.0) + k3x.scale(2.0) + k4x).scale(dt_s / 6.0)
         v = v + (k1v + k2v.scale(2.0) + k3v.scale(2.0) + k4v).scale(dt_s / 6.0)
-        x, v, contacted = _apply_point_charge_contact(scene, x, v)
+        x, v, contacted = _apply_point_charge_contact(scene, previous_x, x, v)
         if contacted:
             v = _correct_velocity_for_energy(scene, x, v, q, m, quality, target_energy_j)
         t += dt_s

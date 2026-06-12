@@ -53,7 +53,7 @@
               <span>创建后只读</span>
             </div>
             <div class="mini-grid">
-              <label>位置 x / cm <input id="point-source-x" type="number" step="0.1" value="-16"></label>
+              <label>位置 x / cm <input id="point-source-x" type="number" step="0.1" value="0"></label>
               <label>位置 y / cm <input id="point-source-y" type="number" step="0.1" value="0"></label>
               <label id="point-source-z-field">位置 z / cm <input id="point-source-z" type="number" step="0.1" value="0"></label>
               <label>电荷量 C <input id="point-source-charge" type="number" step="1e-10" value="1e-9"></label>
@@ -73,8 +73,8 @@
                   <span>创建后可编辑</span>
                 </div>
                 <div class="mini-grid">
-                  <label>位置 x / cm <input id="line-segment-source-x" type="number" step="0.1" value="-8"></label>
-                  <label>位置 y / cm <input id="line-segment-source-y" type="number" step="0.1" value="8"></label>
+                  <label>位置 x / cm <input id="line-segment-source-x" type="number" step="0.1" value="0"></label>
+                  <label>位置 y / cm <input id="line-segment-source-y" type="number" step="0.1" value="0"></label>
                   <label id="line-segment-source-z-field">位置 z / cm <input id="line-segment-source-z" type="number" step="0.1" value="0"></label>
                   <label>方向 x <input id="line-segment-source-orientation-x" type="number" step="0.1" value="1"></label>
                   <label>方向 y <input id="line-segment-source-orientation-y" type="number" step="0.1" value="0"></label>
@@ -97,7 +97,7 @@
                   <span>创建后可编辑</span>
                 </div>
                 <div class="mini-grid">
-                  <label>位置 x / cm <input id="ring-source-x" type="number" step="0.1" value="12"></label>
+                  <label>位置 x / cm <input id="ring-source-x" type="number" step="0.1" value="0"></label>
                   <label>位置 y / cm <input id="ring-source-y" type="number" step="0.1" value="0"></label>
                   <label id="ring-source-z-field">位置 z / cm <input id="ring-source-z" type="number" step="0.1" value="0"></label>
                   <label>半径 / cm <input id="ring-source-radius" type="number" step="0.1" value="8"></label>
@@ -119,7 +119,7 @@
                 </div>
                 <div class="mini-grid">
                   <label>位置 x / cm <input id="disk-source-x" type="number" step="0.1" value="0"></label>
-                  <label>位置 y / cm <input id="disk-source-y" type="number" step="0.1" value="-11"></label>
+                  <label>位置 y / cm <input id="disk-source-y" type="number" step="0.1" value="0"></label>
                   <label id="disk-source-z-field">位置 z / cm <input id="disk-source-z" type="number" step="0.1" value="0"></label>
                   <label>半径 / cm <input id="disk-source-radius" type="number" step="0.1" value="9"></label>
                   <label>电荷量 C <input id="disk-source-charge" type="number" step="1e-10" value="2e-9"></label>
@@ -200,12 +200,12 @@
         <section class="status-block">
           <h3>探针测量</h3>
           <form id="probe-form" class="probe-form">
-            <label>探针 x / cm <input id="probe-x" type="number" step="0.1" value="20"></label>
-            <label>探针 y / cm <input id="probe-y" type="number" step="0.1" value="3"></label>
-            <label>探针 z / cm <input id="probe-z" type="number" step="0.1" value="5"></label>
+            <label>探针 x / cm <input id="probe-x" type="number" step="0.1" value="0"></label>
+            <label>探针 y / cm <input id="probe-y" type="number" step="0.1" value="0"></label>
+            <label>探针 z / cm <input id="probe-z" type="number" step="0.1" value="0"></label>
             <button id="probe-submit" class="probe-submit" type="submit">确定</button>
           </form>
-          <p class="probe-position" data-testid="probe-position">探针位置 (20, 3, 5) cm</p>
+          <p class="probe-position" data-testid="probe-position">探针位置 (0, 0, 0) cm</p>
           <p class="status-value" data-testid="solver-status">等待源</p>
           <dl class="measurement-results">
             <div><dt>电场 E</dt><dd id="field-vector-value">暂无</dd></div>
@@ -222,8 +222,8 @@
           <div class="motion-grid">
             <label>电荷 q (nC)<input id="motion-charge" type="number" step="0.5" value="-1"></label>
             <label>质量 m (mg)<input id="motion-mass" type="number" step="0.5" min="0.01" value="6"></label>
-            <label>初始 x (cm)<input id="motion-x" type="number" step="1" value="-8"></label>
-            <label>初始 y (cm)<input id="motion-y" type="number" step="1" value="4"></label>
+            <label>初始 x (cm)<input id="motion-x" type="number" step="1" value="0"></label>
+            <label>初始 y (cm)<input id="motion-y" type="number" step="1" value="0"></label>
             <label>初速 vx (cm/s)<input id="motion-vx" type="number" step="1" value="6"></label>
             <label>初速 vy (cm/s)<input id="motion-vy" type="number" step="1" value="0"></label>
             <label>时间步 dt (s)<input id="motion-dt" type="number" step="0.001" min="0.000001" value="0.005"></label>

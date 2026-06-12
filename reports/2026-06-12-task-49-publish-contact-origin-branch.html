@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 49 - Publish Contact Fix and Origin Defaults</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1f2937;
+      --muted: #4b5563;
+      --line: #d1d5db;
+      --panel: #f8fafc;
+      --accent: #0f766e;
+    }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: #ffffff;
+      line-height: 1.55;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1, h2 {
+      line-height: 1.2;
+    }
+    h1 {
+      margin: 0 0 8px;
+      color: var(--accent);
+    }
+    .timestamp {
+      margin: 0 0 28px;
+      color: var(--muted);
+    }
+    section {
+      margin: 28px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      background: var(--panel);
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      width: 28%;
+      background: #eef2f7;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.95em;
+    }
+    ul {
+      padding-left: 22px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Task 49 - Publish Contact Fix and Origin Defaults</h1>
+    <p class="timestamp">Completed: 2026-06-12 23:54:06 +08:00</p>
+
+    <section aria-labelledby="scope">
+      <h2 id="scope">Scope Delivered</h2>
+      <ul>
+        <li>Created branch <code>codex/fix-contact-origin-defaults</code> from <code>feature/em-workbench-foundation</code>.</li>
+        <li>Committed the point-charge contact tunneling fix, origin-default UI changes, regression tests, and task reports.</li>
+        <li>Pushed the branch to <code>origin</code> on GitHub.</li>
+        <li>Attempted to open a draft pull request against <code>feature/em-workbench-foundation</code>; GitHub rejected the connector request with a 403 permission error.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="deferred">
+      <h2 id="deferred">Scope Deferred</h2>
+      <p>Pull request creation and merge remain manual because GitHub returned <code>Resource not accessible by integration</code> for the available connector, and the local <code>gh</code> CLI is not installed.</p>
+    </section>
+
+    <section aria-labelledby="files">
+      <h2 id="files">Changed Files</h2>
+      <table>
+        <tbody>
+          <tr><th>Physics</th><td><code>src/em_workbench/physics/dynamics.py</code><br><code>src/em_workbench/physics/compute/cpu_backend.py</code></td></tr>
+          <tr><th>Browser UI</th><td><code>web/app.js</code><br><code>web/index.html</code></td></tr>
+          <tr><th>Tests</th><td><code>tests/test_dynamics.py</code><br><code>tests/test_browser_smoke.py</code></td></tr>
+          <tr><th>Reports</th><td><code>reports/2026-06-12-task-47-point-contact-tunneling-fix.html</code><br><code>reports/2026-06-12-task-48-default-origin-positions.html</code><br><code>reports/2026-06-12-task-49-publish-contact-origin-branch.html</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="commands">
+      <h2 id="commands">Commands Executed</h2>
+      <table>
+        <thead>
+          <tr><th>Command</th><th>Outcome</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>&amp; 'C:\Users\...\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\...\desktop-stability-publish' pytest tests\test_dynamics.py tests\test_app.py tests\test_browser_smoke.py::test_browser_position_defaults_start_at_origin -q</code></td>
+            <td>Passed: 19 tests passed, with existing websocket deprecation warnings.</td>
+          </tr>
+          <tr>
+            <td><code>&amp; 'C:\Users\...\139xff-physicsmodel-git-https-github-com\.tools\uv\uv.exe' run --project 'C:\Users\...\desktop-stability-publish' ruff check src tests</code></td>
+            <td>Passed: all checks passed.</td>
+          </tr>
+          <tr>
+            <td><code>git switch -c codex/fix-contact-origin-defaults</code></td>
+            <td>Created and switched to the publish branch.</td>
+          </tr>
+          <tr>
+            <td><code>git add -- src/em_workbench/physics/compute/cpu_backend.py src/em_workbench/physics/dynamics.py tests/test_browser_smoke.py tests/test_dynamics.py web/app.js web/index.html reports/2026-06-12-task-47-point-contact-tunneling-fix.html reports/2026-06-12-task-48-default-origin-positions.html</code></td>
+            <td>Staged only the intended implementation, test, UI, and report files.</td>
+          </tr>
+          <tr>
+            <td><code>git commit -m "Fix point contact tunneling and origin defaults"</code></td>
+            <td>Created commit <code>07bbcf8</code>.</td>
+          </tr>
+          <tr>
+            <td><code>git push -u origin codex/fix-contact-origin-defaults</code></td>
+            <td>Uploaded the branch to GitHub successfully.</td>
+          </tr>
+          <tr>
+            <td><code>GitHub connector: create draft pull request</code></td>
+            <td>Failed with GitHub API 403: <code>Resource not accessible by integration</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="verification">
+      <h2 id="verification">Verification Evidence</h2>
+      <p>The targeted pytest suite and ruff lint check both passed before publishing. The pushed branch URL is available through the repository remote, and GitHub advertised the pull request creation URL after push.</p>
+    </section>
+
+    <section aria-labelledby="risks">
+      <h2 id="risks">Known Risks or Limitations</h2>
+      <ul>
+        <li>The PR was not opened automatically because neither an authenticated <code>gh</code> CLI nor sufficient GitHub connector permission was available.</li>
+        <li>Because all default position controls now start at the origin, multiple newly created field sources can overlap until the user edits their positions.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="next">
+      <h2 id="next">Next Scheduled Task</h2>
+      <p>Open the GitHub pull request from <code>codex/fix-contact-origin-defaults</code> into <code>feature/em-workbench-foundation</code>, review the diff, and merge when the team accepts the behavior.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -341,16 +341,13 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     expect(page.get_by_test_id("source-card-ring-1")).to_contain_text("带电圆环 1")
 
 
-def test_browser_sources_use_fruit_glass_material(page: Page) -> None:
+def test_browser_sources_use_charge_orb_material(page: Page) -> None:
     for button_selector in ["#add-point", "#add-line-segment", "#add-ring", "#add-disk"]:
         page.locator(button_selector).click()
 
     material_metadata = page.evaluate(
         """
         () => ({
-            filter: Boolean(document.querySelector("#source-fruit-glass-filter")),
-            positiveGradient: Boolean(document.querySelector("#source-fruit-positive-gradient")),
-            negativeGradient: Boolean(document.querySelector("#source-fruit-negative-gradient")),
             pointPositiveGradient: Boolean(
                 document.querySelector("#source-point-positive-gradient")
             ),
@@ -363,37 +360,29 @@ def test_browser_sources_use_fruit_glass_material(page: Page) -> None:
             )?.dataset,
             ring: document.querySelector('[data-testid="source-ring-2d-ring-1"]')?.dataset,
             disk: document.querySelector('[data-testid="source-disk-2d-disk-1"]')?.dataset,
-            highlightCount: document.querySelectorAll(
-                '[data-testid^="source-fruit-highlight-2d-"]'
-            ).length,
-            causticCount: document.querySelectorAll(
-                '[data-testid^="source-fruit-caustic-2d-"]'
-            ).length,
-            rimCount: document.querySelectorAll(
-                '[data-testid^="source-fruit-rim-2d-"]'
-            ).length,
-            refractCount: document.querySelectorAll(
-                '[data-testid^="source-fruit-refract-2d-"]'
-            ).length,
+            lineStroke: getComputedStyle(
+                document.querySelector('[data-testid="source-line-segment-2d-line-segment-1"]')
+            ).stroke,
+            ringStroke: getComputedStyle(
+                document.querySelector('[data-testid="source-ring-2d-ring-1"]')
+            ).stroke,
+            diskFill: getComputedStyle(
+                document.querySelector('[data-testid="source-disk-2d-disk-1"]')
+            ).fill,
         })
         """
     )
 
-    assert material_metadata["filter"]
-    assert material_metadata["positiveGradient"]
-    assert material_metadata["negativeGradient"]
     assert material_metadata["pointPositiveGradient"]
     assert material_metadata["pointNegativeGradient"]
     assert material_metadata["point"]["material"] == "charge-orb"
     assert material_metadata["point"]["materialFinish"] == "internal-radial-glow"
     for key in ["line", "ring", "disk"]:
-        assert material_metadata[key]["material"] == "fruit-glass"
-        assert material_metadata[key]["materialFinish"] == "translucent-caustic"
-        assert material_metadata[key]["materialDepth"] == "layered-rind-lens"
-    assert material_metadata["highlightCount"] >= 3
-    assert material_metadata["causticCount"] >= 3
-    assert material_metadata["rimCount"] >= 3
-    assert material_metadata["refractCount"] >= 2
+        assert material_metadata[key]["material"] == "charge-orb"
+        assert material_metadata[key]["materialFinish"] == "solid-charge-gradient"
+    assert material_metadata["lineStroke"] == "rgb(217, 45, 32)"
+    assert "source-point-positive-gradient" in material_metadata["ringStroke"]
+    assert "source-point-positive-gradient" in material_metadata["diskFill"]
 
 
 def test_browser_source_library_modules_are_collapsible_parameter_forms(page: Page) -> None:
@@ -1249,14 +1238,18 @@ def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) 
         """
         node => {
             const trail = document.querySelector('.motion-trail');
+            const trailBody = document.querySelector('.motion-trail-body');
             const group = document.querySelector('[data-testid="motion-particle-group-2d"]');
+            const layer = document.querySelector('[data-testid="motion-layer-2d"]');
             const particleStyle = getComputedStyle(node);
             const trailStyle = getComputedStyle(trail);
-            return {
-                particleFill: particleStyle.fill,
-                particleStroke: particleStyle.stroke,
-                particleRadius: node.getAttribute('r'),
-                particleVisualRadius: node.getAttribute('data-visual-radius-cm'),
+            const trailBodyStyle = getComputedStyle(trailBody);
+                return {
+                    particleFill: particleStyle.fill,
+                    particleStroke: particleStyle.stroke,
+                    particleClasses: Array.from(node.classList),
+                    particleRadius: node.getAttribute('r'),
+                    particleVisualRadius: node.getAttribute('data-visual-radius-cm'),
                 particleStrokeWidth: particleStyle.strokeWidth,
                 particleFilter: particleStyle.filter,
                 particleMaterial: node.getAttribute('data-material'),
@@ -1266,12 +1259,20 @@ def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) 
                 particleGroupRatio: group.getAttribute('data-radius-ratio-to-static'),
                 trailStroke: trailStyle.stroke,
                 trailWidth: trailStyle.strokeWidth,
+                trailStrokeWidthCm: trail.getAttribute('data-stroke-width-cm'),
+                trailFilter: trailStyle.filter,
+                trailVectorEffect: trailStyle.vectorEffect,
+                trailBodyStroke: trailBodyStyle.stroke,
+                trailBodyWidth: trailBodyStyle.strokeWidth,
+                trailBodyRole: trailBody.getAttribute('data-visual-role'),
+                trailHaloCount: document.querySelectorAll('.motion-trail-halo').length,
+                trailHeadCount: document.querySelectorAll('.motion-trail-head').length,
+                layerChargeSign: layer.getAttribute('data-charge-sign'),
             };
         }
         """
     )
-    assert "source-point-negative-gradient" in motion_style["particleFill"]
-    assert motion_style["particleStroke"] == "rgba(207, 248, 255, 0.9)"
+    assert "negative" in motion_style["particleClasses"]
     assert float(motion_style["particleRadius"]) == pytest.approx(0.1)
     assert float(motion_style["particleVisualRadius"]) == pytest.approx(0.1)
     assert motion_style["particleStrokeWidth"] == "0.012px"
@@ -1279,8 +1280,17 @@ def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) 
     assert motion_style["particleMaterial"] == "charge-orb"
     assert motion_style["hasParticleSymbol"] is False
     assert motion_style["particleGroupRatio"] == "0.2"
-    assert motion_style["trailStroke"] == "rgb(57, 255, 20)"
-    assert motion_style["trailWidth"] == "0.22px"
+    assert motion_style["layerChargeSign"] == "negative"
+    assert motion_style["trailStroke"] == "rgb(234, 255, 255)"
+    assert float(motion_style["trailStrokeWidthCm"]) == pytest.approx(0.05)
+    assert float(motion_style["trailWidth"].replace("px", "")) == pytest.approx(0.05)
+    assert "drop-shadow" in motion_style["trailFilter"]
+    assert motion_style["trailVectorEffect"] == "none"
+    assert motion_style["trailBodyStroke"] == "rgb(120, 247, 255)"
+    assert float(motion_style["trailBodyWidth"].replace("px", "")) == pytest.approx(0.13)
+    assert motion_style["trailBodyRole"] == "motion-trail-body"
+    assert motion_style["trailHaloCount"] == 0
+    assert motion_style["trailHeadCount"] == 0
 
 
 def test_browser_rutherford_scattering_panel_renders_tracks(page: Page) -> None:
@@ -1321,6 +1331,7 @@ def test_browser_rutherford_scattering_panel_renders_tracks(page: Page) -> None:
         () => document.querySelectorAll('[data-testid="scattering-track-2d"]').length === 5
         """
     )
+    expect(page.get_by_test_id("scattering-track-body-2d")).to_have_count(5)
     expect(page.get_by_test_id("scattering-track-2d").nth(0)).to_have_attribute(
         "data-impact-cm",
         "-2.000",
@@ -1329,10 +1340,46 @@ def test_browser_rutherford_scattering_panel_renders_tracks(page: Page) -> None:
         "data-impact-cm",
         "6.000",
     )
-    particle_fill = page.get_by_test_id("scattering-particle-2d").first.evaluate(
-        "element => getComputedStyle(element).fill"
+    scattering_track_style = page.get_by_test_id("scattering-track-2d").first.evaluate(
+        """
+        element => {
+            const layer = document.querySelector('[data-testid="scattering-trail-layer-2d"]');
+            const body = document.querySelector('[data-testid="scattering-track-body-2d"]');
+            const coreStyle = getComputedStyle(element);
+            const bodyStyle = getComputedStyle(body);
+            return {
+                layerChargeSign: layer.getAttribute("data-charge-sign"),
+                coreStroke: coreStyle.stroke,
+                coreWidth: coreStyle.strokeWidth,
+                coreStrokeWidthCm: element.getAttribute("data-stroke-width-cm"),
+                bodyStroke: bodyStyle.stroke,
+                bodyWidth: bodyStyle.strokeWidth,
+                coreRole: element.getAttribute("data-visual-role"),
+            };
+        }
+        """
     )
-    assert particle_fill == "rgb(22, 163, 74)"
+    assert scattering_track_style["layerChargeSign"] == "positive"
+    assert scattering_track_style["coreStroke"] == "rgb(255, 242, 232)"
+    assert float(scattering_track_style["coreWidth"].replace("px", "")) == pytest.approx(0.05)
+    assert float(scattering_track_style["coreStrokeWidthCm"]) == pytest.approx(0.05)
+    assert scattering_track_style["bodyStroke"] == "rgb(255, 122, 69)"
+    assert float(scattering_track_style["bodyWidth"].replace("px", "")) == pytest.approx(0.13)
+    assert scattering_track_style["coreRole"] == "scattering-track-core"
+    particle_style = page.get_by_test_id("scattering-particle-2d").first.evaluate(
+        """
+        element => ({
+            fill: getComputedStyle(element).fill,
+            radius: element.getAttribute("r"),
+            material: element.getAttribute("data-material"),
+            visualRadius: element.getAttribute("data-visual-radius-cm"),
+        })
+        """
+    )
+    assert "source-point-positive-gradient" in particle_style["fill"]
+    assert float(particle_style["radius"]) == pytest.approx(0.1)
+    assert float(particle_style["visualRadius"]) == pytest.approx(0.1)
+    assert particle_style["material"] == "charge-orb"
     assert float(layer.get_attribute("data-max-angle-deg") or "0") > 90
     assert int(layer.get_attribute("data-backscatter-count") or "0") >= 1
     expect(page.get_by_test_id("scattering-readout")).to_contain_text("个粒子")

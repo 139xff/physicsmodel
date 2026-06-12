@@ -1,8 +1,9 @@
 import pytest
 
-from em_workbench.models import Scene
+from em_workbench.models import PointChargeSource, Position, Scene
 from em_workbench.physics.compute.contracts import CudaRuntimeStatus
 from em_workbench.physics.compute.dispatcher import ComputeService
+from em_workbench.physics.contact import POINT_CHARGE_CONTACT_RADIUS_M
 from em_workbench.physics.dynamics import (
     TestCharge as Particle,
 )
@@ -10,6 +11,7 @@ from em_workbench.physics.dynamics import (
     simulate_trajectory,
     simulate_trajectory_scalar,
 )
+from em_workbench.physics.solver import COULOMB_CONSTANT
 
 
 def test_compiled_trajectory_matches_scalar_rk4_for_dipole(
@@ -86,3 +88,49 @@ def test_compiled_trajectory_record_every_reduces_payload(
     )
 
     assert [sample.t_s for sample in result.samples] == pytest.approx([0.0, 0.004, 0.008, 0.009])
+
+
+def test_attractive_point_charge_contact_preserves_mechanical_energy() -> None:
+    scene = Scene(
+        id="energy-scene",
+        title="Energy scene",
+        sources=[
+            PointChargeSource(
+                id="positive-source",
+                kind="point",
+                label="Positive source",
+                position=Position(x=0.0, y=0.0, z=0.0),
+                charge_c=1.0e-9,
+            )
+        ],
+    )
+    particle = Particle(
+        charge_c=-1.0e-9,
+        mass_kg=1.0e-6,
+        position=Position(x=-0.02, y=0.0, z=0.0),
+        velocity=Position(x=0.35, y=0.0, z=0.0),
+    )
+
+    def energy(sample) -> float:
+        radius = max(abs(sample.position.x), POINT_CHARGE_CONTACT_RADIUS_M)
+        potential_energy = (
+            COULOMB_CONSTANT * scene.sources[0].charge_c * particle.charge_c / radius
+        )
+        speed_sq = sample.velocity.x**2 + sample.velocity.y**2 + sample.velocity.z**2
+        return 0.5 * particle.mass_kg * speed_sq + potential_energy
+
+    for simulate in [simulate_trajectory_scalar, simulate_trajectory]:
+        result = simulate(
+            scene,
+            particle,
+            dt_s=1.0e-4,
+            steps=320,
+            quality="preview",
+            record_every=1,
+        )
+        initial_energy = energy(result.samples[0])
+        assert min(abs(sample.position.x) for sample in result.samples) == pytest.approx(
+            POINT_CHARGE_CONTACT_RADIUS_M,
+            abs=1.0e-7,
+        )
+        assert max(abs(energy(sample) - initial_energy) for sample in result.samples) < 1.0e-10

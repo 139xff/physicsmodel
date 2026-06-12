@@ -747,7 +747,8 @@ summary:focus-visible {
 }
 
 .source-point-rim,
-.motion-particle-rim {
+.motion-particle-rim,
+.charge-orb-rim {
   fill: none;
   opacity: 0.86;
   pointer-events: none;
@@ -756,7 +757,8 @@ summary:focus-visible {
 }
 
 .source-point-highlight,
-.motion-particle-highlight {
+.motion-particle-highlight,
+.charge-orb-highlight {
   fill: rgba(255, 255, 255, 0.82);
   opacity: 0.72;
   pointer-events: none;
@@ -841,6 +843,7 @@ summary:focus-visible {
   stroke: #0a84ff;
   stroke-linecap: round;
   stroke-width: 1.45;
+  vector-effect: non-scaling-stroke;
 }
 
 .source-disk {
@@ -940,12 +943,64 @@ summary:focus-visible {
   pointer-events: none;
 }
 
-.motion-trail {
+.particle-trajectory {
   fill: none;
-  stroke: #39ff14;
+  stroke: rgba(20, 83, 45, 0.78);
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 0.22;
+  stroke-width: 0.16;
+  vector-effect: non-scaling-stroke;
+}
+
+.motion-trail-body {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: none;
+}
+
+.motion-trail-body {
+  opacity: 0.86;
+}
+
+.motion-trail {
+  filter: drop-shadow(0 0 4px currentColor);
+  opacity: 1;
+  vector-effect: none;
+}
+
+.motion-layer.negative .motion-trail-body,
+.scattering-trail-layer.negative .motion-trail-body {
+  stroke: #78f7ff;
+}
+
+.motion-layer.negative .motion-trail,
+.scattering-trail-layer.negative .motion-trail {
+  color: #eaffff;
+  stroke: #eaffff;
+}
+
+.motion-layer.positive .motion-trail-body,
+.scattering-trail-layer.positive .motion-trail-body {
+  stroke: #ff7a45;
+}
+
+.motion-layer.positive .motion-trail,
+.scattering-trail-layer.positive .motion-trail {
+  color: #fff2e8;
+  stroke: #fff2e8;
+}
+
+.motion-particle-group.negative {
+  filter:
+    drop-shadow(0 0 4px rgba(234, 255, 255, 0.98))
+    drop-shadow(0 0 16px rgba(0, 213, 255, 0.82));
+}
+
+.motion-particle-group.positive {
+  filter:
+    drop-shadow(0 0 4px rgba(255, 242, 232, 0.98))
+    drop-shadow(0 0 16px rgba(255, 59, 48, 0.82));
 }
 
 .motion-particle {
@@ -967,17 +1022,25 @@ summary:focus-visible {
 }
 
 .scattering-track {
-  fill: none;
   opacity: 0.82;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 0.08;
+}
+
+.scattering-track-body {
+  opacity: 0.72;
 }
 
 .scattering-particle {
-  fill: #16a34a;
-  stroke: #fff;
-  stroke-width: 0.08;
+  stroke: rgba(255, 244, 232, 0.88);
+  stroke-width: 0.012;
+}
+
+.scattering-particle.positive {
+  fill: url(#source-point-positive-gradient);
+}
+
+.scattering-particle.negative {
+  fill: url(#source-point-negative-gradient);
+  stroke: rgba(207, 248, 255, 0.9);
 }
 
 .scattering-nucleus {

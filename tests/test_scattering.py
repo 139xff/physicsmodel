@@ -98,6 +98,46 @@ def test_scattering_can_use_integrated_scene_sources() -> None:
     assert upper.closest_approach_m < abs(beam.start_x_m)
 
 
+def test_single_point_scene_scattering_uses_rutherford_model() -> None:
+    scene = Scene(
+        id="point-nucleus-scene",
+        title="Point nucleus scene",
+        sources=[
+            {
+                "id": "point-nucleus",
+                "kind": "point",
+                "label": "Point nucleus",
+                "position": {"x": 0.0, "y": 0.01, "z": 0.0, "unit": "m"},
+                "charge_c": 1.0e-9,
+            }
+        ],
+    )
+    beam = AlphaBeam(
+        charge_c=1.0e-9,
+        mass_kg=1.0e-6,
+        speed_m_per_s=1.5,
+        start_x_m=-0.5,
+        impact_parameters_m=[0.03, -0.01],
+    )
+
+    result = simulate_scattering(
+        None,
+        beam,
+        scene=scene,
+        dt_s=0.001,
+        max_steps=4000,
+        record_every=20,
+    )
+
+    upper, lower = result.tracks
+    assert result.field_model == "point-nucleus"
+    assert result.characteristic_distance_m == pytest.approx(0.0079889349)
+    assert upper.rutherford_angle_deg == pytest.approx(rutherford_angle_deg(0.02, 0.0079889349))
+    assert lower.rutherford_angle_deg == pytest.approx(rutherford_angle_deg(-0.02, 0.0079889349))
+    assert upper.scattering_angle_deg == pytest.approx(upper.rutherford_angle_deg, abs=0.4)
+    assert lower.scattering_angle_deg == pytest.approx(lower.rutherford_angle_deg, abs=0.4)
+
+
 @pytest.mark.parametrize(
     ("source_kind", "source"),
     [
@@ -196,7 +236,14 @@ def test_scene_scattering_accepts_every_source_kind(source_kind: str, source: di
         record_every=20,
     )
 
-    assert result.field_model == "scene-sources"
-    assert result.tracks[0].scattering_angle_deg > 0.01
+    if source_kind == "point":
+        assert result.field_model == "point-nucleus"
+        assert result.tracks[0].scattering_angle_deg == pytest.approx(
+            result.tracks[0].rutherford_angle_deg,
+            abs=0.4,
+        )
+    else:
+        assert result.field_model == "scene-sources"
+        assert result.tracks[0].scattering_angle_deg > 0.01
     assert result.tracks[0].closest_approach_m < abs(beam.start_x_m)
     assert len(result.tracks[0].samples) > 2

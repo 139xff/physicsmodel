@@ -1,6 +1,10 @@
+import math
+
+import pytest
 from fastapi.testclient import TestClient
 
 from em_workbench.app import app
+from em_workbench.physics.contact import POINT_CHARGE_CONTACT_RADIUS_M
 from em_workbench.presets import get_preset
 
 client = TestClient(app)
@@ -63,8 +67,8 @@ def test_root_serves_the_explicitly_scoped_workbench_shell():
         assert expected_copy in html
     assert '<script type="importmap">' in html
     assert '"three": "./vendor/three.module.js"' in html
-    assert 'href="./styles.css?v=20260610-scene-scattering-sources"' in html
-    assert 'src="./app.js?v=20260610-scene-scattering-sources"' in html
+    assert 'href="./styles.css?v=20260612-scattering-motion-trails"' in html
+    assert 'src="./app.js?v=20260612-scattering-motion-trails"' in html
 
 
 def test_static_assets_and_vendor_modules_are_served_locally():
@@ -146,6 +150,49 @@ def test_trajectory_endpoint_simulates_test_charge_motion():
     assert len(trajectory["samples"]) == 9
     assert trajectory["samples"][0]["position"] != trajectory["samples"][-1]["position"]
     assert trajectory["execution"]["backend_effective"] == "cpu-jit"
+
+
+def test_trajectory_endpoint_prevents_point_charge_contact_penetration():
+    response = client.post(
+        "/api/field/trajectory",
+        json={
+            "request_id": "trajectory-contact-test",
+            "scene": {
+                "id": "contact-scene",
+                "title": "Contact scene",
+                "sources": [
+                    {
+                        "id": "point-1",
+                        "kind": "point",
+                        "label": "Point charge",
+                        "position": {"x": 0.0, "y": 0.0, "z": 0.0, "unit": "m"},
+                        "charge_c": 1e-9,
+                    }
+                ],
+            },
+            "particle": {
+                "charge_c": -1e-9,
+                "mass_kg": 1e-6,
+                "position": {"x": -0.012, "y": 0.0, "z": 0.0, "unit": "m"},
+                "velocity": {"x": 0.4, "y": 0.0, "z": 0.0, "unit": "m"},
+            },
+            "dt_s": 0.001,
+            "steps": 40,
+            "quality": "preview",
+        },
+    )
+
+    assert response.status_code == 200
+    trajectory = response.json()
+    distances = [
+        math.hypot(
+            sample["position"]["x"],
+            sample["position"]["y"],
+            sample["position"]["z"],
+        )
+        for sample in trajectory["samples"]
+    ]
+    assert min(distances) >= POINT_CHARGE_CONTACT_RADIUS_M - 1e-7
 
 
 def test_compute_status_reports_cpu_and_optional_cuda_runtime() -> None:
@@ -231,3 +278,46 @@ def test_scattering_endpoint_can_use_current_scene_sources():
     assert len(scatter["tracks"]) == 2
     assert scatter["tracks"][0]["scattering_angle_deg"] > 0.05
     assert scatter["tracks"][1]["scattering_angle_deg"] < -0.05
+
+
+def test_scattering_endpoint_uses_single_point_scene_as_rutherford_nucleus():
+    response = client.post(
+        "/api/scattering/evaluate",
+        json={
+            "request_id": "scatter-point-scene-api-test",
+            "scene": {
+                "id": "scatter-point-scene",
+                "title": "Scatter point scene",
+                "sources": [
+                    {
+                        "id": "point-1",
+                        "kind": "point",
+                        "label": "Point target",
+                        "position": {"x": 0.0, "y": 0.0, "z": 0.0, "unit": "m"},
+                        "charge_c": 1.0e-9,
+                    }
+                ],
+            },
+            "beam": {
+                "charge_c": 1.0e-9,
+                "mass_kg": 1.0e-6,
+                "speed_m_per_s": 1.5,
+                "start_x_m": -0.5,
+                "impact_parameters_m": [0.02, -0.02],
+            },
+            "dt_s": 0.001,
+            "max_steps": 4000,
+            "record_every": 20,
+        },
+    )
+
+    assert response.status_code == 200
+    scatter = response.json()
+    assert scatter["field_model"] == "point-nucleus"
+    assert scatter["characteristic_distance_m"] > 0
+    for track in scatter["tracks"]:
+        assert track["rutherford_angle_deg"] != 0
+        assert track["scattering_angle_deg"] == pytest.approx(
+            track["rutherford_angle_deg"],
+            abs=0.4,
+        )

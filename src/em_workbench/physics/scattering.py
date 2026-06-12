@@ -110,6 +110,7 @@ def _simulate_one(
     position = Vector3(beam.start_x_m, impact_parameter_m, 0.0)
     velocity = Vector3(beam.speed_m_per_s, 0.0, 0.0)
     start_distance = (position - nucleus_pos).magnitude()
+    relative_impact_parameter_m = impact_parameter_m - nucleus_pos.y
     closest_approach_m = start_distance
     samples = [_position(position)]
 
@@ -150,12 +151,21 @@ def _simulate_one(
         impact_parameter_m=impact_parameter_m,
         scattering_angle_deg=math.degrees(math.atan2(velocity.y, velocity.x)),
         rutherford_angle_deg=rutherford_angle_deg(
-            impact_parameter_m,
+            relative_impact_parameter_m,
             characteristic_distance_m,
         ),
         closest_approach_m=closest_approach_m,
         samples=samples,
     )
+
+
+def _single_point_nucleus(scene: Scene) -> Nucleus | None:
+    if len(scene.sources) != 1:
+        return None
+    source = scene.sources[0]
+    if source.kind != "point":
+        return None
+    return Nucleus(charge_c=source.charge_c, position=source.position)
 
 
 def _source_geometry_distance(source: ElectrostaticSource, sample: Vector3) -> float:
@@ -323,6 +333,27 @@ def simulate_scattering(
     if scene is not None:
         if not scene.sources:
             raise ValueError("scene scattering requires at least one electrostatic source.")
+        scene_nucleus = _single_point_nucleus(scene)
+        if scene_nucleus is not None:
+            characteristic_distance_m = _characteristic_distance(scene_nucleus, beam)
+            return ScatterResponse(
+                request_id=request_id,
+                characteristic_distance_m=characteristic_distance_m,
+                dt_s=dt_s,
+                field_model="point-nucleus",
+                tracks=[
+                    _simulate_one(
+                        scene_nucleus,
+                        beam,
+                        impact_parameter_m,
+                        dt_s=dt_s,
+                        max_steps=max_steps,
+                        exit_radius_m=radius,
+                        record_every=record_every,
+                    )
+                    for impact_parameter_m in beam.impact_parameters_m
+                ],
+            )
         tracks, execution, warnings = _simulate_scene_scattering(
             scene,
             beam,

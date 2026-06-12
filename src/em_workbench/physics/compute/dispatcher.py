@@ -305,6 +305,8 @@ class ComputeService:
             packed,
             initial_position,
             initial_velocity,
+            particle_charge=particle.charge_c,
+            particle_mass=particle.mass_kg,
             charge_over_mass=particle.charge_c / particle.mass_kg,
             dt_s=dt_s,
             steps=steps,

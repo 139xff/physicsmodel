@@ -38,6 +38,75 @@ MIN_SOURCE_DISTANCE_SQ = MIN_SOURCE_DISTANCE_M**2
 
 
 @njit(cache=True)
+def _enforce_hard_sphere_contacts(position, velocity, hard_sphere_positions, hard_sphere_radii):
+    contacted = False
+    for sphere_index in range(hard_sphere_positions.shape[0]):
+        radius = hard_sphere_radii[sphere_index]
+        dx = position[0] - hard_sphere_positions[sphere_index, 0]
+        dy = position[1] - hard_sphere_positions[sphere_index, 1]
+        dz = position[2] - hard_sphere_positions[sphere_index, 2]
+        distance_sq = dx * dx + dy * dy + dz * dz
+        radius_sq = radius * radius
+        if distance_sq >= radius_sq:
+            continue
+        contacted = True
+
+        if distance_sq <= MIN_SOURCE_DISTANCE_SQ:
+            velocity_magnitude = math.sqrt(
+                velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2]
+            )
+            if velocity_magnitude > 0.0:
+                nx = -velocity[0] / velocity_magnitude
+                ny = -velocity[1] / velocity_magnitude
+                nz = -velocity[2] / velocity_magnitude
+            else:
+                nx = 1.0
+                ny = 0.0
+                nz = 0.0
+        else:
+            distance = math.sqrt(distance_sq)
+            nx = dx / distance
+            ny = dy / distance
+            nz = dz / distance
+
+        position[0] = hard_sphere_positions[sphere_index, 0] + nx * radius
+        position[1] = hard_sphere_positions[sphere_index, 1] + ny * radius
+        position[2] = hard_sphere_positions[sphere_index, 2] + nz * radius
+
+        normal_velocity = velocity[0] * nx + velocity[1] * ny + velocity[2] * nz
+        if normal_velocity < 0.0:
+            velocity[0] -= 2.0 * normal_velocity * nx
+            velocity[1] -= 2.0 * normal_velocity * ny
+            velocity[2] -= 2.0 * normal_velocity * nz
+    return contacted
+
+
+@njit(cache=True)
+def _correct_velocity_for_mechanical_energy(
+    velocity,
+    potential,
+    particle_charge,
+    particle_mass,
+    target_energy,
+):
+    kinetic = target_energy - particle_charge * potential
+    if kinetic < 0.0:
+        kinetic = 0.0
+    target_speed_sq = 2.0 * kinetic / particle_mass
+    current_speed_sq = (
+        velocity[0] * velocity[0]
+        + velocity[1] * velocity[1]
+        + velocity[2] * velocity[2]
+    )
+    if current_speed_sq <= 0.0:
+        return
+    scale = math.sqrt(target_speed_sq / current_speed_sq)
+    velocity[0] *= scale
+    velocity[1] *= scale
+    velocity[2] *= scale
+
+
+@njit(cache=True)
 def _field_at_single(
     point,
     element_positions,
@@ -545,6 +614,8 @@ def _evaluate_contributions_kernel(
 def _trajectory_kernel(
     initial_position,
     initial_velocity,
+    particle_charge,
+    particle_mass,
     charge_over_mass,
     dt_s,
     half_dt_s,
@@ -560,6 +631,8 @@ def _trajectory_kernel(
     shell_positions,
     shell_radii,
     shell_charges,
+    hard_sphere_positions,
+    hard_sphere_radii,
 ):
     record_count = steps // record_every + 2
     times = np.empty(record_count, dtype=initial_position.dtype)
@@ -570,7 +643,7 @@ def _trajectory_kernel(
     velocity = initial_velocity.copy()
     time_s = dt_s * 0
     record_index = 0
-    _potential, field = _field_at_single(
+    potential, field = _field_at_single(
         position,
         element_positions,
         element_charges,
@@ -580,6 +653,12 @@ def _trajectory_kernel(
         shell_positions,
         shell_radii,
         shell_charges,
+    )
+    target_energy = (
+        particle_charge * potential
+        + 0.5
+        * particle_mass
+        * (velocity[0] * velocity[0] + velocity[1] * velocity[1] + velocity[2] * velocity[2])
     )
     times[record_index] = time_s
     positions[record_index] = position
@@ -641,6 +720,31 @@ def _trajectory_kernel(
         k4v = field * charge_over_mass
         position = position + (k1x + two * k2x + two * k3x + k4x) * sixth_dt_s
         velocity = velocity + (k1v + two * k2v + two * k3v + k4v) * sixth_dt_s
+        contacted = _enforce_hard_sphere_contacts(
+            position,
+            velocity,
+            hard_sphere_positions,
+            hard_sphere_radii,
+        )
+        if contacted:
+            potential, _field_after_contact = _field_at_single(
+                position,
+                element_positions,
+                element_charges,
+                plane_positions,
+                plane_normals,
+                plane_densities,
+                shell_positions,
+                shell_radii,
+                shell_charges,
+            )
+            _correct_velocity_for_mechanical_energy(
+                velocity,
+                potential,
+                particle_charge,
+                particle_mass,
+                target_energy,
+            )
         time_s += dt_s
         if step % record_every == 0 or step == steps:
             _potential, field = _field_at_single(
@@ -713,6 +817,8 @@ def evaluate_trajectory_cpu(
     initial_position: np.ndarray,
     initial_velocity: np.ndarray,
     *,
+    particle_charge: float,
+    particle_mass: float,
     charge_over_mass: float,
     dt_s: float,
     steps: int,
@@ -723,6 +829,8 @@ def evaluate_trajectory_cpu(
     return _trajectory_kernel(
         np.ascontiguousarray(initial_position, dtype=packed.dtype),
         np.ascontiguousarray(initial_velocity, dtype=packed.dtype),
+        scalar_type(particle_charge),
+        scalar_type(particle_mass),
         scalar_type(charge_over_mass),
         prepared_dt_s,
         scalar_type(prepared_dt_s * scalar_type(0.5)),
@@ -738,6 +846,8 @@ def evaluate_trajectory_cpu(
         packed.shell_positions,
         packed.shell_radii,
         packed.shell_charges,
+        packed.hard_sphere_positions,
+        packed.hard_sphere_radii,
     )
 
 

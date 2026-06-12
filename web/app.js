@@ -151,6 +151,9 @@ const VIEWPORT_MIN_ZOOM = 1;
 const DEFAULT_VIEW_ZOOM = 100;
 const POINT_VISUAL_RADIUS_CM = 0.5;
 const MOTION_CHARGE_VISUAL_RADIUS_CM = POINT_VISUAL_RADIUS_CM / 5;
+const MOTION_TRAIL_STROKE_CM = MOTION_CHARGE_VISUAL_RADIUS_CM / 2;
+const MOTION_TRAIL_BODY_STROKE_CM = MOTION_TRAIL_STROKE_CM * 2.6;
+const SCATTERING_PARTICLE_VISUAL_RADIUS_CM = MOTION_CHARGE_VISUAL_RADIUS_CM;
 const COULOMB_CONSTANT = 8.9875517923e9;
 const MIN_VISIBLE_MARKER_RADIUS_UNITS = 1.5;
 const MAX_AXIS_TICKS = 36;
@@ -239,7 +242,6 @@ const EQUIPOTENTIAL_LABEL_DOUBLE_FRACTIONS = [
   [0.66, 0.7, 0.62, 0.74],
 ];
 const SCATTERING_ANIMATION_INTERVAL_MS = 90;
-const SCATTERING_PARTICLE_COLOR = "#16a34a";
 
 const state = {
   mode: "2D",
@@ -283,6 +285,8 @@ const state = {
     characteristicDistanceM: null,
     fieldModel: "point-nucleus",
     targetSourceCount: 0,
+    particleChargeClass: "positive",
+    nucleusPosition: { x: 0, y: 0, z: 0 },
   },
 };
 
@@ -1128,6 +1132,23 @@ function compute2dViewBox() {
   };
 }
 
+function apply2dViewBoxOnly() {
+  const svg = view2d.querySelector(".plane-svg");
+  if (!svg) {
+    return;
+  }
+  const viewBox = compute2dViewBox();
+  svg.setAttribute("viewBox", `${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`);
+  svg.dataset.zoom = String(state.view2d.zoom);
+  const gridPlane = svg.querySelector("[data-testid='grid-plane-2d']");
+  if (gridPlane) {
+    gridPlane.setAttribute("x", String(viewBox.minX));
+    gridPlane.setAttribute("y", String(viewBox.minY));
+    gridPlane.setAttribute("width", String(viewBox.width));
+    gridPlane.setAttribute("height", String(viewBox.height));
+  }
+}
+
 function compute2dWorldBounds() {
   return {
     minX: -VIEWPORT_AXIS_LIMIT_M,
@@ -1228,12 +1249,12 @@ function sourceChargeSign(source) {
   return sourceChargeValue(source) >= 0 ? "positive" : "negative";
 }
 
-function sourceFruitGradientId(source) {
-  return `source-fruit-${sourceChargeSign(source)}-gradient`;
-}
-
 function sourcePointGradientId(source) {
   return `source-point-${sourceChargeSign(source)}-gradient`;
+}
+
+function sourceStrokeWidthPx(scale) {
+  return scale.fontPx;
 }
 
 function chargeSymbolForSign(chargeSign) {
@@ -1277,83 +1298,46 @@ function sourcePointSymbolMarkup(source, point, radius, chargeSign) {
   `;
 }
 
-function sourceFruitMaterialAttributes() {
-  return 'data-material="fruit-glass" data-material-finish="translucent-caustic" data-material-depth="layered-rind-lens"';
-}
-
-function sourceFruitCircleLayers(source, point, radius) {
-  const gradientId = sourceFruitGradientId(source);
+function chargeOrbMarkup({
+  groupClass,
+  groupTestId,
+  circleClass,
+  circleTestId,
+  chargeClass,
+  radius,
+  transform,
+  extraGroupAttributes = "",
+  extraCircleAttributes = "",
+}) {
   return `
-    <circle
-      class="source-fruit-rim"
-      data-testid="source-fruit-rim-2d-${source.id}"
-      cx="${point.x}"
-      cy="${point.y}"
-      r="${radius}"
-    ></circle>
-    <ellipse
-      class="source-fruit-caustic"
-      data-testid="source-fruit-caustic-2d-${source.id}"
-      cx="${point.x + radius * 0.16}"
-      cy="${point.y + radius * 0.22}"
-      rx="${radius * 0.58}"
-      ry="${radius * 0.18}"
-      fill="url(#${gradientId})"
-    ></ellipse>
-    <ellipse
-      class="source-fruit-refract"
-      data-testid="source-fruit-refract-2d-${source.id}"
-      cx="${point.x + radius * 0.08}"
-      cy="${point.y - radius * 0.02}"
-      rx="${radius * 0.44}"
-      ry="${radius * 0.66}"
-      fill="url(#${gradientId})"
-    ></ellipse>
-    <ellipse
-      class="source-fruit-highlight"
-      data-testid="source-fruit-highlight-2d-${source.id}"
-      cx="${point.x - radius * 0.28}"
-      cy="${point.y - radius * 0.34}"
-      rx="${Math.max(radius * 0.2, 0.18)}"
-      ry="${Math.max(radius * 0.11, 0.1)}"
-    ></ellipse>
-  `;
-}
-
-function sourceFruitLineLayers(source, point, dx, dy, markerStrokeWidth) {
-  const length = Math.hypot(dx, dy);
-  if (length <= 1e-12) {
-    return "";
-  }
-  const normalX = dy / length;
-  const normalY = dx / length;
-  const highlightOffset = Math.max(markerStrokeWidth * 0.3, 0.18);
-  const causticOffset = Math.max(markerStrokeWidth * 0.42, 0.24);
-  return `
-    <line
-      class="source-fruit-rim source-fruit-rim-line"
-      data-testid="source-fruit-rim-2d-${source.id}"
-      x1="${point.x}"
-      y1="${point.y}"
-      x2="${point.x + dx}"
-      y2="${point.y - dy}"
-    ></line>
-    <line
-      class="source-fruit-caustic source-fruit-caustic-line"
-      data-testid="source-fruit-caustic-2d-${source.id}"
-      x1="${point.x + normalX * causticOffset}"
-      y1="${point.y - normalY * causticOffset}"
-      x2="${point.x + dx + normalX * causticOffset}"
-      y2="${point.y - dy - normalY * causticOffset}"
-    ></line>
-    <line
-      class="source-fruit-highlight source-fruit-highlight-line"
-      data-testid="source-fruit-highlight-2d-${source.id}"
-      x1="${point.x - normalX * highlightOffset}"
-      y1="${point.y + normalY * highlightOffset}"
-      x2="${point.x + dx * 0.72 - normalX * highlightOffset}"
-      y2="${point.y - dy * 0.72 + normalY * highlightOffset}"
-    ></line>
+    <g
+      class="${groupClass} ${chargeClass}"
+      data-testid="${groupTestId}"
+      data-visual-radius-cm="${radius}"
+      transform="${transform}"
+      ${extraGroupAttributes}
+    >
+      <circle
+        class="${circleClass} ${chargeClass}"
+        data-testid="${circleTestId}"
+        cx="0"
+        cy="0"
+        data-material="charge-orb"
+        data-material-finish="internal-radial-glow"
+        data-charge-sign="${chargeClass}"
+        data-visual-radius-cm="${radius}"
+        r="${radius}"
+        ${extraCircleAttributes}
+      ></circle>
+      <circle class="${circleClass}-rim charge-orb-rim" cx="0" cy="0" r="${radius * 0.94}"></circle>
+      <ellipse
+        class="${circleClass}-highlight charge-orb-highlight"
+        cx="${-radius * 0.22}"
+        cy="${-radius * 0.24}"
+        rx="${radius * 0.2}"
+        ry="${radius * 0.12}"
+      ></ellipse>
+    </g>
   `;
 }
 
@@ -1379,7 +1363,7 @@ function renderSource2d(source, scale) {
   const point = mapToViewport(source.position.x, source.position.y);
   const label = escapeHtml(source.label);
   const markerRadius = POINT_VISUAL_RADIUS_CM;
-  const markerStrokeWidth = scale.fontPx * ((scale.xUnitsPerPx + scale.yUnitsPerPx) / 2);
+  const markerStrokeWidth = sourceStrokeWidthPx(scale);
   const chargeColor = sourceChargeColor(source);
   const chargeSign = sourceChargeSign(source);
   if (source.kind === "line_segment") {
@@ -1392,21 +1376,21 @@ function renderSource2d(source, scale) {
     return `
       <g data-testid="source-line-segment-group-2d-${source.id}">
         <line
-          class="source-line-segment"
+          class="source-line-segment source-line-segment-${chargeSign}"
           data-testid="source-line-segment-2d-${source.id}"
-          ${sourceFruitMaterialAttributes()}
+          data-material="charge-orb"
+          data-material-finish="solid-charge-gradient"
           data-display-length-cm="${displayLength}"
           data-starts-at-position="true"
           x1="${point.x}"
           y1="${point.y}"
           x2="${point.x + dx}"
           y2="${point.y - dy}"
-          style="stroke-width: ${markerStrokeWidth}px; stroke: url(#${sourceFruitGradientId(source)}); filter: url(#source-fruit-glass-filter);"
+          style="stroke-width: ${markerStrokeWidth}px; stroke: ${chargeColor};"
           data-charge-color="${chargeColor}"
           data-charge-sign="${chargeSign}"
-          data-stroke-px="${scale.fontPx.toFixed(2)}"
+          data-stroke-px="${markerStrokeWidth.toFixed(2)}"
         ></line>
-        ${sourceFruitLineLayers(source, point, dx, dy, markerStrokeWidth)}
         ${sourceLabelMarkup(source, label, point, scale)}
       </g>
     `;
@@ -1417,21 +1401,21 @@ function renderSource2d(source, scale) {
     return `
       <g data-testid="source-ring-group-2d-${source.id}">
         <circle
-          class="source-ring"
+          class="source-ring source-ring-${chargeSign}"
           data-testid="source-ring-2d-${source.id}"
-          ${sourceFruitMaterialAttributes()}
+          data-material="charge-orb"
+          data-material-finish="solid-charge-gradient"
           data-display-diameter-cm="${formatCentimeters(source.radius_m * 2)}"
           data-physical-radius-cm="${physicalRadiusCm}"
           data-visual-model="hollow-ring"
           cx="${point.x}"
           cy="${point.y}"
           r="${radius}"
-          style="stroke-width: ${markerStrokeWidth}px; stroke: url(#${sourceFruitGradientId(source)}); fill: none; fill-opacity: 0; filter: url(#source-fruit-glass-filter);"
+          style="stroke-width: ${markerStrokeWidth}px; stroke: url(#${sourcePointGradientId(source)}); fill: none; fill-opacity: 0;"
           data-charge-color="${chargeColor}"
           data-charge-sign="${chargeSign}"
           data-stroke-px="${scale.fontPx.toFixed(2)}"
         ></circle>
-        ${sourceFruitCircleLayers(source, point, radius)}
         ${sourceLabelMarkup(source, label, point, scale)}
       </g>
     `;
@@ -1440,14 +1424,14 @@ function renderSource2d(source, scale) {
     const className = `source-${source.kind.replaceAll("_", "-")}`;
     const radius = radiusToViewport(source.radius_m, MIN_VISIBLE_MARKER_RADIUS_UNITS);
     const shapeStyle = source.kind === "disk"
-      ? `stroke: ${chargeColor}; fill: url(#${sourceFruitGradientId(source)}); fill-opacity: 0.82; filter: url(#source-fruit-glass-filter);`
+      ? `stroke: ${chargeColor}; fill: url(#${sourcePointGradientId(source)}); fill-opacity: 0.92;`
       : `stroke: ${chargeColor}; fill: none; fill-opacity: 0;`;
     return `
       <g data-testid="source-${source.kind.replaceAll("_", "-")}-group-2d-${source.id}">
         <circle
-          class="${className}"
+          class="${className} ${className}-${chargeSign}"
           data-testid="source-${source.kind.replaceAll("_", "-")}-2d-${source.id}"
-          ${source.kind === "disk" ? sourceFruitMaterialAttributes() : ""}
+          ${source.kind === "disk" ? 'data-material="charge-orb" data-material-finish="solid-charge-gradient"' : ""}
           cx="${point.x}"
           cy="${point.y}"
           r="${radius}"
@@ -1455,7 +1439,6 @@ function renderSource2d(source, scale) {
           data-charge-color="${chargeColor}"
           data-charge-sign="${chargeSign}"
         ></circle>
-        ${source.kind === "disk" ? sourceFruitCircleLayers(source, point, radius) : ""}
         ${sourceLabelMarkup(source, label, point, scale)}
       </g>
     `;
@@ -4086,6 +4069,7 @@ function render2d() {
         </pattern>
       </defs>
       <rect
+        data-testid="grid-plane-2d"
         x="${viewBox.minX}"
         y="${viewBox.minY}"
         width="${viewBox.width}"
@@ -4109,7 +4093,12 @@ function renderMotionLayer2d() {
   }
   const motionLayer = motionLayerFrameState2d();
   return `
-    <g class="motion-layer" data-testid="motion-layer-2d" data-point-count="${motionLayer.pointCount}">
+    <g
+      class="motion-layer ${motionLayer.chargeClass}"
+      data-testid="motion-layer-2d"
+      data-point-count="${motionLayer.pointCount}"
+      data-charge-sign="${motionLayer.chargeClass}"
+    >
       ${motionLayerInnerMarkup2d(motionLayer)}
     </g>
   `;
@@ -4117,11 +4106,9 @@ function renderMotionLayer2d() {
 
 function motionLayerFrameState2d() {
   const visibleSamples = state.motion.samples.slice(0, state.motion.frameIndex + 1);
-  const path = visibleSamples
-    .map((sample, index) => {
-      const point = mapToViewport(sample.position.x, sample.position.y);
-      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
-    })
+  const points = visibleSamples.map((sample) => mapToViewport(sample.position.x, sample.position.y));
+  const path = points
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
     .join(" ");
   const current = visibleSamples[visibleSamples.length - 1];
   const marker = mapToViewport(current.position.x, current.position.y);
@@ -4138,34 +4125,29 @@ function motionLayerFrameState2d() {
 
 function motionLayerInnerMarkup2d(motionLayer) {
   return `
-    <path class="motion-trail" fill="none" stroke="#39ff14" stroke-width="0.22" d="${motionLayer.path}"></path>
-    <g
-      class="motion-particle-group ${motionLayer.chargeClass}"
-      data-testid="motion-particle-group-2d"
-      data-visual-radius-cm="${MOTION_CHARGE_VISUAL_RADIUS_CM}"
-      data-radius-ratio-to-static="0.2"
-      transform="translate(${motionLayer.marker.x} ${motionLayer.marker.y})"
-    >
-      <circle
-        class="motion-particle ${motionLayer.chargeClass}"
-        data-testid="motion-particle-2d"
-        cx="0"
-        cy="0"
-        data-material="charge-orb"
-        data-material-finish="internal-radial-glow"
-        data-charge-sign="${motionLayer.chargeClass}"
-        data-visual-radius-cm="${MOTION_CHARGE_VISUAL_RADIUS_CM}"
-        r="${motionLayer.radius}"
-      ></circle>
-      <circle class="motion-particle-rim" cx="0" cy="0" r="${motionLayer.radius * 0.94}"></circle>
-      <ellipse
-        class="motion-particle-highlight"
-        cx="${-motionLayer.radius * 0.22}"
-        cy="${-motionLayer.radius * 0.24}"
-        rx="${motionLayer.radius * 0.2}"
-        ry="${motionLayer.radius * 0.12}"
-      ></ellipse>
-    </g>
+    <path
+      class="motion-trail-body"
+      d="${motionLayer.path}"
+      data-visual-role="motion-trail-body"
+      style="stroke-width: ${MOTION_TRAIL_BODY_STROKE_CM};"
+    ></path>
+    <path
+      class="motion-trail motion-trail-core particle-trajectory"
+      d="${motionLayer.path}"
+      data-stroke-width-cm="${MOTION_TRAIL_STROKE_CM}"
+      data-visual-role="motion-trail-core"
+      style="stroke-width: ${MOTION_TRAIL_STROKE_CM};"
+    ></path>
+    ${chargeOrbMarkup({
+      groupClass: "motion-particle-group",
+      groupTestId: "motion-particle-group-2d",
+      circleClass: "motion-particle",
+      circleTestId: "motion-particle-2d",
+      chargeClass: motionLayer.chargeClass,
+      radius: motionLayer.radius,
+      transform: `translate(${motionLayer.marker.x} ${motionLayer.marker.y})`,
+      extraGroupAttributes: 'data-radius-ratio-to-static="0.2"',
+    })}
   `;
 }
 
@@ -4181,8 +4163,9 @@ function renderMotionFrame2d() {
     return;
   }
   const motionLayer = motionLayerFrameState2d();
-  layer.classList.add("motion-layer");
+  layer.setAttribute("class", `motion-layer ${motionLayer.chargeClass}`);
   layer.dataset.pointCount = String(motionLayer.pointCount);
+  layer.dataset.chargeSign = motionLayer.chargeClass;
   layer.innerHTML = motionLayerInnerMarkup2d(motionLayer);
 }
 
@@ -4193,14 +4176,6 @@ function impactParameterSeries(count, halfWidthM, centerM = 0) {
   return Array.from({ length: count }, (_unused, index) => (
     centerM - halfWidthM + (2 * halfWidthM * index) / (count - 1)
   ));
-}
-
-function scatteringColor(angleDeg) {
-  const t = Math.min(Math.abs(Number(angleDeg) || 0), 180) / 180;
-  const red = Math.round(46 + 198 * t);
-  const green = Math.round(111 - 78 * t);
-  const blue = Math.round(215 - 146 * t);
-  return `rgb(${red}, ${green}, ${blue})`;
 }
 
 function scatteringMaxFrameCount() {
@@ -4230,12 +4205,21 @@ function scatteringTrackPath(track) {
     .join(" ");
 }
 
+function singlePointScatteringSource() {
+  if (state.scene.sources.length !== 1) {
+    return null;
+  }
+  const source = state.scene.sources[0];
+  return source.kind === "point" ? source : null;
+}
+
 function renderScatteringTracks2d() {
   return `
     <g
-      class="scattering-trail-layer"
+      class="scattering-trail-layer ${state.scattering.particleChargeClass}"
       data-testid="scattering-trail-layer-2d"
       data-frame-index="${state.scattering.frameIndex}"
+      data-charge-sign="${state.scattering.particleChargeClass}"
     >
       ${state.scattering.tracks
         .map((track, index) => {
@@ -4245,14 +4229,23 @@ function renderScatteringTracks2d() {
           }
           return `
             <path
-              class="scattering-track"
+              class="scattering-track-body motion-trail-body"
+              data-testid="scattering-track-body-2d"
+              data-track-index="${index}"
+              d="${path}"
+              style="stroke-width: ${MOTION_TRAIL_BODY_STROKE_CM};"
+            ></path>
+            <path
+              class="scattering-track scattering-track-core motion-trail motion-trail-core particle-trajectory"
               data-testid="scattering-track-2d"
               data-track-index="${index}"
               data-impact-cm="${(track.impact_parameter_m * 100).toFixed(3)}"
               data-angle-deg="${track.scattering_angle_deg.toFixed(3)}"
               data-theory-angle-deg="${track.rutherford_angle_deg.toFixed(3)}"
               d="${path}"
-              style="stroke: ${scatteringColor(track.scattering_angle_deg)};"
+              data-stroke-width-cm="${MOTION_TRAIL_STROKE_CM}"
+              data-visual-role="scattering-track-core"
+              style="stroke-width: ${MOTION_TRAIL_STROKE_CM};"
             ></path>
           `;
         })
@@ -4272,17 +4265,16 @@ function renderScatteringParticles2d() {
         .map((track, index) => {
           const sample = scatteringCurrentSample(track);
           const marker = mapToViewport(sample.x, sample.y);
-          return `
-            <circle
-              class="scattering-particle"
-              data-testid="scattering-particle-2d"
-              data-track-index="${index}"
-              cx="${marker.x}"
-              cy="${marker.y}"
-              r="0.34"
-              style="fill: ${SCATTERING_PARTICLE_COLOR};"
-            ></circle>
-          `;
+          return chargeOrbMarkup({
+            groupClass: "scattering-particle-group",
+            groupTestId: "scattering-particle-group-2d",
+            circleClass: "scattering-particle",
+            circleTestId: "scattering-particle-2d",
+            chargeClass: state.scattering.particleChargeClass,
+            radius: SCATTERING_PARTICLE_VISUAL_RADIUS_CM,
+            transform: `translate(${marker.x} ${marker.y})`,
+            extraGroupAttributes: `data-track-index="${index}" data-radius-cm="${SCATTERING_PARTICLE_VISUAL_RADIUS_CM}"`,
+          });
         })
         .join("")}
     </g>
@@ -4297,7 +4289,9 @@ function renderScatteringLayer2d() {
   const maxAngle = Math.max(...tracks.map((track) => Math.abs(track.scattering_angle_deg)));
   const backscatterCount = tracks.filter((track) => Math.abs(track.scattering_angle_deg) > 90).length;
   const fieldModel = state.scattering.fieldModel || "point-nucleus";
-  const nucleus = fieldModel === "point-nucleus" ? mapToViewport(0, 0) : null;
+  const nucleus = fieldModel === "point-nucleus"
+    ? mapToViewport(state.scattering.nucleusPosition.x, state.scattering.nucleusPosition.y)
+    : null;
   return `
     <g
       class="scattering-layer"
@@ -4375,6 +4369,8 @@ function clearScatteringSimulation() {
   state.scattering.characteristicDistanceM = null;
   state.scattering.fieldModel = "point-nucleus";
   state.scattering.targetSourceCount = 0;
+  state.scattering.particleChargeClass = "positive";
+  state.scattering.nucleusPosition = { x: 0, y: 0, z: 0 };
   scatteringState.textContent = "待命";
   updateScatteringReadout();
   render2d();
@@ -4427,7 +4423,9 @@ async function runScatteringSimulation() {
   const particleCount = clampInteger(scatteringInputs.particles.value, 1, 61, 21);
   const halfWidthM = Math.max(0, centimetersToMeters(Number(scatteringInputs.halfWidth.value)));
   const centerYM = centimetersToMeters(Number(scatteringInputs.centerY.value));
-  const useSceneSources = state.scene.sources.length > 0;
+  const scenePointNucleus = singlePointScatteringSource();
+  const useScenePointNucleus = scenePointNucleus !== null;
+  const useSceneSources = state.scene.sources.length > 0 && !useScenePointNucleus;
   const request = {
     request_id: `ui-scatter-${Date.now()}`,
     beam: {
@@ -4443,13 +4441,26 @@ async function runScatteringSimulation() {
     quality: state.quality,
     backend: "auto",
   };
+  state.scattering.particleChargeClass = request.beam.charge_c >= 0 ? "positive" : "negative";
   if (useSceneSources) {
     request.scene = state.scene;
+    state.scattering.nucleusPosition = { x: 0, y: 0, z: 0 };
+  } else if (useScenePointNucleus) {
+    request.nucleus = {
+      charge_c: scenePointNucleus.charge_c,
+      position: scenePointNucleus.position,
+    };
+    state.scattering.nucleusPosition = {
+      x: scenePointNucleus.position.x,
+      y: scenePointNucleus.position.y,
+      z: scenePointNucleus.position.z,
+    };
   } else {
     request.nucleus = {
       charge_c: Number(scatteringInputs.targetCharge.value) * 1e-9,
       position: { x: 0, y: 0, z: 0, unit: "m" },
     };
+    state.scattering.nucleusPosition = { x: 0, y: 0, z: 0 };
   }
   const result = await evaluateScattering(request);
   state.scattering.tracks = result.tracks;
@@ -4457,7 +4468,7 @@ async function runScatteringSimulation() {
   state.scattering.fieldModel = result.field_model || (useSceneSources ? "scene-sources" : "point-nucleus");
   state.scattering.targetSourceCount = state.scattering.fieldModel === "scene-sources"
     ? state.scene.sources.length
-    : 0;
+    : (useScenePointNucleus ? 1 : 0);
   state.scattering.frameIndex = 0;
   scatteringState.textContent = `已计算 ${result.tracks.length} 个`;
   render2d();
@@ -4604,8 +4615,7 @@ function move2dPan(event) {
   state.view2d.centerX = active2dPan.centerX - deltaX;
   state.view2d.centerY = active2dPan.centerY - deltaY;
   clamp2dView();
-  render2d();
-  scheduleFieldLineEvaluation();
+  apply2dViewBoxOnly();
 }
 
 function end2dPan(event) {
@@ -4617,6 +4627,8 @@ function end2dPan(event) {
   if (view2d.hasPointerCapture(event.pointerId)) {
     view2d.releasePointerCapture(event.pointerId);
   }
+  render2d();
+  scheduleFieldLineEvaluation();
 }
 
 function renderProbe() {

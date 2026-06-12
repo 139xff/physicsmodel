@@ -8,6 +8,7 @@ from threading import RLock
 import numpy as np
 
 from em_workbench.models import Scene
+from em_workbench.physics.contact import POINT_CHARGE_CONTACT_RADIUS_M
 from em_workbench.physics.integration import (
     disk_elements,
     line_segment_elements,
@@ -40,6 +41,8 @@ class PackedScene:
     shell_radii: np.ndarray
     shell_charges: np.ndarray
     shell_source_indexes: np.ndarray
+    hard_sphere_positions: np.ndarray
+    hard_sphere_radii: np.ndarray
 
 
 def _readonly(array: np.ndarray) -> np.ndarray:
@@ -80,6 +83,8 @@ def compile_scene(scene: Scene, *, quality: str) -> PackedScene:
     shell_radii: list[float] = []
     shell_charges: list[float] = []
     shell_source_indexes: list[int] = []
+    hard_sphere_positions: list[Vector3] = []
+    hard_sphere_radii: list[float] = []
 
     for source_index, source in enumerate(scene.sources):
         center = Vector3.from_position(source.position)
@@ -87,6 +92,8 @@ def compile_scene(scene: Scene, *, quality: str) -> PackedScene:
             element_positions.append(center)
             element_charges.append(source.charge_c)
             element_source_indexes.append(source_index)
+            hard_sphere_positions.append(center)
+            hard_sphere_radii.append(POINT_CHARGE_CONTACT_RADIUS_M)
         elif source.kind == "line_segment":
             for element in line_segment_elements(source, settings["line_segments"]):
                 element_positions.append(element.position)
@@ -132,6 +139,8 @@ def compile_scene(scene: Scene, *, quality: str) -> PackedScene:
         shell_radii=_scalar_array(shell_radii, dtype),
         shell_charges=_scalar_array(shell_charges, dtype),
         shell_source_indexes=_index_array(shell_source_indexes),
+        hard_sphere_positions=_vector_array(hard_sphere_positions, dtype),
+        hard_sphere_radii=_scalar_array(hard_sphere_radii, dtype),
     )
 
 

@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from em_workbench.models import Position, Scene
 from em_workbench.physics.compute.contracts import BackendPolicy, ExecutionMetadata
+from em_workbench.physics.contact import POINT_CHARGE_CONTACT_RADIUS_M
 from em_workbench.physics.solver import SolverQuality, evaluate_scene_scalar
 from em_workbench.physics.vectors import Vector3
 
@@ -75,6 +76,33 @@ def _pos(v: Vector3) -> Position:
     return Position(x=v.x, y=v.y, z=v.z)
 
 
+def _apply_point_charge_contact(
+    scene: Scene,
+    position: Vector3,
+    velocity: Vector3,
+) -> tuple[Vector3, Vector3, bool]:
+    contacted = False
+    for source in scene.sources:
+        if source.kind != "point":
+            continue
+        center = Vector3.from_position(source.position)
+        displacement = position - center
+        distance = displacement.magnitude()
+        if distance >= POINT_CHARGE_CONTACT_RADIUS_M:
+            continue
+        contacted = True
+        if distance > 1e-15:
+            normal = displacement.scale(1.0 / distance)
+        else:
+            speed = velocity.magnitude()
+            normal = (-velocity).scale(1.0 / speed) if speed > 0 else Vector3(1.0, 0.0, 0.0)
+        position = center + normal.scale(POINT_CHARGE_CONTACT_RADIUS_M)
+        normal_velocity = velocity.dot(normal)
+        if normal_velocity < 0.0:
+            velocity = velocity - normal.scale(2.0 * normal_velocity)
+    return position, velocity, contacted
+
+
 def field_at(scene: Scene, point: Vector3, quality: SolverQuality) -> Vector3:
     """Read the total electric field E (V/m) at one point by reusing the solver."""
     response = evaluate_scene_scalar(
@@ -84,6 +112,48 @@ def field_at(scene: Scene, point: Vector3, quality: SolverQuality) -> Vector3:
     )
     e = response.samples[0].field_v_per_m
     return Vector3.from_components(e.x, e.y, e.z)
+
+
+def potential_at(scene: Scene, point: Vector3, quality: SolverQuality) -> float:
+    """Read the total electric potential V at one point by reusing the solver."""
+    response = evaluate_scene_scalar(
+        scene,
+        [Position(x=point.x, y=point.y, z=point.z)],
+        quality=quality,
+    )
+    return response.samples[0].potential_v
+
+
+def mechanical_energy(
+    scene: Scene,
+    position: Vector3,
+    velocity: Vector3,
+    charge_c: float,
+    mass_kg: float,
+    quality: SolverQuality,
+) -> float:
+    return 0.5 * mass_kg * velocity.magnitude_squared() + charge_c * potential_at(
+        scene,
+        position,
+        quality,
+    )
+
+
+def _correct_velocity_for_energy(
+    scene: Scene,
+    position: Vector3,
+    velocity: Vector3,
+    charge_c: float,
+    mass_kg: float,
+    quality: SolverQuality,
+    target_energy_j: float,
+) -> Vector3:
+    kinetic_j = target_energy_j - charge_c * potential_at(scene, position, quality)
+    target_speed = (max(0.0, 2.0 * kinetic_j / mass_kg)) ** 0.5
+    current_speed = velocity.magnitude()
+    if current_speed <= 0.0:
+        return velocity
+    return velocity.scale(target_speed / current_speed)
 
 
 def acceleration(
@@ -151,6 +221,7 @@ def simulate_trajectory_scalar(
     m = particle.mass_kg
     x = _vec(particle.position)
     v = _vec(particle.velocity)
+    target_energy_j = mechanical_energy(scene, x, v, q, m, quality)
 
     def accel(pos: Vector3) -> Vector3:
         return acceleration(scene, pos, q, m, quality)
@@ -186,6 +257,9 @@ def simulate_trajectory_scalar(
 
         x = x + (k1x + k2x.scale(2.0) + k3x.scale(2.0) + k4x).scale(dt_s / 6.0)
         v = v + (k1v + k2v.scale(2.0) + k3v.scale(2.0) + k4v).scale(dt_s / 6.0)
+        x, v, contacted = _apply_point_charge_contact(scene, x, v)
+        if contacted:
+            v = _correct_velocity_for_energy(scene, x, v, q, m, quality, target_energy_j)
         t += dt_s
 
         if step % record_every == 0 or step == steps:
@@ -215,6 +289,7 @@ def iter_states(
     m = particle.mass_kg
     x = _vec(particle.position)
     v = _vec(particle.velocity)
+    target_energy_j = mechanical_energy(scene, x, v, q, m, quality)
 
     def accel(pos: Vector3) -> Vector3:
         return acceleration(scene, pos, q, m, quality)
@@ -228,5 +303,8 @@ def iter_states(
         k4x, k4v = v + k3v.scale(dt_s), accel(x + k3x.scale(dt_s))
         x = x + (k1x + k2x.scale(2.0) + k3x.scale(2.0) + k4x).scale(dt_s / 6.0)
         v = v + (k1v + k2v.scale(2.0) + k3v.scale(2.0) + k4v).scale(dt_s / 6.0)
+        x, v, contacted = _apply_point_charge_contact(scene, x, v)
+        if contacted:
+            v = _correct_velocity_for_energy(scene, x, v, q, m, quality, target_energy_j)
         t += dt_s
         yield t, x, v

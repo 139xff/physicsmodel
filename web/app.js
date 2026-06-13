@@ -93,6 +93,9 @@ const motionInputs = {
   dt: document.querySelector("#motion-dt"),
   steps: document.querySelector("#motion-steps"),
 };
+const motionQueryForm = document.querySelector("#motion-query-form");
+const motionQueryTimeInput = document.querySelector("#motion-query-time");
+const motionQueryReadout = document.querySelector("[data-testid='motion-query-readout']");
 
 motionReadout.closest(".status-block")?.insertAdjacentHTML(
   "afterend",
@@ -1404,14 +1407,16 @@ function renderSource2d(source, scale) {
           class="source-ring source-ring-${chargeSign}"
           data-testid="source-ring-2d-${source.id}"
           data-material="charge-orb"
-          data-material-finish="solid-charge-gradient"
+          data-material-finish="outer-ring-outline"
           data-display-diameter-cm="${formatCentimeters(source.radius_m * 2)}"
           data-physical-radius-cm="${physicalRadiusCm}"
-          data-visual-model="hollow-ring"
+          data-visual-model="outer-ring-outline"
+          data-physics-model="charged-ring"
+          data-visual-only="true"
           cx="${point.x}"
           cy="${point.y}"
           r="${radius}"
-          style="stroke-width: ${markerStrokeWidth}px; stroke: url(#${sourcePointGradientId(source)}); fill: none; fill-opacity: 0;"
+          style="stroke-width: ${Math.max(markerStrokeWidth * 0.28, 0.7)}px; stroke: ${chargeColor}; fill: none; fill-opacity: 0;"
           data-charge-color="${chargeColor}"
           data-charge-sign="${chargeSign}"
           data-stroke-px="${scale.fontPx.toFixed(2)}"
@@ -4495,12 +4500,109 @@ function updateMotionReadout() {
     `速度 (${formatNumber(sample.velocity.x * 100, 4)}, ${formatNumber(sample.velocity.y * 100, 4)}) cm/s`;
 }
 
+function interpolateMotionVector(start, end, ratio) {
+  return {
+    x: start.x + (end.x - start.x) * ratio,
+    y: start.y + (end.y - start.y) * ratio,
+    z: start.z + (end.z - start.z) * ratio,
+  };
+}
+
+function magnitude2d(vector) {
+  return Math.hypot(vector.x, vector.y);
+}
+
+function motionSampleAtTime(timeS) {
+  const samples = state.motion.samples;
+  if (samples.length === 0) {
+    return null;
+  }
+  const first = samples[0];
+  const last = samples[samples.length - 1];
+  const clampedTime = Math.min(Math.max(timeS, first.t_s), last.t_s);
+  let left = first;
+  let right = last;
+  for (let index = 1; index < samples.length; index += 1) {
+    if (samples[index].t_s >= clampedTime) {
+      left = samples[index - 1];
+      right = samples[index];
+      break;
+    }
+  }
+  const span = right.t_s - left.t_s;
+  const ratio = span > 0 ? (clampedTime - left.t_s) / span : 0;
+  return {
+    requestedTime: timeS,
+    time: clampedTime,
+    position: interpolateMotionVector(left.position, right.position, ratio),
+    velocity: interpolateMotionVector(left.velocity, right.velocity, ratio),
+    acceleration: interpolateMotionVector(left.acceleration, right.acceleration, ratio),
+  };
+}
+
+function updateMotionQueryBounds() {
+  if (!motionQueryTimeInput || state.motion.samples.length === 0) {
+    return;
+  }
+  const lastSample = state.motion.samples[state.motion.samples.length - 1];
+  motionQueryTimeInput.min = "0";
+  motionQueryTimeInput.max = String(lastSample.t_s);
+  motionQueryTimeInput.step = String(Number(motionInputs.dt.value) || 0.001);
+}
+
+function resetMotionQueryReadout(message = "计算轨迹后，可按时间查询运动电荷的速度和加速度。") {
+  if (!motionQueryReadout) {
+    return;
+  }
+  motionQueryReadout.textContent = message;
+}
+
+function queryMotionAtTime(event) {
+  event?.preventDefault();
+  if (!motionQueryReadout || !motionQueryTimeInput) {
+    return;
+  }
+  if (state.motion.samples.length === 0) {
+    resetMotionQueryReadout("请先计算运动电荷轨迹，再查询某一时刻的速度和加速度。");
+    return;
+  }
+  const requestedTime = inputNumberValue(motionQueryTimeInput, 0);
+  const sample = motionSampleAtTime(requestedTime);
+  if (!sample) {
+    resetMotionQueryReadout("请先计算运动电荷轨迹，再查询某一时刻的速度和加速度。");
+    return;
+  }
+  const positionCm = {
+    x: sample.position.x * 100,
+    y: sample.position.y * 100,
+  };
+  const velocityCmS = {
+    x: sample.velocity.x * 100,
+    y: sample.velocity.y * 100,
+  };
+  const accelerationCmS2 = {
+    x: sample.acceleration.x * 100,
+    y: sample.acceleration.y * 100,
+  };
+  const clampedNotice = Math.abs(sample.requestedTime - sample.time) > 1e-12
+    ? `已修正到轨迹范围内的 t=${formatNumber(sample.time, 4)} s；`
+    : `t=${formatNumber(sample.time, 4)} s；`;
+  motionQueryReadout.textContent =
+    `${clampedNotice}` +
+    `位置 (${formatNumber(positionCm.x, 4)}, ${formatNumber(positionCm.y, 4)}) cm；` +
+    `速度 (${formatNumber(velocityCmS.x, 4)}, ${formatNumber(velocityCmS.y, 4)}) cm/s，` +
+    `|v|=${formatNumber(magnitude2d(velocityCmS), 4)} cm/s；` +
+    `加速度 (${formatNumber(accelerationCmS2.x, 4)}, ${formatNumber(accelerationCmS2.y, 4)}) cm/s²，` +
+    `|a|=${formatNumber(magnitude2d(accelerationCmS2), 4)} cm/s²`;
+}
+
 function clearMotionTrajectory() {
   cancelMotionAnimation();
   state.motion.samples = [];
   state.motion.frameIndex = 0;
   motionState.textContent = "待命";
   updateMotionReadout();
+  resetMotionQueryReadout();
 }
 
 function animateMotionTrajectory() {
@@ -4573,6 +4675,8 @@ async function runMotionSimulation() {
   state.motion.samples = result.samples;
   state.motion.frameIndex = 0;
   motionState.textContent = `已计算 ${result.samples.length} 帧`;
+  updateMotionQueryBounds();
+  queryMotionAtTime();
   animateMotionTrajectory();
 }
 
@@ -5025,6 +5129,7 @@ document.querySelector("#motion-run").addEventListener("click", () => {
   });
 });
 document.querySelector("#motion-reset").addEventListener("click", clearMotionTrajectory);
+motionQueryForm?.addEventListener("submit", queryMotionAtTime);
 document.querySelector("#scatter-run").addEventListener("click", () => {
   runScatteringSimulation().catch((error) => {
     scatteringState.textContent = "失败";

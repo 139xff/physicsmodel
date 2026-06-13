@@ -276,20 +276,31 @@ def test_browser_interaction_slice_keeps_state_across_2d_3d_toggle(page: Page) -
     )
     expect(page.get_by_test_id("source-ring-2d-ring-1")).to_have_attribute(
         "data-visual-model",
-        "hollow-ring",
+        "outer-ring-outline",
     )
+    expect(page.get_by_test_id("source-ring-2d-ring-1")).to_have_attribute(
+        "data-visual-only",
+        "true",
+    )
+    expect(page.get_by_test_id("source-ring-2d-ring-1")).to_have_attribute(
+        "data-physics-model",
+        "charged-ring",
+    )
+    expect(page.get_by_test_id("source-ring-hole-2d-ring-1")).to_have_count(0)
     ring_style = page.get_by_test_id("source-ring-2d-ring-1").evaluate(
         """
         element => ({
           fill: getComputedStyle(element).fill,
           fillOpacity: getComputedStyle(element).fillOpacity,
           stroke: getComputedStyle(element).stroke,
+          mask: element.getAttribute("mask"),
         })
         """
     )
     assert ring_style["fill"] == "none"
     assert ring_style["fillOpacity"] == "0"
-    assert "source-fruit-positive-gradient" in ring_style["stroke"]
+    assert ring_style["stroke"] == "rgb(217, 45, 32)"
+    assert ring_style["mask"] is None
     assert float(
         page.get_by_test_id("source-ring-2d-ring-1").get_attribute("data-stroke-px") or "0"
     ) == pytest.approx(axis_label_size, abs=0.05)
@@ -1226,6 +1237,10 @@ def test_browser_motion_playback_preserves_complex_field_line_layer(page: Page) 
         ) > 1
         """
     )
+    page.locator("#motion-query-time").fill("0.006")
+    page.locator("#motion-query-submit").click()
+    expect(page.get_by_test_id("motion-query-readout")).to_contain_text("速度")
+    expect(page.get_by_test_id("motion-query-readout")).to_contain_text("加速度")
 
     assert page.evaluate(
         """

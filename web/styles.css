@@ -1121,11 +1121,54 @@ summary:focus-visible {
   color: #fff;
 }
 
+.motion-query-form {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 12px;
+}
+
+.motion-query-form label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.motion-query-form input {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  margin-top: 4px;
+  min-height: 36px;
+  min-width: 0;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.motion-query-form button {
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 650;
+  min-height: 36px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
 .motion-readout {
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.55;
   margin: 10px 0 0;
+}
+
+.motion-query-readout {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .analysis {
